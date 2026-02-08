@@ -30,7 +30,8 @@ import {
   MessageSquare,
   Search,
   Shield,
-  ArrowLeftRight
+  ArrowLeftRight,
+  HelpCircle
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/helpers'
 
@@ -216,6 +217,12 @@ export function Navbar() {
                       <span className="text-xs text-muted-foreground">
                         {formatCurrency(profile.wallet_balance)}
                       </span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/support" className="flex items-center">
+                      <HelpCircle className="mr-2 h-4 w-4" />
+                      Help & Support
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />

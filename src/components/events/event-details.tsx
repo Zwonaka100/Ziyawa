@@ -9,11 +9,12 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
-import { Calendar, MapPin, Clock, Users, Ticket, Music, ArrowLeft, Play, ImageIcon, Star, CheckCircle } from 'lucide-react'
+import { Calendar, MapPin, Clock, Users, Ticket, Music, ArrowLeft, Play, ImageIcon, Star, CheckCircle, Flag } from 'lucide-react'
 import { formatCurrency, formatDate, formatTime, getDaysUntilEvent, isEventPast } from '@/lib/helpers'
 import { PROVINCES } from '@/lib/constants'
 import { useAuth } from '@/components/providers/auth-provider'
 import { PaymentDialog } from '@/components/payments/payment-dialog'
+import { ReportDialog } from '@/components/report-dialog'
 import { extractYouTubeId, getYouTubeThumbnail } from '@/types/database'
 import type { Event, Profile, Artist, Booking, EventMedia } from '@/types/database'
 
@@ -380,6 +381,21 @@ export function EventDetails({ event, bookings, media = [], organizerStats }: Ev
                   You&apos;ll need to sign in to purchase tickets
                 </p>
               )}
+
+              {/* Report Event */}
+              <div className="pt-2 border-t">
+                <ReportDialog
+                  type="event"
+                  targetId={event.id}
+                  targetName={event.title}
+                  trigger={
+                    <Button variant="ghost" size="sm" className="w-full text-muted-foreground hover:text-red-600">
+                      <Flag className="h-4 w-4 mr-2" />
+                      Report this event
+                    </Button>
+                  }
+                />
+              </div>
             </CardContent>
           </Card>
         </div>
