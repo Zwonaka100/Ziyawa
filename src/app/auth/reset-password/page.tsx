@@ -55,9 +55,9 @@ export default function ResetPasswordPage() {
 
       setSuccess(true)
       
-      // Redirect to dashboard after 2 seconds
+      // Redirect to profile after 2 seconds
       setTimeout(() => {
-        router.push('/dashboard')
+        router.push('/profile')
       }, 2000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to reset password')
@@ -74,7 +74,7 @@ export default function ResetPasswordPage() {
             <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold mb-2">Password Updated!</h2>
             <p className="text-muted-foreground">
-              Your password has been successfully reset. Redirecting to dashboard...
+              Your password has been successfully reset. Redirecting to profile...
             </p>
           </CardContent>
         </Card>

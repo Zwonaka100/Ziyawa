@@ -7,7 +7,7 @@ export default async function ArtistDiscographyPage() {
   const supabase = await createClient();
   
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  if (!user) redirect('/auth/signin');
 
   // Get artist
   const { data: artist } = await supabase
@@ -16,7 +16,7 @@ export default async function ArtistDiscographyPage() {
     .eq('user_id', user.id)
     .single();
 
-  if (!artist) redirect('/dashboard');
+  if (!artist) redirect('/dashboard/artist/setup');
 
   // Get existing discography
   const { data: discography } = await supabase

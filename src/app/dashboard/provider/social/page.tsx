@@ -7,7 +7,7 @@ export default async function ProviderSocialPage() {
   const supabase = await createClient();
   
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  if (!user) redirect('/auth/signin');
 
   // Get provider
   const { data: provider } = await supabase
@@ -16,7 +16,7 @@ export default async function ProviderSocialPage() {
     .eq('user_id', user.id)
     .single();
 
-  if (!provider) redirect('/dashboard');
+  if (!provider) redirect('/dashboard/provider/setup');
 
   // Get existing social links
   const { data: socialLinks } = await supabase

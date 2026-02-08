@@ -267,11 +267,11 @@ function getActionText(type: PaymentType): string {
 function getRedirectPath(type: PaymentType): string {
   switch (type) {
     case 'ticket_purchase':
-      return '/dashboard/attendee/tickets';
+      return '/dashboard/tickets';
     case 'wallet_deposit':
-      return '/dashboard/wallet';
+      return '/profile';
     case 'booking_payment':
-      return '/dashboard/organizer/bookings';
+      return '/dashboard/organizer';
     default:
       return '/dashboard';
   }
