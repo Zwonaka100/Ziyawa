@@ -10,8 +10,8 @@ export const metadata = {
 export default async function OrganizersPage() {
   const supabase = await createClient();
 
-  // Fetch organizers
-  const { data: organizers } = await supabase
+  // Fetch organizers - only select columns that definitely exist in profiles
+  const { data: organizers, error } = await supabase
     .from('profiles')
     .select(`
       id,
@@ -20,34 +20,52 @@ export default async function OrganizersPage() {
       location,
       company_name,
       bio,
-      total_events_hosted,
-      organizer_rating,
-      total_organizer_reviews,
-      payment_completion_rate,
-      verified_at
+      verified_at,
+      created_at
     `)
     .eq('is_organizer', true)
-    .order('total_events_hosted', { ascending: false });
+    .order('created_at', { ascending: false });
 
-  // Get event counts for each organizer
+  if (error) {
+    console.error('Error fetching organizers:', error);
+  }
+
+  // Get event counts for each organizer from the events table
   const organizerIds = organizers?.map(o => o.id) || [];
   
-  const { data: upcomingEventCounts } = await supabase
+  // Count total events per organizer
+  const { data: allEvents } = organizerIds.length > 0 ? await supabase
     .from('events')
-    .select('organizer_id, id')
-    .in('organizer_id', organizerIds)
-    .gte('event_date', new Date().toISOString());
+    .select('organizer_id')
+    .in('organizer_id', organizerIds) : { data: [] };
 
   // Count upcoming events per organizer
+  const { data: upcomingEvents } = organizerIds.length > 0 ? await supabase
+    .from('events')
+    .select('organizer_id')
+    .in('organizer_id', organizerIds)
+    .gte('event_date', new Date().toISOString().split('T')[0]) : { data: [] };
+
+  // Calculate counts
+  const totalCounts: Record<string, number> = {};
   const upcomingCounts: Record<string, number> = {};
-  upcomingEventCounts?.forEach(e => {
+  
+  allEvents?.forEach(e => {
+    totalCounts[e.organizer_id] = (totalCounts[e.organizer_id] || 0) + 1;
+  });
+  
+  upcomingEvents?.forEach(e => {
     upcomingCounts[e.organizer_id] = (upcomingCounts[e.organizer_id] || 0) + 1;
   });
 
-  // Add upcoming event count to each organizer
+  // Add event counts to each organizer
   const organizersWithCounts = organizers?.map(o => ({
     ...o,
-    upcoming_events: upcomingCounts[o.id] || 0
+    total_events_hosted: totalCounts[o.id] || 0,
+    upcoming_events: upcomingCounts[o.id] || 0,
+    organizer_rating: 0, // Will be calculated from reviews later
+    total_organizer_reviews: 0,
+    payment_completion_rate: 100
   })) || [];
 
   return (
