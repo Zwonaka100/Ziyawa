@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     const offset = (page - 1) * limit;
 
-    // Build the query
+    // Build the query - check both state and is_published for compatibility
     let dbQuery = supabase
       .from('events')
       .select(`
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
           total_reviews
         )
       `, { count: 'exact' })
-      .in('state', ['published', 'locked']); // Show published and locked events
+      .or('state.in.(published,locked),is_published.eq.true');
 
     // Text search - search in title, description, venue
     if (query) {
@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
     const { data: locations } = await supabase
       .from('events')
       .select('location')
-      .in('state', ['published', 'locked'])
+      .or('state.in.(published,locked),is_published.eq.true')
       .gte('event_date', new Date().toISOString().split('T')[0]);
 
     const uniqueLocations = [...new Set(locations?.map(e => e.location) || [])];
@@ -114,7 +114,7 @@ export async function GET(request: NextRequest) {
     const { data: priceRange } = await supabase
       .from('events')
       .select('ticket_price')
-      .in('state', ['published', 'locked'])
+      .or('state.in.(published,locked),is_published.eq.true')
       .gte('event_date', new Date().toISOString().split('T')[0])
       .order('ticket_price', { ascending: true });
 

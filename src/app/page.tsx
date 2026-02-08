@@ -10,7 +10,7 @@ import Image from 'next/image'
 export default async function HomePage() {
   const supabase = await createClient()
 
-  // Fetch upcoming events (limit 6)
+  // Fetch upcoming events (limit 6) - check both state and is_published for compatibility
   const { data: events } = await supabase
     .from('events')
     .select(`
@@ -25,7 +25,7 @@ export default async function HomePage() {
         full_name
       )
     `)
-    .in('state', ['published', 'locked'])
+    .or('state.in.(published,locked),is_published.eq.true')
     .gte('event_date', new Date().toISOString().split('T')[0])
     .order('event_date', { ascending: true })
     .limit(6)
