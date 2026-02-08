@@ -138,6 +138,7 @@ export interface Profile {
   full_name: string | null;
   phone: string | null;
   avatar_url: string | null;
+  bio: string | null;
   location?: SaProvince | null;
   is_artist: boolean;
   is_organizer: boolean;
@@ -164,6 +165,7 @@ export interface Profile {
   organizer_rating: number;
   organizer_reviews: number;
   organizer_verified_at: string | null;
+  total_organizer_reviews: number;
   created_at: string;
   updated_at: string;
 }

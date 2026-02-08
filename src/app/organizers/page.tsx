@@ -1,98 +1,12 @@
-import { Suspense } from 'react';
-import { createClient } from '@/lib/supabase/server';
-import { OrganizersGrid } from './organizers-grid';
+import { redirect } from 'next/navigation';
 
 export const metadata = {
   title: 'Event Organizers | Ziyawa',
-  description: 'Discover trusted event organizers in South Africa',
+  description: 'Discover trusted event organizers in South Africa through their events',
 };
 
-export default async function OrganizersPage() {
-  const supabase = await createClient();
-
-  // Fetch organizers - only select columns that definitely exist in profiles
-  const { data: organizers, error } = await supabase
-    .from('profiles')
-    .select(`
-      id,
-      full_name,
-      avatar_url,
-      location,
-      company_name,
-      bio,
-      verified_at,
-      created_at
-    `)
-    .eq('is_organizer', true)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching organizers:', error);
-  }
-
-  // Get event counts for each organizer from the events table
-  const organizerIds = organizers?.map(o => o.id) || [];
-  
-  // Count total events per organizer
-  const { data: allEvents } = organizerIds.length > 0 ? await supabase
-    .from('events')
-    .select('organizer_id')
-    .in('organizer_id', organizerIds) : { data: [] };
-
-  // Count upcoming events per organizer
-  const { data: upcomingEvents } = organizerIds.length > 0 ? await supabase
-    .from('events')
-    .select('organizer_id')
-    .in('organizer_id', organizerIds)
-    .gte('event_date', new Date().toISOString().split('T')[0]) : { data: [] };
-
-  // Calculate counts
-  const totalCounts: Record<string, number> = {};
-  const upcomingCounts: Record<string, number> = {};
-  
-  allEvents?.forEach(e => {
-    totalCounts[e.organizer_id] = (totalCounts[e.organizer_id] || 0) + 1;
-  });
-  
-  upcomingEvents?.forEach(e => {
-    upcomingCounts[e.organizer_id] = (upcomingCounts[e.organizer_id] || 0) + 1;
-  });
-
-  // Add event counts to each organizer
-  const organizersWithCounts = organizers?.map(o => ({
-    ...o,
-    total_events_hosted: totalCounts[o.id] || 0,
-    upcoming_events: upcomingCounts[o.id] || 0,
-    organizer_rating: 0, // Will be calculated from reviews later
-    total_organizer_reviews: 0,
-    payment_completion_rate: 100
-  })) || [];
-
-  return (
-    <div className="min-h-screen bg-neutral-50">
-      {/* Hero */}
-      <div className="bg-white border-b border-neutral-200">
-        <div className="max-w-6xl mx-auto px-4 py-12 text-center">
-          <h1 className="text-3xl md:text-4xl font-bold text-neutral-900">
-            Event Organizers
-          </h1>
-          <p className="text-neutral-500 mt-2 max-w-xl mx-auto">
-            Discover trusted event organizers in South Africa. View their track record, 
-            past events, and artist reviews.
-          </p>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        <Suspense fallback={
-          <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black" />
-          </div>
-        }>
-          <OrganizersGrid organizers={organizersWithCounts} />
-        </Suspense>
-      </main>
-    </div>
-  );
+// Organizers are discovered through events, not a directory
+// Redirect to events page
+export default function OrganizersPage() {
+  redirect('/ziwaphi');
 }

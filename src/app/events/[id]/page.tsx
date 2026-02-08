@@ -35,7 +35,7 @@ export default async function EventPage({ params }: EventPageProps) {
   const { id } = await params
   const supabase = await createClient()
 
-  // Fetch event with organizer info
+  // Fetch event with organizer info (including more profile fields)
   const { data: event, error } = await supabase
     .from('events')
     .select(`
@@ -43,7 +43,11 @@ export default async function EventPage({ params }: EventPageProps) {
       profiles:organizer_id (
         id,
         full_name,
-        avatar_url
+        avatar_url,
+        company_name,
+        location,
+        bio,
+        verified_at
       )
     `)
     .eq('id', id)
@@ -51,6 +55,51 @@ export default async function EventPage({ params }: EventPageProps) {
 
   if (error || !event) {
     notFound()
+  }
+
+  // Fetch organizer stats
+  const organizerId = event.organizer_id
+  
+  // Count total events by this organizer
+  const { count: totalEvents } = await supabase
+    .from('events')
+    .select('*', { count: 'exact', head: true })
+    .eq('organizer_id', organizerId)
+    .in('state', ['published', 'locked', 'completed'])
+
+  // Count upcoming events
+  const { count: upcomingEvents } = await supabase
+    .from('events')
+    .select('*', { count: 'exact', head: true })
+    .eq('organizer_id', organizerId)
+    .in('state', ['published', 'locked'])
+    .gte('event_date', new Date().toISOString().split('T')[0])
+
+  // Get organizer's event rating summary (aggregate from all their events)
+  const { data: ratingData } = await supabase
+    .from('event_rating_summaries')
+    .select('average_rating, total_reviews, event_id')
+    .in('event_id', (
+      await supabase
+        .from('events')
+        .select('id')
+        .eq('organizer_id', organizerId)
+    ).data?.map(e => e.id) || [])
+
+  // Calculate average rating across all events
+  let totalReviews = 0
+  let weightedRating = 0
+  ratingData?.forEach(r => {
+    totalReviews += r.total_reviews
+    weightedRating += r.average_rating * r.total_reviews
+  })
+  const averageRating = totalReviews > 0 ? weightedRating / totalReviews : 0
+
+  const organizerStats = {
+    totalEvents: totalEvents || 0,
+    upcomingEvents: upcomingEvents || 0,
+    rating: averageRating,
+    totalReviews: totalReviews
   }
 
   // Fetch booked artists for this event
@@ -96,7 +145,12 @@ export default async function EventPage({ params }: EventPageProps) {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <EventDetails event={event} bookings={bookings || []} media={eventMedia || []} />
+      <EventDetails 
+        event={event} 
+        bookings={bookings || []} 
+        media={eventMedia || []} 
+        organizerStats={organizerStats}
+      />
       
       {/* Reviews Section */}
       <div className="max-w-4xl mx-auto mt-12">

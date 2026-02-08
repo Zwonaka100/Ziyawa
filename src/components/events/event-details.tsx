@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
-import { Calendar, MapPin, Clock, Users, Ticket, Music, ArrowLeft, Play, ImageIcon } from 'lucide-react'
+import { Calendar, MapPin, Clock, Users, Ticket, Music, ArrowLeft, Play, ImageIcon, Star, CheckCircle } from 'lucide-react'
 import { formatCurrency, formatDate, formatTime, getDaysUntilEvent, isEventPast } from '@/lib/helpers'
 import { PROVINCES } from '@/lib/constants'
 import { useAuth } from '@/components/providers/auth-provider'
@@ -18,7 +18,14 @@ import { extractYouTubeId, getYouTubeThumbnail } from '@/types/database'
 import type { Event, Profile, Artist, Booking, EventMedia } from '@/types/database'
 
 interface EventWithOrganizer extends Event {
-  profiles: Pick<Profile, 'id' | 'full_name' | 'avatar_url'>
+  profiles: Pick<Profile, 'id' | 'full_name' | 'avatar_url' | 'company_name' | 'location' | 'bio' | 'verified_at'>
+}
+
+interface OrganizerStats {
+  totalEvents: number;
+  upcomingEvents: number;
+  rating: number;
+  totalReviews: number;
 }
 
 interface BookingWithArtist extends Booking {
@@ -29,9 +36,10 @@ interface EventDetailsProps {
   event: EventWithOrganizer
   bookings: BookingWithArtist[]
   media?: EventMedia[]
+  organizerStats?: OrganizerStats
 }
 
-export function EventDetails({ event, bookings, media = [] }: EventDetailsProps) {
+export function EventDetails({ event, bookings, media = [], organizerStats }: EventDetailsProps) {
   const { user, profile } = useAuth()
   const router = useRouter()
   const [showPayment, setShowPayment] = useState(false)
@@ -160,18 +168,83 @@ export function EventDetails({ event, bookings, media = [] }: EventDetailsProps)
             </div>
           )}
 
-          {/* Organizer */}
+          {/* Organizer - Enhanced Trust Section */}
           <div>
             <h2 className="text-xl font-semibold mb-3">Hosted By</h2>
-            <div className="flex items-center gap-3">
-              <Avatar>
-                <AvatarImage src={event.profiles.avatar_url || undefined} />
-                <AvatarFallback>
-                  {event.profiles.full_name?.charAt(0) || 'O'}
-                </AvatarFallback>
-              </Avatar>
-              <span className="font-medium">{event.profiles.full_name || 'Event Organizer'}</span>
-            </div>
+            <Link href={`/organizers/${event.profiles.id}`}>
+              <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-4">
+                    {/* Avatar */}
+                    <Avatar className="h-14 w-14">
+                      <AvatarImage src={event.profiles.avatar_url || undefined} />
+                      <AvatarFallback className="bg-purple-100 text-purple-600 font-semibold text-lg">
+                        {(event.profiles.company_name || event.profiles.full_name || 'O').charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-lg">
+                          {event.profiles.company_name || event.profiles.full_name || 'Event Organizer'}
+                        </h3>
+                        {event.profiles.verified_at && (
+                          <CheckCircle className="h-5 w-5 text-blue-500 flex-shrink-0" />
+                        )}
+                      </div>
+
+                      {/* Stats */}
+                      {organizerStats && (
+                        <div className="flex flex-wrap items-center gap-3 mt-2">
+                          {organizerStats.totalReviews > 0 && (
+                            <div className="flex items-center gap-1 text-sm">
+                              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                              <span className="font-medium">{organizerStats.rating.toFixed(1)}</span>
+                              <span className="text-muted-foreground">
+                                ({organizerStats.totalReviews} reviews)
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Calendar className="h-4 w-4" />
+                            <span>{organizerStats.totalEvents} events hosted</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <p className="text-sm text-purple-600 mt-2 flex items-center gap-1">
+                        View organizer profile
+                        <ArrowLeft className="h-3 w-3 rotate-180" />
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Trust badges */}
+                  {organizerStats && organizerStats.totalEvents >= 3 && (
+                    <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t">
+                      {event.profiles.verified_at && (
+                        <Badge variant="secondary" className="bg-blue-50 text-blue-700">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Verified
+                        </Badge>
+                      )}
+                      {organizerStats.totalEvents >= 5 && (
+                        <Badge variant="secondary" className="bg-purple-50 text-purple-700">
+                          Experienced Host
+                        </Badge>
+                      )}
+                      {organizerStats.rating >= 4.5 && organizerStats.totalReviews >= 5 && (
+                        <Badge variant="secondary" className="bg-yellow-50 text-yellow-700">
+                          <Star className="h-3 w-3 mr-1 fill-current" />
+                          Top Rated
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </Link>
           </div>
 
           {/* Event Gallery */}

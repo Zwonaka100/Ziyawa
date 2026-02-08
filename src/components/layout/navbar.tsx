@@ -53,7 +53,6 @@ export function Navbar() {
     { href: '/ziwaphi', label: 'Ziwaphi?', icon: Calendar },
     { href: '/artists', label: 'Artists', icon: Music },
     { href: '/crew', label: 'Crew', icon: Users },
-    { href: '/organizers', label: 'Organisers', icon: Mic2 },
   ]
 
   const isActive = (href: string) => pathname.startsWith(href)
