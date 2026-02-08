@@ -28,14 +28,16 @@ import {
   Users,
   Wrench,
   MessageSquare,
-  Search
+  Search,
+  Shield,
+  ArrowLeftRight
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/helpers'
 
 // Get primary role for display
 function getDisplayRole(profile: { is_admin?: boolean; is_organizer?: boolean; is_artist?: boolean; is_provider?: boolean }) {
+  if (profile.is_admin) return 'Admin'
   const roles = []
-  if (profile.is_admin) roles.push('Admin')
   if (profile.is_organizer) roles.push('Organiser')
   if (profile.is_artist) roles.push('Artist')
   if (profile.is_provider) roles.push('Provider')
@@ -126,6 +128,19 @@ export function Navbar() {
                   </div>
                   <DropdownMenuSeparator />
                   
+                  {/* Admin Panel - shown at top for admins */}
+                  {profile.is_admin && (
+                    <>
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin" className="flex items-center text-red-600 font-medium">
+                          <Shield className="mr-2 h-4 w-4" />
+                          Admin Panel
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  
                   {/* Messages */}
                   <DropdownMenuItem asChild>
                     <Link href="/messages" className="flex items-center">
@@ -173,12 +188,22 @@ export function Navbar() {
                   )}
                   
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/profile" className="flex items-center">
-                      <User className="mr-2 h-4 w-4" />
-                      Profile
-                    </Link>
-                  </DropdownMenuItem>
+                  {/* For admins, show switch to user view. For others, show Profile */}
+                  {profile.is_admin ? (
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile" className="flex items-center">
+                        <ArrowLeftRight className="mr-2 h-4 w-4" />
+                        Switch to User View
+                      </Link>
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile" className="flex items-center">
+                        <User className="mr-2 h-4 w-4" />
+                        Profile
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem asChild>
                     <Link href="/wallet" className="flex items-center justify-between w-full">
                       <span className="flex items-center">
@@ -264,6 +289,15 @@ export function Navbar() {
                       </div>
                     </div>
                     <div className="flex flex-col space-y-2">
+                      {/* Admin Panel - shown first for admins */}
+                      {profile.is_admin && (
+                        <Link href="/admin" onClick={() => setMobileMenuOpen(false)}>
+                          <Button variant="destructive" className="w-full justify-start">
+                            <Shield className="mr-2 h-4 w-4" />
+                            Admin Panel
+                          </Button>
+                        </Link>
+                      )}
                       <Link href="/dashboard/tickets" onClick={() => setMobileMenuOpen(false)}>
                         <Button variant="outline" className="w-full justify-start">
                           <Ticket className="mr-2 h-4 w-4" />
@@ -294,12 +328,22 @@ export function Navbar() {
                           </Button>
                         </Link>
                       )}
-                      <Link href="/profile" onClick={() => setMobileMenuOpen(false)}>
-                        <Button variant="outline" className="w-full justify-start">
-                          <User className="mr-2 h-4 w-4" />
-                          Profile
-                        </Button>
-                      </Link>
+                      {/* For admins show "Switch to User View", for others show "Profile" */}
+                      {profile.is_admin ? (
+                        <Link href="/profile" onClick={() => setMobileMenuOpen(false)}>
+                          <Button variant="outline" className="w-full justify-start">
+                            <ArrowLeftRight className="mr-2 h-4 w-4" />
+                            Switch to User View
+                          </Button>
+                        </Link>
+                      ) : (
+                        <Link href="/profile" onClick={() => setMobileMenuOpen(false)}>
+                          <Button variant="outline" className="w-full justify-start">
+                            <User className="mr-2 h-4 w-4" />
+                            Profile
+                          </Button>
+                        </Link>
+                      )}
                       <Link href="/wallet" onClick={() => setMobileMenuOpen(false)}>
                         <Button variant="outline" className="w-full justify-start">
                           <Wallet className="mr-2 h-4 w-4" />

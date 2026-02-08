@@ -144,6 +144,15 @@ export interface Profile {
   is_organizer: boolean;
   is_provider: boolean;
   is_admin: boolean;
+  admin_role?: 'super_admin' | 'admin' | 'moderator' | 'support' | null;
+  is_suspended?: boolean;
+  suspended_at?: string | null;
+  suspended_until?: string | null;
+  suspension_reason?: string | null;
+  is_banned?: boolean;
+  banned_at?: string | null;
+  ban_reason?: string | null;
+  warnings_count?: number;
   role?: UserRole;
   wallet_balance: number;
   bank_name: string | null;

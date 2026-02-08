@@ -20,7 +20,8 @@ import {
   CheckCircle,
   Sparkles,
   Users,
-  Wrench
+  Wrench,
+  Shield
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/components/providers/auth-provider'
@@ -28,9 +29,14 @@ import { formatCurrency } from '@/lib/helpers'
 import { toast } from 'sonner'
 
 // Get all roles as badges
-function getRoleBadges(profile: { is_admin?: boolean; is_organizer?: boolean; is_artist?: boolean; is_provider?: boolean }) {
+function getRoleBadges(profile: { is_admin?: boolean; admin_role?: string | null; is_organizer?: boolean; is_artist?: boolean; is_provider?: boolean }) {
   const badges = []
-  if (profile.is_admin) badges.push({ label: 'Admin', variant: 'destructive' as const })
+  if (profile.is_admin) {
+    badges.push({ 
+      label: profile.admin_role === 'super_admin' ? 'Super Admin' : 'Admin', 
+      variant: 'destructive' as const 
+    })
+  }
   if (profile.is_organizer) badges.push({ label: 'Organiser', variant: 'default' as const })
   if (profile.is_artist) badges.push({ label: 'Artist', variant: 'secondary' as const })
   if (profile.is_provider) badges.push({ label: 'Provider', variant: 'outline' as const, className: 'border-orange-500 text-orange-600' })
@@ -141,6 +147,33 @@ export default function ProfilePage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Admin Dashboard Link - Only for admins */}
+      {profile.is_admin && (
+        <Card className="mb-6 border-red-200 bg-red-50">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-red-100 rounded-xl">
+                  <Shield className="h-6 w-6 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg">Admin Dashboard</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Manage users, events, reports, and platform settings
+                  </p>
+                </div>
+              </div>
+              <Link href="/admin">
+                <Button variant="destructive">
+                  Go to Admin Panel
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Quick Actions based on roles */}
       <div className="grid md:grid-cols-3 gap-4 mb-6">

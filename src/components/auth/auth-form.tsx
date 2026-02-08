@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,6 +25,7 @@ export function AuthForm({ onSuccess, defaultMode = 'signin' }: AuthFormProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const router = useRouter()
 
   const supabase = createClient()
 
@@ -59,12 +61,28 @@ export function AuthForm({ onSuccess, defaultMode = 'signin' }: AuthFormProps) {
         
       } else if (mode === 'signin') {
         // Sign in with password
-        const { error: signInError } = await supabase.auth.signInWithPassword({
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password,
         })
 
         if (signInError) throw signInError
+        
+        // Check if user is admin and redirect accordingly
+        if (data.user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('is_admin')
+            .eq('id', data.user.id)
+            .single()
+          
+          if (profile?.is_admin) {
+            // Admin users go directly to admin panel
+            router.push('/admin')
+            return
+          }
+        }
+        
         onSuccess?.()
         
       } else if (mode === 'forgot-password') {

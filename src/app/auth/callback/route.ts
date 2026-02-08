@@ -8,9 +8,21 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     
-    if (!error) {
+    if (!error && data.user) {
+      // Check if user is admin
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', data.user.id)
+        .single()
+      
+      // Admins go to admin panel, others follow the next parameter
+      if (profile?.is_admin) {
+        return NextResponse.redirect(`${origin}/admin`)
+      }
+      
       return NextResponse.redirect(`${origin}${next}`)
     }
   }
