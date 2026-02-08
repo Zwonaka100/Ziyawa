@@ -16,11 +16,12 @@ import {
   Music,
   Ticket,
   TrendingUp,
-  Receipt
+  Receipt,
+  Wrench
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/helpers'
 import { useRouter } from 'next/navigation'
-import { PLATFORM_CONFIG } from '@/lib/constants'
+import { PLATFORM_CONFIG, PLATFORM_FEES } from '@/lib/constants'
 
 interface Transaction {
   id: string
@@ -79,7 +80,7 @@ export default function WalletPage() {
     return null
   }
 
-  const hasRoles = profile.is_organizer || profile.is_artist
+  const hasRoles = profile.is_organizer || profile.is_artist || profile.is_provider
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -106,7 +107,7 @@ export default function WalletPage() {
           </div>
           {!hasRoles && (
             <p className="text-xs text-muted-foreground mt-3 text-center">
-              Become an Organiser or Artist to earn and withdraw funds
+              Become an Organiser, Artist, or Provider to earn and withdraw funds
             </p>
           )}
         </CardContent>
@@ -114,7 +115,7 @@ export default function WalletPage() {
 
       {/* Role-based earnings breakdown */}
       {hasRoles && (
-        <div className="grid md:grid-cols-2 gap-4 mb-6">
+        <div className="grid md:grid-cols-3 gap-4 mb-6">
           {profile.is_organizer && (
             <Card>
               <CardHeader className="pb-2">
@@ -126,7 +127,7 @@ export default function WalletPage() {
               <CardContent>
                 <p className="text-2xl font-bold">{formatCurrency(0)}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  After {PLATFORM_CONFIG.platformFeePercent}% platform fee
+                  After {PLATFORM_FEES.ticketing.platformFeePercent}% platform fee
                 </p>
               </CardContent>
             </Card>
@@ -144,6 +145,23 @@ export default function WalletPage() {
                 <p className="text-2xl font-bold">{formatCurrency(0)}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   From performances
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {profile.is_provider && (
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Wrench className="h-4 w-4 text-orange-600" />
+                  <CardTitle className="text-sm font-medium">Service Earnings</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">{formatCurrency(0)}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  From crew services
                 </p>
               </CardContent>
             </Card>
@@ -183,6 +201,12 @@ export default function WalletPage() {
                     Bookings
                   </TabsTrigger>
                 )}
+                {profile.is_provider && (
+                  <TabsTrigger value="service-earnings">
+                    <Wrench className="h-3 w-3 mr-1" />
+                    Services
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               <TabsContent value="all">
@@ -206,6 +230,14 @@ export default function WalletPage() {
                 <TabsContent value="booking-earnings">
                   <TransactionList 
                     transactions={transactions.filter(t => t.type === 'booking_payment')} 
+                    loading={loadingTx} 
+                  />
+                </TabsContent>
+              )}
+              {profile.is_provider && (
+                <TabsContent value="service-earnings">
+                  <TransactionList 
+                    transactions={transactions.filter(t => t.type === 'vendor_service')} 
                     loading={loadingTx} 
                   />
                 </TabsContent>
@@ -252,12 +284,14 @@ function TransactionList({ transactions, loading }: { transactions: Transaction[
               tx.type === 'ticket_purchase' ? 'bg-blue-100' :
               tx.type === 'event_revenue' ? 'bg-green-100' :
               tx.type === 'booking_payment' ? 'bg-purple-100' :
+              tx.type === 'vendor_service' ? 'bg-orange-100' :
               'bg-muted'
             }`}>
               {tx.type === 'ticket_purchase' && <Ticket className="h-4 w-4 text-blue-600" />}
               {tx.type === 'event_revenue' && <TrendingUp className="h-4 w-4 text-green-600" />}
               {tx.type === 'booking_payment' && <Music className="h-4 w-4 text-purple-600" />}
-              {!['ticket_purchase', 'event_revenue', 'booking_payment'].includes(tx.type) && 
+              {tx.type === 'vendor_service' && <Wrench className="h-4 w-4 text-orange-600" />}
+              {!['ticket_purchase', 'event_revenue', 'booking_payment', 'vendor_service'].includes(tx.type) && 
                 <Receipt className="h-4 w-4" />
               }
             </div>
@@ -266,6 +300,7 @@ function TransactionList({ transactions, loading }: { transactions: Transaction[
                 {tx.type === 'ticket_purchase' ? 'Ticket Purchase' :
                  tx.type === 'event_revenue' ? 'Event Revenue' :
                  tx.type === 'booking_payment' ? 'Booking Payment' :
+                 tx.type === 'vendor_service' ? 'Service Payment' :
                  tx.type}
               </p>
               <p className="text-xs text-muted-foreground">{formatDate(tx.created_at)}</p>

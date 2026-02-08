@@ -4,9 +4,10 @@ import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Calendar, MapPin, Clock, Ticket, QrCode } from 'lucide-react'
+import { Calendar, MapPin, Clock, Ticket, QrCode, CheckCircle } from 'lucide-react'
 import { formatDate, formatTime, getDaysUntilEvent, isEventPast } from '@/lib/helpers'
 import { PROVINCES } from '@/lib/constants'
+import { TicketWithQR } from './ticket-with-qr'
 
 export const metadata = {
   title: 'My Tickets | Ziyawa',
@@ -104,7 +105,7 @@ export default async function TicketsPage() {
                         </div>
                       </div>
 
-                      {/* Ticket Code */}
+                      {/* Ticket Code with QR */}
                       <div className="mt-4 p-3 bg-muted rounded-lg flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <QrCode className="h-5 w-5" />
@@ -113,9 +114,19 @@ export default async function TicketsPage() {
                             <p className="font-mono font-bold">{ticket.ticket_code}</p>
                           </div>
                         </div>
-                        {ticket.is_used && (
-                          <Badge variant="secondary">Used</Badge>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {ticket.checked_in && (
+                            <Badge variant="default" className="bg-green-500">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Checked In
+                            </Badge>
+                          )}
+                          <TicketWithQR 
+                            ticketCode={ticket.ticket_code}
+                            eventId={ticket.events?.id}
+                            ticketId={ticket.id}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>

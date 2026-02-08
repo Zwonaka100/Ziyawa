@@ -172,7 +172,6 @@ export const TRANSACTION_STATES = {
 export const PLATFORM_CONFIG = {
   name: 'Ziyawa',
   tagline: 'Your Event Operating System',
-  platformFeePercent: 10,
   currency: 'ZAR',
   currencySymbol: 'R',
   // Principle: Ziyawa is a neutral platform
@@ -182,6 +181,210 @@ export const PLATFORM_CONFIG = {
     oneHumanManyRoles: true,
   },
 } as const
+
+// =====================================================
+// PLATFORM FEES - Complete Fee Structure
+// All amounts in CENTS (ZAR * 100)
+// =====================================================
+
+export const PLATFORM_FEES = {
+  // -------------------------------------------------
+  // A. TICKET SALES
+  // -------------------------------------------------
+  ticketing: {
+    // 5% of ticket price goes to Ziyawa
+    commissionPercent: 5,
+    // 5% platform service fee
+    platformFeePercent: 5,
+    // Booking fee tiers (paid by buyer, added to ticket price)
+    // Amounts in cents
+    bookingFeeTiers: [
+      { maxPrice: 10000, fee: 500 },    // R0-R100 ticket = R5 fee
+      { maxPrice: 30000, fee: 700 },    // R101-R300 ticket = R7 fee
+      { maxPrice: Infinity, fee: 1000 }, // R301+ ticket = R10 fee
+    ],
+  },
+
+  // -------------------------------------------------
+  // B. ARTIST BOOKING COMMISSION
+  // Tiered: smaller bookings = higher %, rewards big deals
+  // -------------------------------------------------
+  artistBooking: {
+    tiers: [
+      { maxAmount: 2000000, percent: 20 },   // Under R20K = 20%
+      { maxAmount: 10000000, percent: 15 },  // R20K-R100K = 15%
+      { maxAmount: Infinity, percent: 10 },  // Over R100K = 10%
+    ],
+  },
+
+  // -------------------------------------------------
+  // C. VENDOR/CREW BOOKING COMMISSION
+  // -------------------------------------------------
+  vendorBooking: {
+    tiers: [
+      { maxAmount: 1500000, percent: 10 },   // Under R15K = 10%
+      { maxAmount: 7500000, percent: 7.5 },  // R15K-R75K = 7.5%
+      { maxAmount: Infinity, percent: 5 },   // Over R75K = 5%
+    ],
+  },
+
+  // -------------------------------------------------
+  // D. WALLET OPERATIONS
+  // -------------------------------------------------
+  wallet: {
+    // Deposit: 2.5% + R3 (covers Paystack + small margin)
+    depositPercent: 2.5,
+    depositFlatFee: 300, // R3 in cents
+    // Withdrawal: R20 flat fee
+    withdrawalFlatFee: 2000, // R20 in cents
+    // Minimum withdrawal
+    minimumWithdrawal: 10000, // R100 minimum
+  },
+
+  // -------------------------------------------------
+  // E. PAYSTACK FEES (for reference)
+  // -------------------------------------------------
+  paystack: {
+    localCardPercent: 1.5,
+    localCardCap: 200000, // R2000 cap
+    internationalPercent: 3.9,
+    transferFee: 1000, // R10 per transfer
+  },
+} as const
+
+// =====================================================
+// FEE CALCULATION HELPERS
+// =====================================================
+
+/**
+ * Calculate booking fee based on ticket price (in cents)
+ */
+export function calculateBookingFee(ticketPriceCents: number): number {
+  const tier = PLATFORM_FEES.ticketing.bookingFeeTiers.find(
+    t => ticketPriceCents <= t.maxPrice
+  );
+  return tier?.fee || PLATFORM_FEES.ticketing.bookingFeeTiers[2].fee;
+}
+
+/**
+ * Calculate total ticket fees (ticketing + platform)
+ * Returns amount in cents that Ziyawa keeps from organizer's revenue
+ */
+export function calculateTicketingFees(ticketPriceCents: number): {
+  ticketingCommission: number;
+  platformFee: number;
+  total: number;
+} {
+  const { commissionPercent, platformFeePercent } = PLATFORM_FEES.ticketing;
+  const ticketingCommission = Math.round(ticketPriceCents * commissionPercent / 100);
+  const platformFee = Math.round(ticketPriceCents * platformFeePercent / 100);
+  return {
+    ticketingCommission,
+    platformFee,
+    total: ticketingCommission + platformFee,
+  };
+}
+
+/**
+ * Calculate artist booking commission (tiered)
+ * Returns commission in cents
+ */
+export function calculateArtistCommission(bookingAmountCents: number): {
+  commissionPercent: number;
+  commissionAmount: number;
+  artistPayout: number;
+} {
+  const tier = PLATFORM_FEES.artistBooking.tiers.find(
+    t => bookingAmountCents <= t.maxAmount
+  );
+  const percent = tier?.percent || 10;
+  const commissionAmount = Math.round(bookingAmountCents * percent / 100);
+  return {
+    commissionPercent: percent,
+    commissionAmount,
+    artistPayout: bookingAmountCents - commissionAmount,
+  };
+}
+
+/**
+ * Calculate vendor booking commission (tiered)
+ * Returns commission in cents
+ */
+export function calculateVendorCommission(bookingAmountCents: number): {
+  commissionPercent: number;
+  commissionAmount: number;
+  vendorPayout: number;
+} {
+  const tier = PLATFORM_FEES.vendorBooking.tiers.find(
+    t => bookingAmountCents <= t.maxAmount
+  );
+  const percent = tier?.percent || 5;
+  const commissionAmount = Math.round(bookingAmountCents * percent / 100);
+  return {
+    commissionPercent: percent,
+    commissionAmount,
+    vendorPayout: bookingAmountCents - commissionAmount,
+  };
+}
+
+/**
+ * Calculate wallet deposit fee
+ * Returns fee in cents
+ */
+export function calculateDepositFee(amountCents: number): {
+  fee: number;
+  totalToPay: number;
+} {
+  const { depositPercent, depositFlatFee } = PLATFORM_FEES.wallet;
+  const percentFee = Math.round(amountCents * depositPercent / 100);
+  const fee = percentFee + depositFlatFee;
+  return {
+    fee,
+    totalToPay: amountCents + fee,
+  };
+}
+
+/**
+ * Calculate withdrawal fee and net amount
+ * Returns amounts in cents
+ */
+export function calculateWithdrawalFee(amountCents: number): {
+  fee: number;
+  netAmount: number;
+} {
+  const fee = PLATFORM_FEES.wallet.withdrawalFlatFee;
+  return {
+    fee,
+    netAmount: amountCents - fee,
+  };
+}
+
+/**
+ * Calculate complete ticket sale breakdown
+ * Shows exactly where every cent goes
+ */
+export function calculateTicketSaleBreakdown(ticketPriceCents: number): {
+  ticketPrice: number;
+  bookingFee: number;
+  buyerTotal: number;
+  ticketingCommission: number;
+  platformFee: number;
+  organizerNet: number;
+  ziyawaTotal: number;
+} {
+  const bookingFee = calculateBookingFee(ticketPriceCents);
+  const fees = calculateTicketingFees(ticketPriceCents);
+  
+  return {
+    ticketPrice: ticketPriceCents,
+    bookingFee,
+    buyerTotal: ticketPriceCents + bookingFee,
+    ticketingCommission: fees.ticketingCommission,
+    platformFee: fees.platformFee,
+    organizerNet: ticketPriceCents - fees.total,
+    ziyawaTotal: bookingFee + fees.total,
+  };
+}
 
 // User roles with display names (legacy)
 export const USER_ROLES = {

@@ -1,0 +1,71 @@
+-- =====================================================
+-- MIGRATION 004: Storage Setup Reference
+-- Ziyawa Platform - Media Storage Infrastructure
+-- =====================================================
+-- 
+-- ⚠️  STORAGE BUCKET MUST BE CREATED VIA SUPABASE DASHBOARD
+--     SQL Editor cannot modify storage.objects policies
+--
+-- =====================================================
+-- MANUAL SETUP INSTRUCTIONS:
+-- =====================================================
+--
+-- 1. Go to: Supabase Dashboard → Storage → New Bucket
+-- 2. Create bucket with these settings:
+--    - Name: media
+--    - Public bucket: YES (checked)
+--    - File size limit: 50MB
+--    - Allowed MIME types: image/*, video/mp4, video/webm, audio/*
+--
+-- 3. Go to: Storage → Policies → media bucket
+-- 4. Create these policies:
+--
+-- POLICY 1: Public Read Access
+--    - Name: "Public media read access"
+--    - Allowed operation: SELECT
+--    - Target roles: (leave empty for all)
+--    - USING expression: true
+--
+-- POLICY 2: Authenticated Upload
+--    - Name: "Authenticated users can upload"
+--    - Allowed operation: INSERT
+--    - Target roles: authenticated
+--    - WITH CHECK expression:
+--      (storage.foldername(name))[2] = auth.uid()::text
+--
+-- POLICY 3: Owner Update
+--    - Name: "Users can update own files"
+--    - Allowed operation: UPDATE
+--    - Target roles: authenticated
+--    - USING expression:
+--      (storage.foldername(name))[2] = auth.uid()::text
+--
+-- POLICY 4: Owner Delete
+--    - Name: "Users can delete own files"  
+--    - Allowed operation: DELETE
+--    - Target roles: authenticated
+--    - USING expression:
+--      (storage.foldername(name))[2] = auth.uid()::text
+--
+-- =====================================================
+-- Folder structure (for reference):
+-- media/
+-- ├── artists/{user_id}/
+-- │   ├── profile/   (profile pictures)
+-- │   ├── cover/     (cover/banner images)
+-- │   └── gallery/   (portfolio photos/videos)
+-- ├── providers/{user_id}/
+-- │   ├── profile/
+-- │   ├── cover/
+-- │   └── portfolio/ (work samples)
+-- ├── organizers/{user_id}/
+-- │   ├── profile/
+-- │   ├── cover/
+-- │   └── gallery/
+-- └── events/{event_id}/
+--     ├── poster/    (event poster)
+--     ├── gallery/   (event photos)
+--     └── promo/     (promo videos)
+-- =====================================================
+
+-- No SQL needed - bucket created via Dashboard

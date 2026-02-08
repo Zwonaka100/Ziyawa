@@ -11,203 +11,144 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { formatCurrency, calculatePlatformFee, generateReference, generateTicketCode } from '@/lib/helpers'
-import { PLATFORM_CONFIG } from '@/lib/constants'
-import { createClient } from '@/lib/supabase/client'
+import { formatCurrency } from '@/lib/helpers'
+import { calculateTicketSaleBreakdown, PLATFORM_FEES } from '@/lib/constants'
 import { toast } from 'sonner'
 import type { Event, Profile } from '@/types/database'
-import { CheckCircle, Loader2 } from 'lucide-react'
+import { CheckCircle, Loader2, CreditCard, Shield } from 'lucide-react'
 
 interface PaymentDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   event: Event
   user: Profile
+  quantity?: number
 }
 
-export function PaymentDialog({ open, onOpenChange, event, user }: PaymentDialogProps) {
+export function PaymentDialog({ open, onOpenChange, event, user, quantity = 1 }: PaymentDialogProps) {
   const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState(false)
-  const [ticketCode, setTicketCode] = useState<string | null>(null)
   const router = useRouter()
-  const supabase = createClient()
 
-  const platformFee = calculatePlatformFee(event.ticket_price)
-  const totalAmount = event.ticket_price // Fee is taken from organizer, not buyer
-  const netAmount = event.ticket_price - platformFee
+  // Calculate fees using our fee structure
+  const ticketBasePriceCents = event.ticket_price * 100 * quantity // Convert Rands to cents
+  const breakdown = calculateTicketSaleBreakdown(ticketBasePriceCents)
+  const totalAmount = breakdown.buyerTotal // This is what the buyer pays (in cents)
 
   const handlePayment = async () => {
     setLoading(true)
 
     try {
-      // In a real app, this would redirect to Paystack
-      // For demo, we simulate a successful payment
-      
-      // Generate references
-      const transactionRef = generateReference('TXN')
-      const newTicketCode = generateTicketCode()
-      const paystackRef = `PAY-TEST-${Date.now()}`
+      // Call our ticket purchase API
+      const response = await fetch('/api/payments/ticket', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventId: event.id,
+          quantity: quantity,
+        }),
+      })
 
-      // Create transaction record
-      const { data: transaction, error: txnError } = await supabase
-        .from('transactions')
-        .insert({
-          user_id: user.id,
-          type: 'ticket_sale',
-          amount: totalAmount,
-          platform_fee: platformFee,
-          net_amount: netAmount,
-          status: 'completed',
-          reference: transactionRef,
-          event_id: event.id,
-          paystack_reference: paystackRef,
-        })
-        .select()
-        .single()
+      const data = await response.json()
 
-      if (txnError) throw txnError
-
-      // Create ticket
-      const { error: ticketError } = await supabase
-        .from('tickets')
-        .insert({
-          event_id: event.id,
-          user_id: user.id,
-          transaction_id: transaction.id,
-          ticket_code: newTicketCode,
-        })
-
-      if (ticketError) throw ticketError
-
-      // Update event tickets_sold count
-      const { error: updateError } = await supabase
-        .from('events')
-        .update({ tickets_sold: event.tickets_sold + 1 })
-        .eq('id', event.id)
-
-      if (updateError) throw updateError
-
-      // Update organizer wallet balance (add net amount)
-      const { data: organizer } = await supabase
-        .from('profiles')
-        .select('wallet_balance')
-        .eq('id', event.organizer_id)
-        .single()
-
-      if (organizer) {
-        await supabase
-          .from('profiles')
-          .update({ wallet_balance: organizer.wallet_balance + netAmount })
-          .eq('id', event.organizer_id)
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to initialize payment')
       }
 
-      setTicketCode(newTicketCode)
-      setSuccess(true)
-      toast.success('Payment successful! Your ticket has been purchased.')
+      // Redirect to Paystack checkout
+      if (data.authorizationUrl) {
+        window.location.href = data.authorizationUrl
+      } else {
+        throw new Error('No payment URL received')
+      }
       
     } catch (error) {
       console.error('Payment error:', error)
-      toast.error('Payment failed. Please try again.')
-    } finally {
+      toast.error(error instanceof Error ? error.message : 'Payment failed. Please try again.')
       setLoading(false)
     }
+    // Note: We don't setLoading(false) on success because we're redirecting
   }
 
   const handleClose = () => {
-    if (success) {
-      router.refresh()
-    }
     onOpenChange(false)
-    setSuccess(false)
-    setTicketCode(null)
   }
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
-        {success ? (
-          // Success State
-          <div className="text-center py-6">
-            <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-            <DialogHeader className="text-center">
-              <DialogTitle>Payment Successful!</DialogTitle>
-              <DialogDescription>
-                Your ticket has been purchased. Save your ticket code below.
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="my-6 p-4 bg-muted rounded-lg">
-              <p className="text-sm text-muted-foreground mb-1">Your Ticket Code</p>
-              <p className="text-2xl font-mono font-bold">{ticketCode}</p>
+        <DialogHeader>
+          <DialogTitle>Complete Your Purchase</DialogTitle>
+          <DialogDescription>
+            You&apos;re buying {quantity} ticket{quantity > 1 ? 's' : ''} for {event.title}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          {/* Order Summary */}
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span>Ticket Price {quantity > 1 ? `(${quantity}x)` : ''}</span>
+              <span>{formatCurrency(breakdown.ticketPrice / 100)}</span>
             </div>
-
-            <p className="text-sm text-muted-foreground mb-4">
-              Show this code at the event entrance. You can also find this in your tickets dashboard.
-            </p>
-
-            <Button onClick={handleClose} className="w-full">
-              Done
-            </Button>
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>Booking Fee</span>
+              <span>{formatCurrency(breakdown.bookingFee / 100)}</span>
+            </div>
+            <Separator />
+            <div className="flex justify-between font-bold text-lg">
+              <span>Total</span>
+              <span>{formatCurrency(totalAmount / 100)}</span>
+            </div>
           </div>
-        ) : (
-          // Payment Form
-          <>
-            <DialogHeader>
-              <DialogTitle>Complete Your Purchase</DialogTitle>
-              <DialogDescription>
-                You&apos;re buying a ticket for {event.title}
-              </DialogDescription>
-            </DialogHeader>
 
-            <div className="space-y-4 py-4">
-              {/* Order Summary */}
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Ticket Price</span>
-                  <span>{formatCurrency(event.ticket_price)}</span>
-                </div>
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>Service Fee</span>
-                  <span>R0.00</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between font-bold text-lg">
-                  <span>Total</span>
-                  <span>{formatCurrency(totalAmount)}</span>
-                </div>
-              </div>
-
-              {/* Demo Notice */}
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
-                <p className="font-medium text-yellow-800">Demo Mode</p>
-                <p className="text-yellow-700">
-                  This is a simulated payment. In production, you&apos;d be redirected to Paystack.
-                </p>
-              </div>
-
-              {/* Payment Button */}
-              <Button 
-                onClick={handlePayment} 
-                className="w-full" 
-                size="lg"
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  `Pay ${formatCurrency(totalAmount)}`
-                )}
-              </Button>
-
-              <p className="text-xs text-center text-muted-foreground">
-                Secured by Paystack. {PLATFORM_CONFIG.platformFeePercent}% platform fee applies to organizers.
+          {/* Security Badge */}
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm flex items-start gap-3">
+            <Shield className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="font-medium text-green-800">Secure Payment</p>
+              <p className="text-green-700">
+                Your payment is processed securely by Paystack, a PCI-DSS compliant payment provider.
               </p>
             </div>
-          </>
-        )}
+          </div>
+
+          {/* Payment Methods */}
+          <div className="flex items-center justify-center gap-4 py-2">
+            <div className="text-xs text-muted-foreground">Pay with:</div>
+            <div className="flex items-center gap-2">
+              <div className="bg-gray-100 rounded px-2 py-1 text-xs font-medium">Card</div>
+              <div className="bg-gray-100 rounded px-2 py-1 text-xs font-medium">EFT</div>
+              <div className="bg-gray-100 rounded px-2 py-1 text-xs font-medium">Bank</div>
+            </div>
+          </div>
+
+          {/* Payment Button */}
+          <Button 
+            onClick={handlePayment} 
+            className="w-full" 
+            size="lg"
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Connecting to Paystack...
+              </>
+            ) : (
+              <>
+                <CreditCard className="mr-2 h-4 w-4" />
+                Pay {formatCurrency(totalAmount / 100)}
+              </>
+            )}
+          </Button>
+
+          <p className="text-xs text-center text-muted-foreground">
+            By completing this purchase, you agree to our Terms of Service. 
+            Platform fee of {PLATFORM_FEES.ticketing.platformFeePercent}% applies.
+          </p>
+        </div>
       </DialogContent>
     </Dialog>
   )

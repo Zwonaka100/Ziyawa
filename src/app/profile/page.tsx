@@ -19,7 +19,8 @@ import {
   ArrowRight, 
   CheckCircle,
   Sparkles,
-  Users
+  Users,
+  Wrench
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/components/providers/auth-provider'
@@ -27,11 +28,12 @@ import { formatCurrency } from '@/lib/helpers'
 import { toast } from 'sonner'
 
 // Get all roles as badges
-function getRoleBadges(profile: { is_admin?: boolean; is_organizer?: boolean; is_artist?: boolean }) {
+function getRoleBadges(profile: { is_admin?: boolean; is_organizer?: boolean; is_artist?: boolean; is_provider?: boolean }) {
   const badges = []
   if (profile.is_admin) badges.push({ label: 'Admin', variant: 'destructive' as const })
   if (profile.is_organizer) badges.push({ label: 'Organiser', variant: 'default' as const })
   if (profile.is_artist) badges.push({ label: 'Artist', variant: 'secondary' as const })
+  if (profile.is_provider) badges.push({ label: 'Provider', variant: 'outline' as const, className: 'border-orange-500 text-orange-600' })
   if (badges.length === 0) badges.push({ label: 'Groovist', variant: 'outline' as const })
   return badges
 }
@@ -49,13 +51,15 @@ export default function ProfilePage() {
     return null
   }
 
-  const handleUpgrade = async (role: 'organizer' | 'artist') => {
+  const handleUpgrade = async (role: 'organizer' | 'artist' | 'provider') => {
     setUpgrading(role)
     try {
       const supabase = createClient()
       const updateData = role === 'organizer' 
         ? { is_organizer: true }
-        : { is_artist: true }
+        : role === 'artist'
+        ? { is_artist: true }
+        : { is_provider: true }
       
       const { error } = await supabase
         .from('profiles')
@@ -65,10 +69,18 @@ export default function ProfilePage() {
       if (error) throw error
 
       await refreshProfile()
-      toast.success(role === 'organizer' 
-        ? 'You are now an Event Organiser! 🎉' 
-        : 'You are now an Artist! 🎤'
+      toast.success(
+        role === 'organizer' 
+          ? 'You are now an Event Organiser! 🎉' 
+          : role === 'artist'
+          ? 'You are now an Artist! 🎤'
+          : 'You are now a Provider! 🔧'
       )
+      
+      // Redirect to provider setup if becoming a provider
+      if (role === 'provider') {
+        router.push('/dashboard/provider/setup')
+      }
     } catch (error) {
       console.error('Error upgrading profile:', error)
       toast.error('Failed to upgrade. Please try again.')
@@ -178,6 +190,22 @@ export default function ProfilePage() {
           </Link>
         )}
 
+        {profile.is_provider && (
+          <Link href="/dashboard/provider">
+            <Card className="hover:border-orange-500 transition-colors cursor-pointer h-full">
+              <CardContent className="pt-6 flex items-center gap-3">
+                <div className="p-2 bg-orange-500/10 rounded-lg">
+                  <Wrench className="h-5 w-5 text-orange-600" />
+                </div>
+                <div>
+                  <p className="font-medium">Provider Dashboard</p>
+                  <p className="text-sm text-muted-foreground">Manage services</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
+
         <Link href="/wallet">
           <Card className="hover:border-primary transition-colors cursor-pointer h-full">
             <CardContent className="pt-6 flex items-center gap-3">
@@ -194,13 +222,13 @@ export default function ProfilePage() {
       </div>
 
       {/* Role Upgrade Cards */}
-      {(!profile.is_organizer || !profile.is_artist) && (
+      {(!profile.is_organizer || !profile.is_artist || !profile.is_provider) && (
         <div className="mb-6">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
             Upgrade Your Profile
           </h2>
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-3 gap-4">
             {/* Become an Organiser */}
             {!profile.is_organizer && (
               <Card className="border-2 border-dashed hover:border-primary transition-colors">
@@ -299,21 +327,81 @@ export default function ProfilePage() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Become a Provider */}
+            {!profile.is_provider && (
+              <Card className="border-2 border-dashed hover:border-orange-500 transition-colors">
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-orange-500/10 rounded-xl">
+                      <Wrench className="h-6 w-6 text-orange-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">Become a Provider</CardTitle>
+                      <CardDescription>Join the crew</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2 mb-4">
+                    <li className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      Offer your services
+                    </li>
+                    <li className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      Get hired by organisers
+                    </li>
+                    <li className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      Grow your business
+                    </li>
+                    <li className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      Earn from events
+                    </li>
+                  </ul>
+                  <Button 
+                    variant="outline"
+                    className="w-full border-orange-500 text-orange-600 hover:bg-orange-50" 
+                    onClick={() => handleUpgrade('provider')}
+                    disabled={upgrading === 'provider'}
+                  >
+                    {upgrading === 'provider' ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <ArrowRight className="h-4 w-4 mr-2" />
+                    )}
+                    Become a Provider
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       )}
 
       {/* Already unlocked roles status */}
-      {(profile.is_organizer || profile.is_artist) && (
+      {(profile.is_organizer || profile.is_artist || profile.is_provider) && (
         <Card className="mb-6 bg-muted/50">
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Users className="h-4 w-4" />
               <span>
-                You&apos;re a{profile.is_organizer && profile.is_artist ? 'n Organiser and Artist' : profile.is_organizer ? 'n Organiser' : 'n Artist'} — 
-                {!profile.is_organizer && ' upgrade to Organiser to create events.'}
-                {!profile.is_artist && ' upgrade to Artist to get booked.'}
-                {profile.is_organizer && profile.is_artist && ' you have access to all features!'}
+                You&apos;re a {[
+                  profile.is_organizer && 'Organiser',
+                  profile.is_artist && 'Artist',
+                  profile.is_provider && 'Provider'
+                ].filter(Boolean).join(', ')} — 
+                {!profile.is_organizer && !profile.is_artist && !profile.is_provider && ' unlock more roles above!'}
+                {profile.is_organizer && profile.is_artist && profile.is_provider && ' you have access to all features!'}
+                {!(profile.is_organizer && profile.is_artist && profile.is_provider) && (
+                  <>
+                    {!profile.is_organizer && ' upgrade to Organiser to create events.'}
+                    {!profile.is_artist && ' upgrade to Artist to get booked.'}
+                    {!profile.is_provider && ' upgrade to Provider to offer services.'}
+                  </>
+                )}
               </span>
             </div>
           </CardContent>

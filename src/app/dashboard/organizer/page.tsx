@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Calendar, Plus, Users, DollarSign, Clock } from 'lucide-react'
+import { Calendar, Plus, Users, DollarSign, Clock, Wrench, Star } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/helpers'
 import { BOOKING_STATUS, PROVINCES } from '@/lib/constants'
 
@@ -51,6 +51,14 @@ export default async function OrganizerDashboardPage() {
     `)
     .eq('organizer_id', user.id)
     .order('created_at', { ascending: false })
+
+  // Fetch crew bookings
+  const { data: crewBookings } = await supabase
+    .from('provider_bookings')
+    .select('id, state')
+    .eq('organizer_id', user.id)
+
+  const pendingCrewBookings = crewBookings?.filter(b => b.state === 'pending' || b.state === 'accepted') || []
 
   const upcomingEvents = events?.filter(e => new Date(e.event_date) >= new Date()) || []
   const pastEvents = events?.filter(e => new Date(e.event_date) < new Date()) || []
@@ -129,7 +137,20 @@ export default async function OrganizerDashboardPage() {
       <Tabs defaultValue="events" className="space-y-4">
         <TabsList>
           <TabsTrigger value="events">My Events</TabsTrigger>
-          <TabsTrigger value="bookings">Bookings</TabsTrigger>
+          <TabsTrigger value="bookings">Artist Bookings</TabsTrigger>
+          <TabsTrigger value="crew" className="flex items-center gap-1">
+            <Wrench className="h-3 w-3" />
+            Crew
+            {pendingCrewBookings.length > 0 && (
+              <span className="ml-1 bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                {pendingCrewBookings.length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="reviews" className="flex items-center gap-1">
+            <Star className="h-3 w-3" />
+            Reviews
+          </TabsTrigger>
         </TabsList>
 
         {/* Events Tab */}
@@ -156,15 +177,24 @@ export default async function OrganizerDashboardPage() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
                         <Link href={`/events/${event.id}`}>
                           <Button variant="outline" size="sm">View</Button>
                         </Link>
                         <Link href={`/dashboard/organizer/events/${event.id}/edit`}>
                           <Button variant="outline" size="sm">Edit</Button>
                         </Link>
+                        <Link href={`/dashboard/organizer/events/${event.id}/media`}>
+                          <Button variant="outline" size="sm">Media</Button>
+                        </Link>
                         <Link href={`/dashboard/organizer/events/${event.id}/book`}>
                           <Button size="sm">Book Artist</Button>
+                        </Link>
+                        <Link href={`/crew`}>
+                          <Button size="sm" variant="outline" className="border-orange-300 text-orange-600 hover:bg-orange-50">
+                            <Wrench className="h-3 w-3 mr-1" />
+                            Book Crew
+                          </Button>
                         </Link>
                       </div>
                     </div>
@@ -238,6 +268,55 @@ export default async function OrganizerDashboardPage() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        {/* Crew Tab */}
+        <TabsContent value="crew" className="space-y-4">
+          <Card>
+            <CardContent className="py-8 text-center">
+              <Wrench className="h-12 w-12 text-orange-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Manage Your Crew</h3>
+              <p className="text-muted-foreground mb-4">
+                Book sound, lighting, catering, and other services for your events.
+              </p>
+              <div className="flex gap-4 justify-center flex-wrap">
+                <Link href="/dashboard/organizer/crew">
+                  <Button variant="outline">
+                    View Crew Bookings
+                    {pendingCrewBookings.length > 0 && (
+                      <span className="ml-2 bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                        {pendingCrewBookings.length}
+                      </span>
+                    )}
+                  </Button>
+                </Link>
+                <Link href="/crew">
+                  <Button className="bg-orange-500 hover:bg-orange-600">
+                    <Users className="h-4 w-4 mr-2" />
+                    Find Crew
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reviews" className="space-y-4">
+          <Card>
+            <CardContent className="py-8 text-center">
+              <Star className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Event Reviews</h3>
+              <p className="text-muted-foreground mb-4">
+                See what attendees are saying about your events and respond to their feedback.
+              </p>
+              <Link href="/dashboard/organizer/reviews">
+                <Button>
+                  <Star className="h-4 w-4 mr-2" />
+                  View All Reviews
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

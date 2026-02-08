@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { ArtistProfile } from '@/components/artists/artist-profile'
+import { ArtistProfileEnhanced } from '@/components/artists/artist-profile-enhanced'
 
 interface ArtistPageProps {
   params: Promise<{
@@ -53,9 +53,78 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
     notFound()
   }
 
+  // Fetch social links
+  const { data: socialLinks } = await supabase
+    .from('artist_social_links')
+    .select('*')
+    .eq('artist_id', id)
+    .order('display_order')
+
+  // Fetch media
+  const { data: media } = await supabase
+    .from('artist_media')
+    .select('*')
+    .eq('artist_id', id)
+    .order('display_order')
+
+  // Fetch portfolio
+  const { data: portfolio } = await supabase
+    .from('artist_portfolio')
+    .select('*')
+    .eq('artist_id', id)
+    .order('event_date', { ascending: false })
+
+  // Fetch discography
+  const { data: discography } = await supabase
+    .from('artist_discography')
+    .select('*')
+    .eq('artist_id', id)
+    .order('release_date', { ascending: false })
+
+  // Fetch reviews
+  const { data: reviews } = await supabase
+    .from('reviews')
+    .select(`
+      *,
+      reviewer:reviewer_id (
+        full_name,
+        avatar_url
+      )
+    `)
+    .eq('reviewee_type', 'artist')
+    .eq('reviewee_id', id)
+    .eq('is_public', true)
+    .order('created_at', { ascending: false })
+
+  // Fetch upcoming events (where artist is booked)
+  const { data: upcomingBookings } = await supabase
+    .from('bookings')
+    .select(`
+      *,
+      events:event_id (
+        id,
+        title,
+        venue,
+        event_date,
+        cover_image
+      )
+    `)
+    .eq('artist_id', id)
+    .eq('state', 'confirmed')
+    .gte('events.event_date', new Date().toISOString().split('T')[0])
+    .order('events.event_date')
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <ArtistProfile artist={artist} />
+    <div className="min-h-screen bg-white">
+      <ArtistProfileEnhanced 
+        artist={artist} 
+        socialLinks={socialLinks || []}
+        media={media || []}
+        portfolio={portfolio || []}
+        discography={discography || []}
+        reviews={reviews || []}
+        upcomingBookings={upcomingBookings || []}
+      />
     </div>
   )
 }

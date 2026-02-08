@@ -2,7 +2,7 @@
  * Utility functions for Ziyawa
  */
 
-import { PLATFORM_CONFIG } from './constants'
+import { PLATFORM_CONFIG, PLATFORM_FEES } from './constants'
 
 /**
  * Format currency in South African Rand
@@ -41,7 +41,8 @@ export function formatTime(time: string): string {
  * Calculate platform fee
  */
 export function calculatePlatformFee(amount: number): number {
-  return Math.round(amount * (PLATFORM_CONFIG.platformFeePercent / 100) * 100) / 100
+  const feePercent = PLATFORM_FEES.ticketing.commissionPercent + PLATFORM_FEES.ticketing.platformFeePercent
+  return Math.round(amount * (feePercent / 100) * 100) / 100
 }
 
 /**

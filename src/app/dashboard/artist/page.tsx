@@ -1,9 +1,11 @@
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Calendar, DollarSign, Clock, CheckCircle, XCircle } from 'lucide-react'
+import { Calendar, DollarSign, Clock, CheckCircle, XCircle, Image as ImageIcon, Music2, Share2, User } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/helpers'
 import { BOOKING_STATUS, PROVINCES } from '@/lib/constants'
 import { BookingActions } from '@/components/bookings/booking-actions'
@@ -87,6 +89,70 @@ export default async function ArtistDashboardPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Artist Dashboard</h1>
         <p className="text-muted-foreground">Welcome back, {artist.stage_name}!</p>
+      </div>
+
+      {/* Quick Links to Profile Management */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+        <Link href={`/artists/${artist.id}`}>
+          <Card className="hover:bg-neutral-50 transition-colors cursor-pointer h-full">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-black flex items-center justify-center">
+                  <User className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-medium">View Profile</p>
+                  <p className="text-xs text-muted-foreground">See your public profile</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/dashboard/artist/media">
+          <Card className="hover:bg-neutral-50 transition-colors cursor-pointer h-full">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-neutral-900 flex items-center justify-center">
+                  <ImageIcon className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-medium">Media</p>
+                  <p className="text-xs text-muted-foreground">Photos & Videos</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/dashboard/artist/social">
+          <Card className="hover:bg-neutral-50 transition-colors cursor-pointer h-full">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-neutral-800 flex items-center justify-center">
+                  <Share2 className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-medium">Social Links</p>
+                  <p className="text-xs text-muted-foreground">Instagram, TikTok...</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/dashboard/artist/discography">
+          <Card className="hover:bg-neutral-50 transition-colors cursor-pointer h-full">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-neutral-700 flex items-center justify-center">
+                  <Music2 className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-medium">Discography</p>
+                  <p className="text-xs text-muted-foreground">Music releases</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Stats Cards */}

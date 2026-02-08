@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { EventDetails } from '@/components/events/event-details'
+import { EventReviewsSection } from '@/components/events/event-reviews-section'
 
 interface EventPageProps {
   params: Promise<{
@@ -67,9 +68,45 @@ export default async function EventPage({ params }: EventPageProps) {
     .eq('event_id', id)
     .in('status', ['accepted', 'paid', 'completed'])
 
+  // Fetch event media (gallery and promo videos)
+  const { data: eventMedia } = await supabase
+    .from('event_media')
+    .select('*')
+    .eq('event_id', id)
+    .order('display_order')
+
+  // Check if current user has a ticket for this event
+  const { data: { user } } = await supabase.auth.getUser()
+  let hasTicket = false
+  
+  if (user) {
+    const { data: ticket } = await supabase
+      .from('tickets')
+      .select('id')
+      .eq('event_id', id)
+      .eq('user_id', user.id)
+      .in('status', ['confirmed', 'checked_in'])
+      .single()
+    
+    hasTicket = !!ticket
+  }
+
+  // Check if event has ended
+  const eventEnded = new Date(event.end_date || event.event_date) < new Date()
+
   return (
     <div className="container mx-auto px-4 py-8">
-      <EventDetails event={event} bookings={bookings || []} />
+      <EventDetails event={event} bookings={bookings || []} media={eventMedia || []} />
+      
+      {/* Reviews Section */}
+      <div className="max-w-4xl mx-auto mt-12">
+        <EventReviewsSection
+          eventId={id}
+          eventTitle={event.title}
+          organizerId={event.organizer_id}
+          canReview={hasTicket && eventEnded}
+        />
+      </div>
     </div>
   )
 }

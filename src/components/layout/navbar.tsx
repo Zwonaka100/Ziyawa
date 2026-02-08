@@ -1,10 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useAuth } from '@/components/providers/auth-provider'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
@@ -23,30 +24,47 @@ import {
   LogOut,
   Wallet,
   Ticket,
-  Mic2
+  Mic2,
+  Users,
+  Wrench,
+  MessageSquare,
+  Search
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/helpers'
 
 // Get primary role for display
-function getDisplayRole(profile: { is_admin?: boolean; is_organizer?: boolean; is_artist?: boolean }) {
+function getDisplayRole(profile: { is_admin?: boolean; is_organizer?: boolean; is_artist?: boolean; is_provider?: boolean }) {
   const roles = []
   if (profile.is_admin) roles.push('Admin')
   if (profile.is_organizer) roles.push('Organiser')
   if (profile.is_artist) roles.push('Artist')
+  if (profile.is_provider) roles.push('Provider')
   return roles.length > 0 ? roles.join(' • ') : 'Groovist'
 }
 
 export function Navbar() {
   const { user, profile, signOut } = useAuth()
   const pathname = usePathname()
+  const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const navLinks = [
     { href: '/ziwaphi', label: 'Ziwaphi?', icon: Calendar },
     { href: '/artists', label: 'Artists', icon: Music },
+    { href: '/crew', label: 'Crew', icon: Users },
+    { href: '/organizers', label: 'Organisers', icon: Mic2 },
   ]
 
   const isActive = (href: string) => pathname.startsWith(href)
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      router.push(`/ziwaphi?q=${encodeURIComponent(searchQuery.trim())}`)
+      setSearchQuery('')
+    }
+  }
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -73,6 +91,20 @@ export function Navbar() {
             ))}
           </div>
 
+          {/* Search Bar */}
+          <form onSubmit={handleSearch} className="hidden lg:flex items-center max-w-sm flex-1 mx-6">
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search events..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-4 h-9 w-full bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-purple-500"
+              />
+            </div>
+          </form>
+
           {/* User Menu / Auth Buttons */}
           <div className="hidden md:flex items-center space-x-4">
             {user && profile ? (
@@ -94,6 +126,14 @@ export function Navbar() {
                     <p className="text-xs text-muted-foreground">{getDisplayRole(profile)}</p>
                   </div>
                   <DropdownMenuSeparator />
+                  
+                  {/* Messages */}
+                  <DropdownMenuItem asChild>
+                    <Link href="/messages" className="flex items-center">
+                      <MessageSquare className="mr-2 h-4 w-4" />
+                      Messages
+                    </Link>
+                  </DropdownMenuItem>
                   
                   {/* Always show My Tickets */}
                   <DropdownMenuItem asChild>
@@ -119,6 +159,16 @@ export function Navbar() {
                       <Link href="/dashboard/artist" className="flex items-center">
                         <Mic2 className="mr-2 h-4 w-4" />
                         Artist Dashboard
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+
+                  {/* Show Provider features if unlocked */}
+                  {profile.is_provider && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/dashboard/provider" className="flex items-center">
+                        <Wrench className="mr-2 h-4 w-4" />
+                        Provider Dashboard
                       </Link>
                     </DropdownMenuItem>
                   )}
@@ -173,6 +223,18 @@ export function Navbar() {
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t">
             <div className="flex flex-col space-y-4">
+              {/* Mobile Search */}
+              <form onSubmit={(e) => { handleSearch(e); setMobileMenuOpen(false); }} className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search events..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 pr-4 h-10 w-full"
+                />
+              </form>
+
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
@@ -222,6 +284,14 @@ export function Navbar() {
                           <Button variant="outline" className="w-full justify-start">
                             <Mic2 className="mr-2 h-4 w-4" />
                             Artist Dashboard
+                          </Button>
+                        </Link>
+                      )}
+                      {profile.is_provider && (
+                        <Link href="/dashboard/provider" onClick={() => setMobileMenuOpen(false)}>
+                          <Button variant="outline" className="w-full justify-start">
+                            <Wrench className="mr-2 h-4 w-4" />
+                            Provider Dashboard
                           </Button>
                         </Link>
                       )}

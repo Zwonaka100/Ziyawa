@@ -46,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             full_name: userEmail.split('@')[0],
             is_artist: false,
             is_organizer: false,
+            is_provider: false,
             is_admin: false,
           })
           .select()
