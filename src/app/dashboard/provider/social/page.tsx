@@ -9,11 +9,11 @@ export default async function ProviderSocialPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/auth/signin');
 
-  // Get provider
+  // Get provider using profile_id (same as user.id)
   const { data: provider } = await supabase
     .from('providers')
     .select('id, business_name')
-    .eq('user_id', user.id)
+    .eq('profile_id', user.id)
     .single();
 
   if (!provider) redirect('/dashboard/provider/setup');

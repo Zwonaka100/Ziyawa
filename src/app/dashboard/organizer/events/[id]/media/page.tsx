@@ -16,7 +16,7 @@ export default async function EventMediaPage({ params }: EventMediaPageProps) {
   const supabase = await createClient();
   
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  if (!user) redirect('/auth/signin');
 
   // Get event
   const { data: event } = await supabase

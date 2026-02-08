@@ -9,11 +9,11 @@ export default async function ArtistDiscographyPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/auth/signin');
 
-  // Get artist
+  // Get artist using profile_id (same as user.id)
   const { data: artist } = await supabase
     .from('artists')
-    .select('id, name')
-    .eq('user_id', user.id)
+    .select('id, stage_name')
+    .eq('profile_id', user.id)
     .single();
 
   if (!artist) redirect('/dashboard/artist/setup');

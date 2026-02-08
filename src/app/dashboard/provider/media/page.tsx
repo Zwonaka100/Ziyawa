@@ -7,16 +7,16 @@ export default async function ProviderMediaPage() {
   const supabase = await createClient();
   
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login');
+  if (!user) redirect('/auth/signin');
 
-  // Get provider
+  // Get provider using profile_id (same as user.id)
   const { data: provider } = await supabase
     .from('providers')
     .select('id, business_name, profile_image')
-    .eq('user_id', user.id)
+    .eq('profile_id', user.id)
     .single();
 
-  if (!provider) redirect('/dashboard');
+  if (!provider) redirect('/dashboard/provider/setup');
 
   // Get existing media
   const { data: media } = await supabase

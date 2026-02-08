@@ -420,7 +420,18 @@ export default function ProviderProfilePage() {
               ) : (
                 <div className="grid md:grid-cols-2 gap-4">
                   {services.map((service) => (
-                    <Card key={service.id} className="hover:border-primary/50 transition-colors">
+                    <Card key={service.id} className="hover:border-primary/50 transition-colors overflow-hidden">
+                      {/* Service Image */}
+                      {service.image_url && (
+                        <div className="aspect-video w-full relative bg-neutral-100">
+                          <Image
+                            src={service.image_url}
+                            alt={service.service_name}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                      )}
                       <CardHeader className="pb-2">
                         <div className="flex items-start justify-between">
                           <div>

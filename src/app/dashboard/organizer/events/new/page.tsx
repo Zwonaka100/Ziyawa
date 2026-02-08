@@ -46,10 +46,30 @@ export default function NewEventPage() {
       return
     }
 
+    if (!formData.event_date) {
+      toast.error('Please select an event date')
+      return
+    }
+
     setLoading(true)
 
     try {
       const supabase = createClient()
+
+      // Check if organizer already has an event on the same day
+      const { data: existingEvents, error: checkError } = await supabase
+        .from('events')
+        .select('id, title')
+        .eq('organizer_id', profile.id)
+        .eq('event_date', formData.event_date)
+      
+      if (checkError) throw checkError
+
+      if (existingEvents && existingEvents.length > 0) {
+        toast.error(`You already have an event scheduled on this date: "${existingEvents[0].title}". Please choose a different date.`)
+        setLoading(false)
+        return
+      }
 
       const { data, error } = await supabase
         .from('events')

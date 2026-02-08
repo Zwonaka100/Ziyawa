@@ -358,6 +358,7 @@ export interface ProviderService {
   category: ServiceCategory;
   service_name: string;
   description: string | null;
+  image_url: string | null;
   base_price: number;
   price_type: PriceType;
   is_available: boolean;

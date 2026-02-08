@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,7 +23,10 @@ import {
   Plus, 
   ArrowLeft,
   Trash2,
-  Edit
+  Edit,
+  Upload,
+  ImageIcon,
+  X
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/components/providers/auth-provider'
@@ -44,6 +48,7 @@ export default function ProviderServicesPage() {
   const [services, setServices] = useState<ProviderService[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editingService, setEditingService] = useState<ProviderService | null>(null)
   
@@ -54,6 +59,7 @@ export default function ProviderServicesPage() {
   const [basePrice, setBasePrice] = useState('')
   const [priceType, setPriceType] = useState<PriceType>('fixed')
   const [isAvailable, setIsAvailable] = useState(true)
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
 
   useEffect(() => {
     if (!profile) {
@@ -113,6 +119,7 @@ export default function ProviderServicesPage() {
     setBasePrice('')
     setPriceType('fixed')
     setIsAvailable(true)
+    setImageUrl(null)
     setEditingService(null)
     setShowForm(false)
   }
@@ -125,7 +132,53 @@ export default function ProviderServicesPage() {
     setBasePrice(service.base_price.toString())
     setPriceType(service.price_type)
     setIsAvailable(service.is_available)
+    setImageUrl(service.image_url || null)
     setShowForm(true)
+  }
+
+  const handleImageUpload = async (file: File) => {
+    if (!profile || !provider) return
+    
+    // Validate file
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file')
+      return
+    }
+    
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB')
+      return
+    }
+
+    setUploading(true)
+    try {
+      const supabase = createClient()
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+      const filePath = `providers/${profile.id}/services/${fileName}`
+      
+      const { error: uploadError } = await supabase.storage
+        .from('media')
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('media')
+        .getPublicUrl(filePath)
+
+      setImageUrl(publicUrl)
+      toast.success('Image uploaded!')
+    } catch (error) {
+      console.error('Error uploading image:', error)
+      toast.error('Failed to upload image')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const removeImage = () => {
+    setImageUrl(null)
   }
 
   const handleDelete = async (serviceId: string) => {
@@ -173,6 +226,7 @@ export default function ProviderServicesPage() {
         base_price: parseFloat(basePrice),
         price_type: priceType,
         is_available: isAvailable,
+        image_url: imageUrl,
       }
 
       if (editingService) {
@@ -244,6 +298,57 @@ export default function ProviderServicesPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Service Image */}
+              <div>
+                <Label>Service Image</Label>
+                <div className="mt-2">
+                  {imageUrl ? (
+                    <div className="relative w-full max-w-xs">
+                      <div className="aspect-video rounded-lg overflow-hidden bg-neutral-100">
+                        <Image
+                          src={imageUrl}
+                          alt="Service"
+                          width={320}
+                          height={180}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={removeImage}
+                        className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center w-full max-w-xs aspect-video border-2 border-dashed border-neutral-300 rounded-lg cursor-pointer hover:border-orange-500 hover:bg-orange-50 transition-colors">
+                      <div className="flex flex-col items-center justify-center py-4">
+                        {uploading ? (
+                          <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+                        ) : (
+                          <>
+                            <ImageIcon className="h-8 w-8 text-neutral-400 mb-2" />
+                            <p className="text-sm text-neutral-500">Click to upload image</p>
+                            <p className="text-xs text-neutral-400 mt-1">PNG, JPG up to 5MB</p>
+                          </>
+                        )}
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) handleImageUpload(file)
+                        }}
+                        disabled={uploading}
+                      />
+                    </label>
+                  )}
+                </div>
+              </div>
+
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="serviceName">Service Name *</Label>
@@ -355,6 +460,19 @@ export default function ProviderServicesPage() {
             <Card key={service.id}>
               <CardContent className="py-4">
                 <div className="flex items-start justify-between gap-4">
+                  {/* Service Image */}
+                  {service.image_url && (
+                    <div className="w-24 h-24 rounded-lg overflow-hidden bg-neutral-100 flex-shrink-0">
+                      <Image
+                        src={service.image_url}
+                        alt={service.service_name}
+                        width={96}
+                        height={96}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                  
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="font-semibold">{service.service_name}</h3>

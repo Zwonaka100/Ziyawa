@@ -21,7 +21,8 @@ import {
   TrendingUp,
   Image as ImageIcon,
   Share2,
-  FolderKanban
+  FolderKanban,
+  Edit
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/components/providers/auth-provider'
@@ -261,7 +262,22 @@ export default function ProviderDashboardPage() {
       </div>
 
       {/* Quick Links to Profile Management */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-8">
+        <Link href="/dashboard/provider/setup">
+          <Card className="hover:bg-neutral-50 transition-colors cursor-pointer h-full border-orange-500">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-orange-500 flex items-center justify-center">
+                  <Edit className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-medium">Edit Profile</p>
+                  <p className="text-xs text-muted-foreground">Update your info</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
         <Link href="/dashboard/provider/media">
           <Card className="hover:bg-neutral-50 transition-colors cursor-pointer h-full">
             <CardContent className="pt-4 pb-4">
