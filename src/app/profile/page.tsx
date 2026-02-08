@@ -255,7 +255,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Role Upgrade Cards - HIDDEN FOR ADMINS */}
-      {!profile.is_admin && (!profile.is_organizer || !profile.is_artist || !profile.is_provider) && (
+      {profile.is_admin !== true && (!profile.is_organizer || !profile.is_artist || !profile.is_provider) && (
         <div className="mb-6">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
@@ -415,7 +415,7 @@ export default function ProfilePage() {
       )}
 
       {/* Already unlocked roles status - HIDDEN FOR ADMINS */}
-      {!profile.is_admin && (profile.is_organizer || profile.is_artist || profile.is_provider) && (
+      {profile.is_admin !== true && (profile.is_organizer || profile.is_artist || profile.is_provider) && (
         <Card className="mb-6 bg-muted/50">
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
