@@ -10,8 +10,8 @@ import Image from 'next/image'
 export default async function HomePage() {
   const supabase = await createClient()
 
-  // Fetch upcoming events (limit 6) - check both state and is_published for compatibility
-  const { data: events } = await supabase
+  // Fetch upcoming events (limit 6)
+  let { data: events } = await supabase
     .from('events')
     .select(`
       id,
@@ -25,10 +25,34 @@ export default async function HomePage() {
         full_name
       )
     `)
-    .or('state.in.(published,locked),is_published.eq.true')
     .gte('event_date', new Date().toISOString().split('T')[0])
     .order('event_date', { ascending: true })
     .limit(6)
+
+  // If no upcoming events, show recent events instead
+  if (!events || events.length === 0) {
+    const { data: recentEvents } = await supabase
+      .from('events')
+      .select(`
+        id,
+        title,
+        event_date,
+        venue,
+        location,
+        ticket_price,
+        cover_image,
+        profiles:organizer_id (
+          full_name
+        )
+      `)
+      .order('event_date', { ascending: false })
+      .limit(6)
+    events = recentEvents
+  }
+
+  // Check if we're showing upcoming or recent events
+  const hasUpcomingEvents = events && events.length > 0 && 
+    events.some(e => new Date(e.event_date) >= new Date(new Date().toISOString().split('T')[0]))
 
   return (
     <div className="flex flex-col">
@@ -53,17 +77,19 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Upcoming Events Section */}
-      {events && events.length > 0 && (
-        <section className="py-16 md:py-20 bg-white">
-          <div className="container mx-auto px-4">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-2xl md:text-3xl font-bold">Upcoming Events</h2>
-              <Link href="/ziwaphi" className="text-sm font-medium flex items-center gap-1 hover:underline">
-                View all <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
-            
+      {/* Events Section */}
+      <section className="py-16 md:py-20 bg-white">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-2xl md:text-3xl font-bold">
+              {hasUpcomingEvents ? 'Upcoming Events' : 'Recent Events'}
+            </h2>
+            <Link href="/ziwaphi" className="text-sm font-medium flex items-center gap-1 hover:underline">
+              View all <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          
+          {events && events.length > 0 ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {events.map((event) => (
                 <Link key={event.id} href={`/events/${event.id}`}>
@@ -99,18 +125,16 @@ export default async function HomePage() {
                 </Link>
               ))}
             </div>
-
-            {events.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground">No upcoming events yet. Be the first to create one!</p>
-                <Link href="/dashboard/organizer/events/new">
-                  <Button className="mt-4">Create Event</Button>
-                </Link>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">No events yet. Be the first to create one!</p>
+              <Link href="/dashboard/organizer/events/new">
+                <Button className="mt-4">Create Event</Button>
+              </Link>
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* How Ziyawa Works Section */}
       <section className="py-16 md:py-20 bg-neutral-50">

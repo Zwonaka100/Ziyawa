@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     const offset = (page - 1) * limit;
 
-    // Build the query - check both state and is_published for compatibility
+    // Build the query
     let dbQuery = supabase
       .from('events')
       .select(`
@@ -36,8 +36,7 @@ export async function GET(request: NextRequest) {
           average_rating,
           total_reviews
         )
-      `, { count: 'exact' })
-      .or('state.in.(published,locked),is_published.eq.true');
+      `, { count: 'exact' });
 
     // Text search - search in title, description, venue
     if (query) {
@@ -52,10 +51,8 @@ export async function GET(request: NextRequest) {
     // Date filters
     if (dateFrom) {
       dbQuery = dbQuery.gte('event_date', dateFrom);
-    } else {
-      // Default: only show upcoming events
-      dbQuery = dbQuery.gte('event_date', new Date().toISOString().split('T')[0]);
     }
+    // Note: No default date filter - show all events (past and future)
 
     if (dateTo) {
       dbQuery = dbQuery.lte('event_date', dateTo);
@@ -101,21 +98,17 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    // Get unique locations for filter options
+    // Get unique locations for filter options (all events)
     const { data: locations } = await supabase
       .from('events')
-      .select('location')
-      .or('state.in.(published,locked),is_published.eq.true')
-      .gte('event_date', new Date().toISOString().split('T')[0]);
+      .select('location');
 
     const uniqueLocations = [...new Set(locations?.map(e => e.location) || [])];
 
-    // Get price range for filter
+    // Get price range for filter (all events)
     const { data: priceRange } = await supabase
       .from('events')
       .select('ticket_price')
-      .or('state.in.(published,locked),is_published.eq.true')
-      .gte('event_date', new Date().toISOString().split('T')[0])
       .order('ticket_price', { ascending: true });
 
     const prices = priceRange?.map(e => e.ticket_price) || [];

@@ -152,12 +152,15 @@ export default function EditEventPage({ params }: EditEventPageProps) {
       
       const { error } = await supabase
         .from('events')
-        .update({ state: 'published' })
+        .update({ 
+          state: 'published',
+          is_published: true 
+        })
         .eq('id', id)
 
       if (error) throw error
 
-      toast.success('Event published!')
+      toast.success('Event published! It is now visible to everyone.')
       setFormData(prev => ({ ...prev, state: 'published' }))
     } catch (error) {
       console.error('Error publishing event:', error)
