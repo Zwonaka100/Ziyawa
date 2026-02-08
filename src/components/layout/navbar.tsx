@@ -111,6 +111,8 @@ export function Navbar() {
 
           {/* User Menu / Auth Buttons */}
           <div className="hidden md:flex items-center space-x-4">
+            {/* DEBUG - shows current state */}
+            {console.log('DEBUG Navbar - user:', !!user, 'profile:', !!profile, 'is_admin:', profile?.is_admin)}
             {user && profile ? (
               <>
                 {/* DEBUG: Remove this after testing */}
