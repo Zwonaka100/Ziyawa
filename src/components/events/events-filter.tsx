@@ -62,11 +62,14 @@ export function EventsFilter({ currentLocation, currentDate }: EventsFilterProps
 
       {/* Date Filter */}
       <Input
+        id="event-date-filter"
+        name="date"
         type="date"
         className="w-full sm:w-[200px]"
         value={currentDate || ''}
         onChange={(e) => updateFilter('date', e.target.value || null)}
         min={new Date().toISOString().split('T')[0]}
+        autoComplete="off"
       />
 
       {/* Clear Filters */}

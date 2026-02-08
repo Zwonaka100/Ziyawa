@@ -97,10 +97,13 @@ export function Navbar() {
             <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                type="text"
+                id="desktop-search"
+                name="search"
+                type="search"
                 placeholder="Search events..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                autoComplete="off"
                 className="pl-9 pr-4 h-9 w-full bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-purple-500"
               />
             </div>
@@ -251,10 +254,13 @@ export function Navbar() {
               <form onSubmit={(e) => { handleSearch(e); setMobileMenuOpen(false); }} className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  type="text"
+                  id="mobile-search"
+                  name="search"
+                  type="search"
                   placeholder="Search events..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  autoComplete="off"
                   className="pl-9 pr-4 h-10 w-full"
                 />
               </form>

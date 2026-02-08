@@ -455,9 +455,11 @@ export default function ProfilePage() {
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
+                name="email"
                 type="email"
                 value={profile.email}
                 disabled
+                autoComplete="email"
                 className="bg-muted"
               />
               <p className="text-xs text-muted-foreground mt-1">
@@ -469,10 +471,12 @@ export default function ProfilePage() {
               <Label htmlFor="fullName">Full Name</Label>
               <Input
                 id="fullName"
+                name="fullName"
                 type="text"
                 placeholder="Your full name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
+                autoComplete="name"
               />
             </div>
 
@@ -480,10 +484,12 @@ export default function ProfilePage() {
               <Label htmlFor="phone">Phone Number</Label>
               <Input
                 id="phone"
+                name="phone"
                 type="tel"
                 placeholder="+27 XX XXX XXXX"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
+                autoComplete="tel"
               />
             </div>
 
