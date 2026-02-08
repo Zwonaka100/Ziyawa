@@ -112,7 +112,10 @@ export function Navbar() {
           {/* User Menu / Auth Buttons */}
           <div className="hidden md:flex items-center space-x-4">
             {user && profile ? (
-              <DropdownMenu>
+              <>
+                {/* DEBUG: Remove this after testing */}
+                {console.log('Navbar profile.is_admin:', profile.is_admin, 'Type:', typeof profile.is_admin)}
+                <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center space-x-2">
                     <Avatar className="h-8 w-8">
