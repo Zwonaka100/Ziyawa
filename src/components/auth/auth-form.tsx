@@ -7,9 +7,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { Mail, Lock, Sparkles } from 'lucide-react'
+import { Mail, Lock } from 'lucide-react'
 
-type AuthMode = 'signin' | 'signup' | 'magic-link' | 'forgot-password'
+type AuthMode = 'signin' | 'signup' | 'forgot-password'
 
 interface AuthFormProps {
   onSuccess?: () => void
@@ -67,18 +67,6 @@ export function AuthForm({ onSuccess, defaultMode = 'signin' }: AuthFormProps) {
         if (signInError) throw signInError
         onSuccess?.()
         
-      } else if (mode === 'magic-link') {
-        // Send magic link
-        const { error: magicLinkError } = await supabase.auth.signInWithOtp({
-          email,
-          options: {
-            emailRedirectTo: getRedirectUrl(),
-          },
-        })
-
-        if (magicLinkError) throw magicLinkError
-        setMessage('Check your email for the magic link!')
-        
       } else if (mode === 'forgot-password') {
         // Send password reset email
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
@@ -98,7 +86,6 @@ export function AuthForm({ onSuccess, defaultMode = 'signin' }: AuthFormProps) {
   const getTitle = () => {
     switch (mode) {
       case 'signup': return 'Create account'
-      case 'magic-link': return 'Magic Link'
       case 'forgot-password': return 'Reset Password'
       default: return 'Welcome back'
     }
@@ -107,7 +94,6 @@ export function AuthForm({ onSuccess, defaultMode = 'signin' }: AuthFormProps) {
   const getDescription = () => {
     switch (mode) {
       case 'signup': return 'Join Ziyawa and start grooving'
-      case 'magic-link': return 'Get a login link sent to your email'
       case 'forgot-password': return 'We\'ll send you a reset link'
       default: return 'Sign in to your Ziyawa account'
     }
@@ -117,7 +103,6 @@ export function AuthForm({ onSuccess, defaultMode = 'signin' }: AuthFormProps) {
     if (loading) return 'Loading...'
     switch (mode) {
       case 'signup': return 'Create Account'
-      case 'magic-link': return 'Send Magic Link'
       case 'forgot-password': return 'Send Reset Link'
       default: return 'Sign In'
     }
@@ -192,33 +177,11 @@ export function AuthForm({ onSuccess, defaultMode = 'signin' }: AuthFormProps) {
           )}
 
           <Button type="submit" className="w-full" disabled={loading}>
-            {mode === 'magic-link' && <Sparkles className="mr-2 h-4 w-4" />}
             {mode === 'forgot-password' && <Mail className="mr-2 h-4 w-4" />}
             {(mode === 'signin' || mode === 'signup') && <Lock className="mr-2 h-4 w-4" />}
             {getButtonText()}
           </Button>
         </form>
-
-        {/* Magic Link Option for Sign In */}
-        {mode === 'signin' && (
-          <>
-            <div className="relative my-4">
-              <Separator />
-              <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
-                or
-              </span>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={() => setMode('magic-link')}
-            >
-              <Sparkles className="mr-2 h-4 w-4" />
-              Sign in with Magic Link
-            </Button>
-          </>
-        )}
 
         {/* Navigation Links */}
         <div className="mt-4 text-center text-sm space-y-2">
@@ -248,7 +211,7 @@ export function AuthForm({ onSuccess, defaultMode = 'signin' }: AuthFormProps) {
             </p>
           )}
           
-          {(mode === 'magic-link' || mode === 'forgot-password') && (
+          {mode === 'forgot-password' && (
             <p>
               <button
                 type="button"
