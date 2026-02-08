@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useAuth } from '@/components/providers/auth-provider'
+import { useUnreadMessages } from '@/hooks/use-unread-messages'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -51,6 +52,7 @@ export function Navbar() {
   const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const { unreadCount } = useUnreadMessages(user?.id)
 
   const navLinks = [
     { href: '/ziwaphi', label: 'Ziwaphi?', icon: Calendar },
@@ -147,9 +149,16 @@ export function Navbar() {
                   
                   {/* Messages */}
                   <DropdownMenuItem asChild>
-                    <Link href="/messages" className="flex items-center">
-                      <MessageSquare className="mr-2 h-4 w-4" />
-                      Messages
+                    <Link href="/messages" className="flex items-center justify-between w-full">
+                      <span className="flex items-center">
+                        <MessageSquare className="mr-2 h-4 w-4" />
+                        Messages
+                      </span>
+                      {unreadCount > 0 && (
+                        <span className="bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                          {unreadCount > 99 ? '99+' : unreadCount}
+                        </span>
+                      )}
                     </Link>
                   </DropdownMenuItem>
                   
@@ -315,6 +324,17 @@ export function Navbar() {
                         <Button variant="outline" className="w-full justify-start">
                           <Ticket className="mr-2 h-4 w-4" />
                           My Tickets
+                        </Button>
+                      </Link>
+                      <Link href="/messages" onClick={() => setMobileMenuOpen(false)}>
+                        <Button variant="outline" className="w-full justify-start relative">
+                          <MessageSquare className="mr-2 h-4 w-4" />
+                          Messages
+                          {unreadCount > 0 && (
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary text-primary-foreground text-xs rounded-full h-5 min-w-5 flex items-center justify-center px-1">
+                              {unreadCount > 99 ? '99+' : unreadCount}
+                            </span>
+                          )}
                         </Button>
                       </Link>
                       {profile.is_organizer && (

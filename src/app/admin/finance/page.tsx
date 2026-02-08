@@ -99,70 +99,78 @@ export default async function AdminFinancePage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="hover:shadow-md transition-shadow h-full opacity-60">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-neutral-100">
-                <CreditCard className="h-6 w-6" />
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <Link href="/admin/finance/transactions">
+          <Card className="hover:shadow-md transition-shadow h-full cursor-pointer group">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-neutral-100 group-hover:bg-neutral-200 transition-colors">
+                  <CreditCard className="h-6 w-6" />
+                </div>
+                <CardTitle className="text-lg">Transactions</CardTitle>
               </div>
-              <CardTitle className="text-lg">Transactions</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">
-              View all platform transactions. <span className="text-xs text-orange-500">(Coming Soon)</span>
-            </p>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                View all platform transactions, filter by type and status.
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="hover:shadow-md transition-shadow h-full opacity-60">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-100">
-                <Wallet className="h-6 w-6 text-blue-600" />
+        <Link href="/admin/finance/wallets">
+          <Card className="hover:shadow-md transition-shadow h-full cursor-pointer group">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-blue-100 group-hover:bg-blue-200 transition-colors">
+                  <Wallet className="h-6 w-6 text-blue-600" />
+                </div>
+                <CardTitle className="text-lg">Wallets</CardTitle>
               </div>
-              <CardTitle className="text-lg">Wallets</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">
-              Manage user wallets and balances. <span className="text-xs text-orange-500">(Coming Soon)</span>
-            </p>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                Manage user wallets and balances, credit or debit adjustments.
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="hover:shadow-md transition-shadow h-full opacity-60">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-100">
-                <ArrowUpRight className="h-6 w-6 text-green-600" />
+        <Link href="/admin/finance/payouts">
+          <Card className="hover:shadow-md transition-shadow h-full cursor-pointer group">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-green-100 group-hover:bg-green-200 transition-colors">
+                  <ArrowUpRight className="h-6 w-6 text-green-600" />
+                </div>
+                <CardTitle className="text-lg">Payouts</CardTitle>
               </div>
-              <CardTitle className="text-lg">Payouts</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">
-              Review and process pending payouts. <span className="text-xs text-orange-500">(Coming Soon)</span>
-            </p>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                Review and process payout requests to organizers and artists.
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="hover:shadow-md transition-shadow h-full opacity-60">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-orange-100">
-                <RefreshCcw className="h-6 w-6 text-orange-600" />
+        <Link href="/admin/finance/refunds">
+          <Card className="hover:shadow-md transition-shadow h-full cursor-pointer group">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-orange-100 group-hover:bg-orange-200 transition-colors">
+                  <RefreshCcw className="h-6 w-6 text-orange-600" />
+                </div>
+                <CardTitle className="text-lg">Refunds</CardTitle>
               </div>
-              <CardTitle className="text-lg">Refunds</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">
-              Process refund requests. <span className="text-xs text-orange-500">(Coming Soon)</span>
-            </p>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                Process refund requests and manage refund history.
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
     </div>
   )

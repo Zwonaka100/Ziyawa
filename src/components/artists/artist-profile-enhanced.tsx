@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { 
   MapPin, 
   Music, 
@@ -15,7 +16,8 @@ import {
   MessageSquare,
   ExternalLink,
   ChevronDown,
-  Play
+  Play,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency } from '@/lib/helpers';
 import { PROVINCES } from '@/lib/constants';
 import { useAuth } from '@/components/providers/auth-provider';
+import { toast } from 'sonner';
 import { 
   SocialLinksRow, 
   MediaGallery, 
@@ -80,8 +83,49 @@ export function ArtistProfileEnhanced({
   upcomingBookings
 }: ArtistProfileEnhancedProps) {
   const { profile } = useAuth();
+  const router = useRouter();
   const isOrganizer = profile?.is_organizer || profile?.is_admin;
   const [showFullBio, setShowFullBio] = useState(false);
+  const [startingChat, setStartingChat] = useState(false);
+
+  // Start conversation handler
+  const handleStartConversation = async () => {
+    if (!profile) {
+      toast.error('Please sign in to send messages');
+      router.push('/auth/signin');
+      return;
+    }
+
+    if (!isOrganizer) {
+      toast.error('Only organizers can message artists');
+      return;
+    }
+
+    setStartingChat(true);
+    try {
+      const response = await fetch('/api/conversations/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipientId: artist.profiles.id,
+          contextType: 'general',
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to start conversation');
+      }
+
+      router.push(`/messages?chat=${data.conversationId}`);
+    } catch (error) {
+      console.error('Error starting conversation:', error);
+      toast.error('Failed to start conversation');
+    } finally {
+      setStartingChat(false);
+    }
+  };
 
   // Separate media by type
   const images = media.filter(m => m.media_type === 'image');
@@ -497,12 +541,22 @@ export function ArtistProfileEnhanced({
                         {artist.is_available ? 'Request Booking' : 'Not Available'}
                       </Button>
                     </Link>
-                    <Button variant="outline" className="w-full" size="lg">
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      Send Message
+                    <Button 
+                      variant="outline" 
+                      className="w-full" 
+                      size="lg"
+                      onClick={handleStartConversation}
+                      disabled={startingChat}
+                    >
+                      {startingChat ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <MessageSquare className="h-4 w-4 mr-2" />
+                      )}
+                      {startingChat ? 'Opening...' : 'Send Message'}
                     </Button>
                   </div>
-                ) : (
+                ) : profile ? (
                   <div className="text-center">
                     <p className="text-sm text-neutral-500 mb-3">
                       Only event organizers can book artists
@@ -510,6 +564,17 @@ export function ArtistProfileEnhanced({
                     <Link href="/profile">
                       <Button variant="outline" className="w-full">
                         Become an Organizer
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <p className="text-sm text-neutral-500 mb-3">
+                      Sign in to contact this artist
+                    </p>
+                    <Link href="/auth/signin">
+                      <Button className="w-full">
+                        Sign In
                       </Button>
                     </Link>
                   </div>

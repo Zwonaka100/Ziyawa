@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -32,8 +33,11 @@ export function MessagesPageClient({
   currentUserId,
   totalUnread 
 }: MessagesPageClientProps) {
+  const searchParams = useSearchParams();
+  const chatParam = searchParams.get('chat');
+  
   const [conversations, setConversations] = useState(initialConversations);
-  const [selectedConvoId, setSelectedConvoId] = useState<string | null>(null);
+  const [selectedConvoId, setSelectedConvoId] = useState<string | null>(chatParam);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,6 +45,13 @@ export function MessagesPageClient({
   const supabase = createClient();
 
   const selectedConvo = conversations.find(c => c.id === selectedConvoId);
+
+  // Handle chat query param change
+  useEffect(() => {
+    if (chatParam && chatParam !== selectedConvoId) {
+      setSelectedConvoId(chatParam);
+    }
+  }, [chatParam]);
 
   // Filter conversations by search
   const filteredConversations = conversations.filter(convo => 

@@ -5,6 +5,7 @@ import { AuthProvider } from "@/components/providers/auth-provider";
 import { Navbar } from "@/components/layout/navbar";
 import { Footer } from "@/components/layout/footer";
 import { Toaster } from "@/components/ui/sonner";
+import { ZiwaphiFloatingButton } from "@/components/ziwaphi";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,6 +39,7 @@ export default function RootLayout({
             {children}
           </main>
           <Footer />
+          <ZiwaphiFloatingButton />
           <Toaster />
         </AuthProvider>
       </body>

@@ -33,6 +33,7 @@ import { SocialLinksRow } from '@/components/shared'
 import { MediaGallery } from '@/components/shared/media-gallery'
 import { TrackRecordCard } from '@/components/shared/trust-badges'
 import { ReviewsList } from '@/components/shared/reviews'
+import { toast } from 'sonner'
 import { 
   type Provider, 
   type ProviderService, 
@@ -110,6 +111,46 @@ export default function ProviderProfilePage() {
   const [reviews, setReviews] = useState<ReviewWithReviewer[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('services')
+  const [startingChat, setStartingChat] = useState(false)
+
+  // Start conversation handler
+  const handleStartConversation = async () => {
+    if (!profile) {
+      toast.error('Please sign in to send messages');
+      router.push('/auth/signin');
+      return;
+    }
+
+    if (!provider?.profile_id) {
+      toast.error('Cannot message this provider');
+      return;
+    }
+
+    setStartingChat(true);
+    try {
+      const response = await fetch('/api/conversations/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipientId: provider.profile_id,
+          contextType: 'general',
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to start conversation');
+      }
+
+      router.push(`/messages?chat=${data.conversationId}`);
+    } catch (error) {
+      console.error('Error starting conversation:', error);
+      toast.error('Failed to start conversation');
+    } finally {
+      setStartingChat(false);
+    }
+  };
 
   useEffect(() => {
     if (providerId) {
@@ -529,7 +570,7 @@ export default function ProviderProfilePage() {
           {canBook && services.length > 0 && (
             <Card className="border-neutral-200">
               <CardContent className="py-6">
-                <div className="text-center">
+                <div className="text-center space-y-3">
                   <h3 className="font-semibold mb-2">Need this crew?</h3>
                   <p className="text-sm text-muted-foreground mb-4">
                     Send a booking request to {provider.business_name}
@@ -540,6 +581,45 @@ export default function ProviderProfilePage() {
                       Book This Provider
                     </Button>
                   </Link>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={handleStartConversation}
+                    disabled={startingChat}
+                  >
+                    {startingChat ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                    )}
+                    {startingChat ? 'Opening...' : 'Send Message'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Message only (for organizers who see no services) */}
+          {canBook && services.length === 0 && (
+            <Card className="border-neutral-200">
+              <CardContent className="py-6">
+                <div className="text-center space-y-3">
+                  <h3 className="font-semibold mb-2">Contact {provider.business_name}</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Ask about their services
+                  </p>
+                  <Button 
+                    className="w-full"
+                    onClick={handleStartConversation}
+                    disabled={startingChat}
+                  >
+                    {startingChat ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                    )}
+                    {startingChat ? 'Opening...' : 'Send Message'}
+                  </Button>
                 </div>
               </CardContent>
             </Card>

@@ -19,17 +19,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('reviews')
       .select(`
-        *,
-        profiles:user_id (
-          id,
-          full_name,
-          avatar_url
-        ),
-        events:event_id (
-          id,
-          title,
-          slug
-        )
+        *
       `, { count: 'exact' });
 
     if (eventId) {
@@ -62,6 +52,34 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
+    // Fetch user profiles separately for each review
+    let reviewsWithProfiles = reviews || [];
+    if (reviews && reviews.length > 0) {
+      const userIds = [...new Set(reviews.map(r => r.user_id).filter(Boolean))];
+      const eventIds = [...new Set(reviews.map(r => r.event_id).filter(Boolean))];
+      
+      // Fetch profiles
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .in('id', userIds);
+      
+      // Fetch events
+      const { data: events } = await supabase
+        .from('events')
+        .select('id, title, slug')
+        .in('id', eventIds);
+      
+      const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+      const eventMap = new Map((events || []).map(e => [e.id, e]));
+      
+      reviewsWithProfiles = reviews.map(review => ({
+        ...review,
+        profiles: profileMap.get(review.user_id) || null,
+        events: eventMap.get(review.event_id) || null,
+      }));
+    }
+
     // Get rating summary if eventId provided
     let ratingSummary = null;
     if (eventId) {
@@ -75,7 +93,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      reviews: reviews || [],
+      reviews: reviewsWithProfiles,
       ratingSummary,
       pagination: {
         page,

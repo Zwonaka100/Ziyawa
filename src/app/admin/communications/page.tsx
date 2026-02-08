@@ -15,13 +15,13 @@ export default function AdminCommunicationsPage() {
         <p className="text-muted-foreground">Send emails and manage communication templates</p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {/* Send Email */}
         <Link href="/admin/communications/send">
-          <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer h-full group">
             <CardHeader>
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
+                <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
                   <Send className="h-6 w-6 text-primary" />
                 </div>
                 <CardTitle className="text-lg">Send Email</CardTitle>
@@ -37,10 +37,10 @@ export default function AdminCommunicationsPage() {
 
         {/* Bulk Email */}
         <Link href="/admin/communications/bulk">
-          <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer h-full group">
             <CardHeader>
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-blue-100">
+                <div className="p-2 rounded-lg bg-blue-100 group-hover:bg-blue-200 transition-colors">
                   <Users className="h-6 w-6 text-blue-600" />
                 </div>
                 <CardTitle className="text-lg">Bulk Email</CardTitle>
@@ -54,39 +54,43 @@ export default function AdminCommunicationsPage() {
           </Card>
         </Link>
 
-        {/* Email Templates - Coming Soon */}
-        <Card className="hover:shadow-md transition-shadow h-full opacity-60">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-100">
-                <FileText className="h-6 w-6 text-green-600" />
+        {/* Email Templates */}
+        <Link href="/admin/communications/templates">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer h-full group">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-green-100 group-hover:bg-green-200 transition-colors">
+                  <FileText className="h-6 w-6 text-green-600" />
+                </div>
+                <CardTitle className="text-lg">Email Templates</CardTitle>
               </div>
-              <CardTitle className="text-lg">Email Templates</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">
-              Create and manage reusable email templates. <span className="text-xs text-orange-500">(Coming Soon)</span>
-            </p>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                Create and manage reusable email templates with dynamic variables.
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        {/* Email History - Coming Soon */}
-        <Card className="hover:shadow-md transition-shadow h-full opacity-60">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-neutral-100">
-                <History className="h-6 w-6 text-neutral-600" />
+        {/* Email History */}
+        <Link href="/admin/communications/history">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer h-full group">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-neutral-100 group-hover:bg-neutral-200 transition-colors">
+                  <History className="h-6 w-6 text-neutral-600" />
+                </div>
+                <CardTitle className="text-lg">Email History</CardTitle>
               </div>
-              <CardTitle className="text-lg">Email History</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">
-              View all sent emails and their status. <span className="text-xs text-orange-500">(Coming Soon)</span>
-            </p>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                View all sent emails, delivery status, and open rates.
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
     </div>
   )

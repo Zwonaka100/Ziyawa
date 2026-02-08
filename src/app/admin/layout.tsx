@@ -18,7 +18,8 @@ import {
   Menu,
   X,
   LogOut,
-  ChevronDown
+  ChevronDown,
+  Star
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/components/providers/auth-provider'
@@ -30,6 +31,7 @@ const navigation = [
   { name: 'Users', href: '/admin/users', icon: Users },
   { name: 'Events', href: '/admin/events', icon: Calendar },
   { name: 'Reports', href: '/admin/reports', icon: AlertTriangle },
+  { name: 'Reviews', href: '/admin/reviews', icon: Star },
   { name: 'Support Tickets', href: '/admin/support', icon: MessageSquare },
   { name: 'Communications', href: '/admin/communications', icon: Mail },
   { name: 'Finance', href: '/admin/finance', icon: DollarSign },

@@ -46,12 +46,15 @@ export default async function EventPage({ params }: EventPageProps) {
         avatar_url,
         company_name,
         location,
-        bio,
         verified_at
       )
     `)
     .eq('id', id)
     .single()
+
+  if (error) {
+    console.error('Event fetch error:', error)
+  }
 
   if (error || !event) {
     notFound()

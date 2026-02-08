@@ -249,7 +249,7 @@ export default async function HomePage() {
               </Button>
             </Link>
             <Link href="/ziwaphi">
-              <Button size="lg" variant="outline" className="border-neutral-600 text-white hover:bg-neutral-800">
+              <Button size="lg" className="bg-transparent border-2 border-white text-white hover:bg-white hover:text-black">
                 Browse Events
               </Button>
             </Link>

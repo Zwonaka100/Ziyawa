@@ -15,7 +15,7 @@ import { formatCurrency } from '@/lib/helpers'
 import { calculateTicketSaleBreakdown, PLATFORM_FEES } from '@/lib/constants'
 import { toast } from 'sonner'
 import type { Event, Profile } from '@/types/database'
-import { CheckCircle, Loader2, CreditCard, Shield } from 'lucide-react'
+import { Loader2, CreditCard, Shield } from 'lucide-react'
 
 interface PaymentDialogProps {
   open: boolean
@@ -57,8 +57,9 @@ export function PaymentDialog({ open, onOpenChange, event, user, quantity = 1 }:
       }
 
       // Redirect to Paystack checkout
-      if (data.authorizationUrl) {
-        window.location.href = data.authorizationUrl
+      const authUrl = data.data?.authorization_url || data.authorizationUrl || data.authorization_url
+      if (authUrl) {
+        window.location.href = authUrl
       } else {
         throw new Error('No payment URL received')
       }
@@ -72,7 +73,9 @@ export function PaymentDialog({ open, onOpenChange, event, user, quantity = 1 }:
   }
 
   const handleClose = () => {
-    onOpenChange(false)
+    if (!loading) {
+      onOpenChange(false)
+    }
   }
 
   return (
@@ -103,25 +106,12 @@ export function PaymentDialog({ open, onOpenChange, event, user, quantity = 1 }:
             </div>
           </div>
 
-          {/* Security Badge */}
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm flex items-start gap-3">
-            <Shield className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="font-medium text-green-800">Secure Payment</p>
-              <p className="text-green-700">
-                Your payment is processed securely by Paystack, a PCI-DSS compliant payment provider.
-              </p>
-            </div>
-          </div>
-
-          {/* Payment Methods */}
-          <div className="flex items-center justify-center gap-4 py-2">
-            <div className="text-xs text-muted-foreground">Pay with:</div>
-            <div className="flex items-center gap-2">
-              <div className="bg-gray-100 rounded px-2 py-1 text-xs font-medium">Card</div>
-              <div className="bg-gray-100 rounded px-2 py-1 text-xs font-medium">EFT</div>
-              <div className="bg-gray-100 rounded px-2 py-1 text-xs font-medium">Bank</div>
-            </div>
+          {/* Security Badge - Simplified */}
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm flex items-center gap-3">
+            <Shield className="h-5 w-5 text-green-600 flex-shrink-0" />
+            <p className="text-green-700">
+              Secure payments by <span className="font-semibold">Paystack</span>
+            </p>
           </div>
 
           {/* Payment Button */}
@@ -145,8 +135,7 @@ export function PaymentDialog({ open, onOpenChange, event, user, quantity = 1 }:
           </Button>
 
           <p className="text-xs text-center text-muted-foreground">
-            By completing this purchase, you agree to our Terms of Service. 
-            Platform fee of {PLATFORM_FEES.ticketing.platformFeePercent}% applies.
+            By completing this purchase, you agree to our Terms of Service.
           </p>
         </div>
       </DialogContent>
