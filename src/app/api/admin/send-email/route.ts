@@ -2,10 +2,22 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Lazy initialization to avoid build errors
+const getResend = () => {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    return null
+  }
+  return new Resend(apiKey)
+}
 
 export async function POST(request: NextRequest) {
   try {
+    const resend = getResend()
+    if (!resend) {
+      return NextResponse.json({ error: 'Email service not configured' }, { status: 503 })
+    }
+
     const supabase = await createClient()
     
     // Check if user is admin
