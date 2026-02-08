@@ -17,13 +17,13 @@ export async function GET(request: Request) {
         .eq('id', data.user.id)
         .single()
       
-      // Admins go to admin panel, regular users go to Ziwaphi
+      // Admins go to admin panel, regular users go to profile
       if (profile?.is_admin === true) {
         return NextResponse.redirect(`${origin}/admin`)
       }
       
-      // Non-admin users go to Ziwaphi page
-      return NextResponse.redirect(`${origin}/ziwaphi`)
+      // Regular users go to their profile
+      return NextResponse.redirect(`${origin}/profile`)
     }
   }
 
