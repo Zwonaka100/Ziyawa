@@ -139,10 +139,12 @@ export function AuthForm({ onSuccess, defaultMode = 'signin' }: AuthFormProps) {
               <Label htmlFor="fullName">Full Name</Label>
               <Input
                 id="fullName"
+                name="fullName"
                 type="text"
                 placeholder="Enter your full name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
+                autoComplete="name"
                 required
               />
             </div>
@@ -152,10 +154,12 @@ export function AuthForm({ onSuccess, defaultMode = 'signin' }: AuthFormProps) {
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
+              name="email"
               type="email"
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
               required
             />
           </div>
@@ -176,10 +180,12 @@ export function AuthForm({ onSuccess, defaultMode = 'signin' }: AuthFormProps) {
               </div>
               <Input
                 id="password"
+                name="password"
                 type="password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                 required
                 minLength={6}
               />
