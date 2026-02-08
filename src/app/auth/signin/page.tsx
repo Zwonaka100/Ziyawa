@@ -1,23 +1,14 @@
 'use client'
 
 import { Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
 import { AuthForm } from '@/components/auth/auth-form'
 import { Loader2 } from 'lucide-react'
 
 function SignInContent() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const redirect = searchParams.get('redirect') || '/'
-
-  const handleSuccess = () => {
-    // The AuthForm will handle admin redirect internally
-    // For non-admins, redirect to the specified page or home
-    router.push(redirect)
-    router.refresh()
-  }
-
-  return <AuthForm defaultMode="signin" onSuccess={handleSuccess} />
+  // AuthForm handles all redirects internally:
+  // - Admins go to /admin
+  // - Regular users go to /ziwaphi
+  return <AuthForm defaultMode="signin" />
 }
 
 export default function SignInPage() {

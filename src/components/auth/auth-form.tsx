@@ -70,14 +70,17 @@ export function AuthForm({ onSuccess, defaultMode = 'signin' }: AuthFormProps) {
         
         // Check if user is admin and redirect accordingly
         if (data.user) {
-          const { data: profile } = await supabase
+          const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('is_admin')
             .eq('id', data.user.id)
             .single()
           
+          console.log('Auth signin - Profile data:', profile, 'Error:', profileError)
+          
           if (profile?.is_admin === true) {
             // Admin users go directly to admin panel
+            console.log('Redirecting admin to /admin')
             router.push('/admin')
             router.refresh()
             return
@@ -85,6 +88,7 @@ export function AuthForm({ onSuccess, defaultMode = 'signin' }: AuthFormProps) {
         }
         
         // Non-admin users go to Ziwaphi page
+        console.log('Redirecting non-admin to /ziwaphi')
         router.push('/ziwaphi')
         router.refresh()
         
