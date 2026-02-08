@@ -76,14 +76,17 @@ export function AuthForm({ onSuccess, defaultMode = 'signin' }: AuthFormProps) {
             .eq('id', data.user.id)
             .single()
           
-          if (profile?.is_admin) {
+          if (profile?.is_admin === true) {
             // Admin users go directly to admin panel
             router.push('/admin')
+            router.refresh()
             return
           }
         }
         
-        onSuccess?.()
+        // Non-admin users go to Ziwaphi page
+        router.push('/ziwaphi')
+        router.refresh()
         
       } else if (mode === 'forgot-password') {
         // Send password reset email

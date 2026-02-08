@@ -4,7 +4,6 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/'
 
   if (code) {
     const supabase = await createClient()
@@ -18,12 +17,13 @@ export async function GET(request: Request) {
         .eq('id', data.user.id)
         .single()
       
-      // Admins go to admin panel, others follow the next parameter
-      if (profile?.is_admin) {
+      // Admins go to admin panel, regular users go to Ziwaphi
+      if (profile?.is_admin === true) {
         return NextResponse.redirect(`${origin}/admin`)
       }
       
-      return NextResponse.redirect(`${origin}${next}`)
+      // Non-admin users go to Ziwaphi page
+      return NextResponse.redirect(`${origin}/ziwaphi`)
     }
   }
 
