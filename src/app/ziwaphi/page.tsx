@@ -12,15 +12,12 @@ export default function ZiwaphiPage() {
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 bg-clip-text text-transparent">
-          Ziwaphi?
+        <h1 className="text-4xl font-bold mb-2">
+          Ziwaphi? <span className="text-muted-foreground text-2xl">(Where is it going down?)</span>
         </h1>
-        <p className="text-xl text-muted-foreground mb-1">
-          Where is it going down?
-        </p>
         <p className="text-muted-foreground max-w-xl mx-auto">
-          Discover events across South Africa. From Amapiano sessions to festivals, 
-          concerts to comedy shows – find your next unforgettable experience.
+          Find upcoming events across South Africa. Whether it's Amapiano Sunday sessions, 
+          festivals, or intimate concerts – we've got you covered.
         </p>
       </div>
 

@@ -189,7 +189,7 @@ export function SearchFilters({ onSearch, className, compact = false }: SearchFi
           </SelectContent>
         </Select>
 
-        <Button onClick={handleSearch} className="h-12 px-8 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
+        <Button onClick={handleSearch} className="h-12 px-8">
           <Search className="h-5 w-5 mr-2" />
           Search
         </Button>
@@ -377,11 +377,11 @@ export function SearchFilters({ onSearch, className, compact = false }: SearchFi
 
 function FilterTag({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-sm">
+    <span className="inline-flex items-center gap-1 px-3 py-1 bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 rounded-full text-sm">
       {label}
       <button
         onClick={onRemove}
-        className="ml-1 hover:text-purple-900 dark:hover:text-purple-100"
+        className="ml-1 hover:text-neutral-900 dark:hover:text-neutral-100"
       >
         <X className="h-3 w-3" />
       </button>
