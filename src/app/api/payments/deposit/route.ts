@@ -26,9 +26,14 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { amount } = body; // Amount in Rands
+    const amountUnit = body.amountUnit === 'cents' ? 'cents' : 'rands';
+    const rawAmount = Number(body.amount);
+    const amountCents = amountUnit === 'cents'
+      ? Math.round(rawAmount)
+      : Math.round(rawAmount * 100);
+    const amount = amountCents / 100;
 
-    if (!amount || amount < 50) {
+    if (!amountCents || amount < 50) {
       return NextResponse.json(
         { error: 'Minimum deposit is R50' },
         { status: 400 }
@@ -49,8 +54,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Calculate fees (convert to cents)
-    const amountCents = amount * 100;
+    // Calculate fees
     const { fee, totalToPay } = calculateDepositFee(amountCents);
 
     // Generate unique reference
@@ -115,6 +119,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      authorizationUrl: paystackResponse.data.authorization_url,
       data: {
         authorization_url: paystackResponse.data.authorization_url,
         access_code: paystackResponse.data.access_code,

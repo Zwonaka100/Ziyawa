@@ -9,11 +9,10 @@ import { createClient } from '@/lib/supabase/client';
  */
 export function useUnreadMessages(userId: string | undefined) {
   const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(Boolean(userId));
 
   useEffect(() => {
     if (!userId) {
-      setLoading(false);
       return;
     }
 

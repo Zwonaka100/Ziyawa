@@ -12,7 +12,7 @@ This document lists all temporary configurations that need to be updated when ha
 
 | Current (Zande) | Client Should Replace With |
 |-----------------|---------------------------|
-| `RESEND_API_KEY=re_eeZUqWEb_GSgHBh5cqW8pq3UcixQXU4Qj` | Client's own Resend API key |
+| `RESEND_API_KEY=YOUR_RESEND_API_KEY` | Client's own Resend API key |
 | `FROM_EMAIL=Ziyawa <noreply@zande.io>` | Client's verified domain email (e.g., `noreply@ziyawa.co.za`) |
 
 **Steps for client:**
@@ -36,7 +36,7 @@ This document lists all temporary configurations that need to be updated when ha
 **Steps for client:**
 1. Complete Paystack business verification
 2. Get live API keys from dashboard
-3. Set up webhook URL: `https://ziyawa.vercel.app/api/payments/webhook`
+3. Set up webhook URL: `https://ziyawa.vercel.app/api/webhooks/paystack`
 4. Update `.env.local` with live keys
 
 ---

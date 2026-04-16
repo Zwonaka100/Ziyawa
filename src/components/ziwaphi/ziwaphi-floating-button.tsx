@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { X, MessageCircle, Sparkles } from 'lucide-react';
@@ -11,18 +11,16 @@ export function ZiwaphiFloatingButton() {
   const [isOpen, setIsOpen] = useState(false);
   const [showPulse, setShowPulse] = useState(true);
 
-  // Stop pulsing after first open
-  useEffect(() => {
-    if (isOpen) {
-      setShowPulse(false);
-    }
-  }, [isOpen]);
+  const handleOpen = () => {
+    setShowPulse(false);
+    setIsOpen(true);
+  };
 
   return (
     <>
       {/* Floating Button */}
       <Button
-        onClick={() => setIsOpen(true)}
+        onClick={handleOpen}
         className={cn(
           'fixed bottom-4 right-4 z-50 h-14 w-14 rounded-full shadow-lg',
           'bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70',

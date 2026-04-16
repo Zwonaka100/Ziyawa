@@ -20,7 +20,7 @@ import { Separator } from '@/components/ui/separator'
 import { formatCurrency } from '@/lib/helpers'
 import { calculateDepositFee, PLATFORM_FEES } from '@/lib/constants'
 import { toast } from 'sonner'
-import { Loader2, Wallet, Shield, Plus, Minus } from 'lucide-react'
+import { Loader2, Wallet, Shield, Plus } from 'lucide-react'
 
 interface WalletDepositDialogProps {
   open: boolean
@@ -60,8 +60,8 @@ export function WalletDepositDialog({
   }
 
   const handleDeposit = async () => {
-    if (depositAmount < 10) {
-      toast.error('Minimum deposit is R10')
+    if (depositAmount < 50) {
+      toast.error('Minimum deposit is R50')
       return
     }
 
@@ -79,7 +79,8 @@ export function WalletDepositDialog({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          amount: depositAmountCents,
+          amount: depositAmount,
+          amountUnit: 'rands',
         }),
       })
 
@@ -90,8 +91,9 @@ export function WalletDepositDialog({
       }
 
       // Redirect to Paystack checkout
-      if (data.authorizationUrl) {
-        window.location.href = data.authorizationUrl
+      const authUrl = data.authorizationUrl || data.data?.authorization_url
+      if (authUrl) {
+        window.location.href = authUrl
       } else {
         throw new Error('No payment URL received')
       }
@@ -170,7 +172,7 @@ export function WalletDepositDialog({
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              Min: R10 • Max: R50,000
+              Min: R50 • Max: R50,000
             </p>
           </div>
 
@@ -213,7 +215,7 @@ export function WalletDepositDialog({
             onClick={handleDeposit} 
             className="w-full" 
             size="lg"
-            disabled={loading || depositAmount < 10}
+            disabled={loading || depositAmount < 50}
           >
             {loading ? (
               <>

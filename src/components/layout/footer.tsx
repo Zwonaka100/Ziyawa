@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { PLATFORM_CONFIG } from '@/lib/constants'
 
+const contactEmail = process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'info@zande.io'
+
 export function Footer() {
   return (
     <footer className="border-t bg-muted/50">
@@ -60,7 +62,7 @@ export function Footer() {
           <div className="space-y-4">
             <h4 className="font-semibold">Contact</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>hello@ziyawa.co.za</li>
+              <li>{contactEmail}</li>
               <li>South Africa</li>
             </ul>
           </div>

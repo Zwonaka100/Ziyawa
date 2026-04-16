@@ -4,6 +4,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { sendEmail } from './email';
 
 // Service client for server-side operations
 const supabaseAdmin = createClient(
@@ -369,14 +370,26 @@ async function sendNotificationEmail(
   const shouldSend = shouldSendEmail(type, prefs);
   if (!shouldSend) return false;
 
-  // TODO: Integrate with email service (Resend, SendGrid, etc.)
-  // For now, just log
-  console.log(`📧 Email to ${profile.email}: ${title} - ${message}`);
-  
-  // Mark email as sent
-  // This would be done after actually sending the email
-  
-  return true;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const emailResult = await sendEmail({
+    to: profile.email,
+    subject: title,
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="padding: 20px; background-color: #f5f5f5;">
+          <h1 style="color: #333; margin: 0;">Ziyawa</h1>
+        </div>
+        <div style="padding: 20px;">
+          <p>Hi ${profile.full_name || 'there'},</p>
+          <p>${message}</p>
+          ${link ? `<p><a href="${appUrl}${link}" style="color:#7c3aed; font-weight:600;">Open in Ziyawa</a></p>` : ''}
+        </div>
+      </div>
+    `,
+    tags: [{ name: 'category', value: type }],
+  });
+
+  return emailResult.success;
 }
 
 function shouldSendEmail(
@@ -450,7 +463,7 @@ export const notify = {
       userId,
       type: 'payment_received',
       ...NotificationTemplates.paymentReceived(amount, eventTitle),
-      link: `/dashboard/wallet`,
+      link: `/wallet`,
       transactionId,
       sendEmail: true,
     }),
@@ -460,7 +473,7 @@ export const notify = {
       userId,
       type: 'payout_completed',
       ...NotificationTemplates.payoutCompleted(amount),
-      link: `/dashboard/wallet`,
+      link: `/wallet`,
       transactionId,
       sendEmail: true,
     }),

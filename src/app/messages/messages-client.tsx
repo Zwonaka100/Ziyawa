@@ -46,12 +46,7 @@ export function MessagesPageClient({
 
   const selectedConvo = conversations.find(c => c.id === selectedConvoId);
 
-  // Handle chat query param change
-  useEffect(() => {
-    if (chatParam && chatParam !== selectedConvoId) {
-      setSelectedConvoId(chatParam);
-    }
-  }, [chatParam]);
+  // Conversation selection is initialized from the URL on first render.
 
   // Filter conversations by search
   const filteredConversations = conversations.filter(convo => 
@@ -171,7 +166,9 @@ export function MessagesPageClient({
       <div className={`w-full md:w-80 lg:w-96 border-r border-neutral-200 flex flex-col ${selectedConvoId ? 'hidden md:flex' : ''}`}>
         {/* Header */}
         <div className="p-4 border-b border-neutral-200">
-          <h1 className="text-xl font-bold text-neutral-900 mb-4">Messages</h1>
+          <h1 className="text-xl font-bold text-neutral-900 mb-4">
+            Messages{totalUnread > 0 ? ` (${totalUnread})` : ''}
+          </h1>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
             <Input

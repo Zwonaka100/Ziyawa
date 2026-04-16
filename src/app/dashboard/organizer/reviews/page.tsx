@@ -31,7 +31,7 @@ export default async function OrganizerReviewsPage() {
   const eventIds = events?.map(e => e.id) || [];
   
   let reviews = [];
-  let ratingSummaries: Record<string, { average_rating: number; total_reviews: number }> = {};
+  const ratingSummaries: Record<string, { average_rating: number; total_reviews: number }> = {};
 
   if (eventIds.length > 0) {
     const { data: reviewsData } = await supabase

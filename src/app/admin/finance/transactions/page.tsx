@@ -7,7 +7,7 @@
  * View all platform transactions with filters
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent } from '@/components/ui/card'
@@ -40,7 +40,6 @@ import {
   ArrowDownRight,
   RefreshCcw,
   CreditCard,
-  ExternalLink,
   Download,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/helpers'
@@ -50,7 +49,7 @@ interface Transaction {
   id: string
   reference: string
   type: string
-  status: string
+  state: string
   amount: number
   platform_fee: number
   net_amount: number
@@ -66,28 +65,27 @@ interface Transaction {
 const ITEMS_PER_PAGE = 25
 
 const TYPE_CONFIG: Record<string, { label: string; icon: any; color: string }> = {
-  ticket_sale: { label: 'Ticket Sale', icon: Ticket, color: 'bg-green-100 text-green-700' },
+  ticket_purchase: { label: 'Ticket Sale', icon: Ticket, color: 'bg-green-100 text-green-700' },
   wallet_deposit: { label: 'Wallet Deposit', icon: Wallet, color: 'bg-blue-100 text-blue-700' },
   payout: { label: 'Payout', icon: ArrowUpRight, color: 'bg-orange-100 text-orange-700' },
   refund: { label: 'Refund', icon: RefreshCcw, color: 'bg-red-100 text-red-700' },
   booking_payment: { label: 'Booking Payment', icon: CreditCard, color: 'bg-purple-100 text-purple-700' },
+  artist_booking: { label: 'Artist Booking', icon: CreditCard, color: 'bg-purple-100 text-purple-700' },
   vendor_service: { label: 'Vendor Service', icon: CreditCard, color: 'bg-pink-100 text-pink-700' },
   platform_fee: { label: 'Platform Fee', icon: ArrowDownRight, color: 'bg-neutral-100 text-neutral-700' },
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  pending: { label: 'Pending', color: 'bg-yellow-100 text-yellow-700' },
+  initiated: { label: 'Initiated', color: 'bg-yellow-100 text-yellow-700' },
   authorized: { label: 'Authorized', color: 'bg-blue-100 text-blue-700' },
   held: { label: 'Held', color: 'bg-purple-100 text-purple-700' },
   released: { label: 'Released', color: 'bg-green-100 text-green-700' },
-  completed: { label: 'Completed', color: 'bg-green-100 text-green-700' },
+  settled: { label: 'Settled', color: 'bg-emerald-100 text-emerald-700' },
   failed: { label: 'Failed', color: 'bg-red-100 text-red-700' },
   refunded: { label: 'Refunded', color: 'bg-orange-100 text-orange-700' },
 }
 
 export default function AdminTransactionsPage() {
-  const supabase = createClient()
-  
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -104,28 +102,25 @@ export default function AdminTransactionsPage() {
     pendingCount: 0,
   })
 
-  useEffect(() => {
-    fetchTransactions()
-    fetchStats()
-  }, [page, typeFilter, statusFilter])
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
+    const supabase = createClient()
     const { data, count } = await supabase
       .from('transactions')
-      .select('amount, platform_fee, status', { count: 'exact' })
+      .select('amount, platform_fee, state', { count: 'exact' })
 
     if (data) {
-      const completed = data.filter(t => t.status === 'completed')
+      const completed = data.filter(t => t.state === 'settled' || t.state === 'released')
       setStats({
         totalTransactions: count || 0,
         totalVolume: completed.reduce((sum, t) => sum + (t.amount || 0), 0),
         platformFees: completed.reduce((sum, t) => sum + (t.platform_fee || 0), 0),
-        pendingCount: data.filter(t => t.status === 'pending' || t.status === 'held').length,
+        pendingCount: data.filter(t => ['initiated', 'authorized', 'held', 'released'].includes(t.state)).length,
       })
     }
-  }
+  }, [])
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
+    const supabase = createClient()
     setLoading(true)
 
     let query = supabase
@@ -143,7 +138,7 @@ export default function AdminTransactionsPage() {
     }
 
     if (statusFilter !== 'all') {
-      query = query.eq('status', statusFilter)
+      query = query.eq('state', statusFilter)
     }
 
     if (searchQuery) {
@@ -162,7 +157,12 @@ export default function AdminTransactionsPage() {
     }
 
     setLoading(false)
-  }
+  }, [page, typeFilter, statusFilter, searchQuery])
+
+  useEffect(() => {
+    void fetchTransactions()
+    void fetchStats()
+  }, [fetchTransactions, fetchStats])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -243,7 +243,7 @@ export default function AdminTransactionsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="ticket_sale">Ticket Sales</SelectItem>
+                <SelectItem value="ticket_purchase">Ticket Sales</SelectItem>
                 <SelectItem value="wallet_deposit">Wallet Deposits</SelectItem>
                 <SelectItem value="payout">Payouts</SelectItem>
                 <SelectItem value="refund">Refunds</SelectItem>
@@ -256,9 +256,10 @@ export default function AdminTransactionsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="initiated">Initiated</SelectItem>
                 <SelectItem value="held">Held</SelectItem>
+                <SelectItem value="released">Released</SelectItem>
+                <SelectItem value="settled">Settled</SelectItem>
                 <SelectItem value="failed">Failed</SelectItem>
                 <SelectItem value="refunded">Refunded</SelectItem>
               </SelectContent>
@@ -300,7 +301,7 @@ export default function AdminTransactionsPage() {
               ) : (
                 transactions.map((tx) => {
                   const typeConfig = TYPE_CONFIG[tx.type] || { label: tx.type, icon: CreditCard, color: 'bg-neutral-100' }
-                  const statusConfig = STATUS_CONFIG[tx.status] || { label: tx.status, color: 'bg-neutral-100' }
+                  const statusConfig = STATUS_CONFIG[tx.state] || { label: tx.state, color: 'bg-neutral-100' }
                   const TypeIcon = typeConfig.icon
 
                   return (
@@ -338,10 +339,10 @@ export default function AdminTransactionsPage() {
                         ) : '-'}
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        {formatCurrency(tx.amount)}
+                        {formatCurrency(tx.amount / 100)}
                       </TableCell>
                       <TableCell className="text-right text-sm text-muted-foreground">
-                        {formatCurrency(tx.platform_fee)}
+                        {formatCurrency(tx.platform_fee / 100)}
                       </TableCell>
                       <TableCell>
                         <Badge className={statusConfig.color}>

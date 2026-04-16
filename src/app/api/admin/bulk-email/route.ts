@@ -1,23 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { Resend } from 'resend'
+import { sendEmail } from '@/lib/email'
 
-// Lazy initialization to avoid build errors
-const getResend = () => {
-  const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey) {
-    return null
-  }
-  return new Resend(apiKey)
-}
+const INFO_FROM_EMAIL = process.env.INFO_FROM_EMAIL || 'Ziyawa <info@zande.io>'
+const INFO_REPLY_TO = process.env.INFO_EMAIL || process.env.SUPPORT_EMAIL || 'support@zande.io'
 
 export async function POST(request: NextRequest) {
   try {
-    const resend = getResend()
-    if (!resend) {
-      return NextResponse.json({ error: 'Email service not configured' }, { status: 503 })
-    }
-
     const supabase = await createClient()
     
     // Check if user is admin
@@ -45,9 +34,10 @@ export async function POST(request: NextRequest) {
 
     // If test mode, only send to the admin
     if (testMode) {
-      const { error: emailError } = await resend.emails.send({
-        from: 'Ziyawa <noreply@ziyawa.co.za>',
-        to: [profile.email],
+      const emailResult = await sendEmail({
+        from: INFO_FROM_EMAIL,
+        replyTo: INFO_REPLY_TO,
+        to: profile.email,
         subject: `[TEST] ${subject}`,
         html: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
@@ -61,13 +51,14 @@ export async function POST(request: NextRequest) {
               ${body.replace(/\{\{name\}\}/g, 'Test User').replace(/\n/g, '<br>')}
             </div>
             <div style="padding: 20px; background-color: #f5f5f5; font-size: 12px; color: #666;">
-              <p>This email was sent from Ziyawa.</p>
+              <p>This test email was sent from Ziyawa communications. Replies go to ${INFO_REPLY_TO}.</p>
             </div>
           </div>
         `,
+        tags: [{ name: 'category', value: 'admin-bulk-test' }],
       })
 
-      if (emailError) throw emailError
+      if (!emailResult.success) throw new Error(emailResult.error || 'Failed to send test email')
 
       return NextResponse.json({ success: true, count: 1 })
     }
@@ -98,9 +89,10 @@ export async function POST(request: NextRequest) {
         const personalizedBody = body.replace(/\{\{name\}\}/g, firstName)
 
         try {
-          await resend.emails.send({
-            from: 'Ziyawa <noreply@ziyawa.co.za>',
-            to: [recipient.email],
+          const emailResult = await sendEmail({
+            from: INFO_FROM_EMAIL,
+            replyTo: INFO_REPLY_TO,
+            to: recipient.email,
             subject,
             html: `
               <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
@@ -111,11 +103,16 @@ export async function POST(request: NextRequest) {
                   ${personalizedBody.replace(/\n/g, '<br>')}
                 </div>
                 <div style="padding: 20px; background-color: #f5f5f5; font-size: 12px; color: #666;">
-                  <p>This email was sent from Ziyawa. If you did not expect this email, please ignore it.</p>
+                  <p>This email was sent from Ziyawa communications. Replies go to ${INFO_REPLY_TO}.</p>
                 </div>
               </div>
             `,
+            tags: [{ name: 'category', value: 'admin-bulk' }],
           })
+
+          if (!emailResult.success) {
+            throw new Error(emailResult.error || 'Failed to send bulk email')
+          }
           sentCount++
         } catch (e) {
           console.error(`Failed to send to ${recipient.email}:`, e)

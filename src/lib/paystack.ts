@@ -323,10 +323,10 @@ export function verifyWebhookSignature(
   signature: string,
   secret?: string
 ): boolean {
-  const webhookSecret = secret || process.env.PAYSTACK_WEBHOOK_SECRET;
+  const webhookSecret = secret || process.env.PAYSTACK_WEBHOOK_SECRET || process.env.PAYSTACK_SECRET_KEY;
   
   if (!webhookSecret) {
-    console.warn('PAYSTACK_WEBHOOK_SECRET not set - skipping signature verification');
+    console.warn('No Paystack signing secret is set - skipping signature verification');
     return true; // In development, allow without verification
   }
 

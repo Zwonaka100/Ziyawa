@@ -49,9 +49,11 @@ export type TransactionState =
 
 export type TransactionType = 
   | 'ticket_purchase'  // Groovist buying ticket
+  | 'wallet_deposit'   // User topping up wallet
+  | 'booking_payment'  // Generic booking payment flow
   | 'artist_booking'   // Organizer paying artist
   | 'vendor_service'   // Provider/crew payments
-  | 'payout'           // Platform releasing held funds
+  | 'payout'           // Platform releasing held funds / bank payout
   | 'refund'           // Money returning to payer
   | 'platform_fee';    // Ziyawa cut (internal)
 
@@ -155,6 +157,8 @@ export interface Profile {
   warnings_count?: number;
   role?: UserRole;
   wallet_balance: number;
+  held_balance?: number;
+  pending_payout_balance?: number;
   bank_name: string | null;
   bank_account_number: string | null;
   bank_account_holder: string | null;
@@ -232,6 +236,10 @@ export interface Event {
   published_at: string | null;
   locked_at: string | null;
   completed_at: string | null;
+  organizer_completed_at?: string | null;
+  admin_completed_at?: string | null;
+  payout_hold_until?: string | null;
+  completion_notes?: string | null;
   cancelled_at: string | null;
   cancellation_reason: string | null;
   total_revenue: number;
@@ -260,6 +268,10 @@ export interface Booking {
   declined_at: string | null;
   confirmed_at: string | null;
   completed_at: string | null;
+  organizer_completed_at?: string | null;
+  artist_completed_at?: string | null;
+  payout_hold_until?: string | null;
+  completion_notes?: string | null;
   cancelled_at: string | null;
   cancellation_reason: string | null;
   cancelled_by: string | null;
@@ -388,6 +400,10 @@ export interface ProviderBooking {
   declined_at: string | null;
   confirmed_at: string | null;
   completed_at: string | null;
+  organizer_completed_at?: string | null;
+  provider_completed_at?: string | null;
+  payout_hold_until?: string | null;
+  completion_notes?: string | null;
   cancelled_at: string | null;
   cancellation_reason: string | null;
   cancelled_by: string | null;

@@ -15,21 +15,25 @@ import {
   Calendar, 
   Music,
   Ticket,
-  TrendingUp,
   Receipt,
-  Wrench
+  Wrench,
+  Lock,
+  LoaderCircle
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/helpers'
 import { useRouter } from 'next/navigation'
-import { PLATFORM_CONFIG, PLATFORM_FEES } from '@/lib/constants'
+import { PLATFORM_FEES } from '@/lib/constants'
+import { WalletDepositDialog } from '@/components/payments/wallet-deposit-dialog'
+import { WalletWithdrawDialog } from '@/components/payments/wallet-withdraw-dialog'
 
 interface Transaction {
   id: string
   type: string
   amount: number
-  status: string
+  state: string
+  payer_id: string
+  recipient_id: string | null
   created_at: string
-  description?: string
 }
 
 export default function WalletPage() {
@@ -37,33 +41,44 @@ export default function WalletPage() {
   const router = useRouter()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loadingTx, setLoadingTx] = useState(true)
+  const [depositOpen, setDepositOpen] = useState(false)
+  const [withdrawOpen, setWithdrawOpen] = useState(false)
   const supabase = createClient()
+
+  async function fetchTransactions() {
+    if (!user) {
+      setTransactions([])
+      setLoadingTx(false)
+      return
+    }
+
+    setLoadingTx(true)
+
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('id, type, amount, state, payer_id, recipient_id, created_at')
+      .or(`payer_id.eq.${user.id},recipient_id.eq.${user.id}`)
+      .order('created_at', { ascending: false })
+      .limit(20)
+
+    if (!error && data) {
+      setTransactions(data as Transaction[])
+    }
+
+    setLoadingTx(false)
+  }
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/auth/signin')
+      router.replace('/auth/signin')
     }
   }, [user, loading, router])
 
   useEffect(() => {
     if (user) {
-      fetchTransactions()
+      void fetchTransactions()
     }
   }, [user])
-
-  const fetchTransactions = async () => {
-    const { data, error } = await supabase
-      .from('transactions')
-      .select('*')
-      .or(`from_user_id.eq.${user!.id},to_user_id.eq.${user!.id}`)
-      .order('created_at', { ascending: false })
-      .limit(20)
-
-    if (!error && data) {
-      setTransactions(data)
-    }
-    setLoadingTx(false)
-  }
 
   if (loading) {
     return (
@@ -81,53 +96,114 @@ export default function WalletPage() {
   }
 
   const hasRoles = profile.is_organizer || profile.is_artist || profile.is_provider
+  const availableBalance = profile.wallet_balance || 0
+  const heldBalance = profile.held_balance || 0
+  const pendingPayoutBalance = profile.pending_payout_balance || 0
+  const minimumWithdrawal = PLATFORM_FEES.wallet.minimumWithdrawal / 100
+
+  const handleWalletRefresh = async () => {
+    await fetchTransactions()
+    router.refresh()
+  }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-6">My Wallet</h1>
+    <div className="container mx-auto px-4 py-8 max-w-4xl space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold mb-2">My Wallet</h1>
+        <p className="text-muted-foreground">
+          Only cleared funds can be withdrawn. Escrow funds stay protected until the job or event is complete.
+        </p>
+      </div>
 
-      {/* Balance Card */}
-      <Card className="mb-6 bg-gradient-to-br from-primary/10 to-primary/5">
-        <CardHeader>
-          <CardDescription>Total Available Balance</CardDescription>
-          <CardTitle className="text-4xl font-bold text-primary">
-            {formatCurrency(profile.wallet_balance || 0)}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="bg-gradient-to-br from-primary/10 to-primary/5">
+          <CardHeader className="pb-2">
+            <CardDescription>Available Balance</CardDescription>
+            <CardTitle className="text-3xl font-bold text-primary">
+              {formatCurrency(availableBalance)}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">
+              Ready for withdrawal or spending.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Held in Escrow</CardDescription>
+            <CardTitle className="text-3xl font-bold text-amber-600">
+              {formatCurrency(heldBalance)}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">
+              Protected until event or service completion is confirmed.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Payouts Processing</CardDescription>
+            <CardTitle className="text-3xl font-bold text-purple-600">
+              {formatCurrency(pendingPayoutBalance)}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">
+              Already requested and moving through Paystack.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardContent className="pt-6">
           <div className="flex gap-3">
-            <Button disabled={!hasRoles} className="flex-1">
+            <Button
+              disabled={!hasRoles || availableBalance < minimumWithdrawal}
+              className="flex-1"
+              onClick={() => setWithdrawOpen(true)}
+            >
               <ArrowUpRight className="h-4 w-4 mr-2" />
               Request Payout
             </Button>
-            <Button variant="outline" disabled className="flex-1">
+            <Button variant="outline" className="flex-1" onClick={() => setDepositOpen(true)}>
               <ArrowDownLeft className="h-4 w-4 mr-2" />
               Add Funds
             </Button>
           </div>
+
           {!hasRoles && (
             <p className="text-xs text-muted-foreground mt-3 text-center">
-              Become an Organiser, Artist, or Provider to earn and withdraw funds
+              Become an Organiser, Artist, or Provider to earn and withdraw funds.
+            </p>
+          )}
+
+          {hasRoles && availableBalance < minimumWithdrawal && (
+            <p className="text-xs text-muted-foreground mt-3 text-center">
+              Minimum payout amount is {formatCurrency(minimumWithdrawal)}.
             </p>
           )}
         </CardContent>
       </Card>
 
-      {/* Role-based earnings breakdown */}
       {hasRoles && (
-        <div className="grid md:grid-cols-3 gap-4 mb-6">
+        <div className="grid md:grid-cols-3 gap-4">
           {profile.is_organizer && (
             <Card>
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-primary" />
-                  <CardTitle className="text-sm font-medium">Event Earnings</CardTitle>
+                  <CardTitle className="text-sm font-medium">Event Revenue</CardTitle>
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">{formatCurrency(0)}</p>
+                <p className="text-2xl font-bold">{formatCurrency(heldBalance + availableBalance)}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  After {PLATFORM_FEES.ticketing.platformFeePercent}% platform fee
+                  Net of the {PLATFORM_FEES.ticketing.platformFeePercent}% platform fee.
                 </p>
               </CardContent>
             </Card>
@@ -138,13 +214,13 @@ export default function WalletPage() {
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-2">
                   <Music className="h-4 w-4 text-primary" />
-                  <CardTitle className="text-sm font-medium">Booking Earnings</CardTitle>
+                  <CardTitle className="text-sm font-medium">Performance Earnings</CardTitle>
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">{formatCurrency(0)}</p>
+                <p className="text-2xl font-bold">{formatCurrency(heldBalance + availableBalance)}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  From performances
+                  Released only after confirmation and the safety hold window.
                 </p>
               </CardContent>
             </Card>
@@ -159,9 +235,9 @@ export default function WalletPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">{formatCurrency(0)}</p>
+                <p className="text-2xl font-bold">{formatCurrency(heldBalance + availableBalance)}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  From crew services
+                  Cleared after delivery is confirmed and reviewed.
                 </p>
               </CardContent>
             </Card>
@@ -169,7 +245,6 @@ export default function WalletPage() {
         </div>
       )}
 
-      {/* Transaction History with Tabs */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -177,13 +252,13 @@ export default function WalletPage() {
             Transaction History
           </CardTitle>
           <CardDescription>
-            Your wallet activity
+            Purchases, earnings, deposits, and payouts.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {hasRoles ? (
             <Tabs defaultValue="all">
-              <TabsList className="mb-4">
+              <TabsList className="mb-4 flex flex-wrap h-auto">
                 <TabsTrigger value="all">All</TabsTrigger>
                 <TabsTrigger value="purchases">
                   <Ticket className="h-3 w-3 mr-1" />
@@ -210,49 +285,74 @@ export default function WalletPage() {
               </TabsList>
 
               <TabsContent value="all">
-                <TransactionList transactions={transactions} loading={loadingTx} />
+                <TransactionList transactions={transactions} loading={loadingTx} currentUserId={user.id} />
               </TabsContent>
               <TabsContent value="purchases">
-                <TransactionList 
-                  transactions={transactions.filter(t => t.type === 'ticket_purchase')} 
-                  loading={loadingTx} 
+                <TransactionList
+                  transactions={transactions.filter(t => t.type === 'ticket_purchase' && t.payer_id === user.id)}
+                  loading={loadingTx}
+                  currentUserId={user.id}
                 />
               </TabsContent>
               {profile.is_organizer && (
                 <TabsContent value="event-earnings">
-                  <TransactionList 
-                    transactions={transactions.filter(t => t.type === 'event_revenue')} 
-                    loading={loadingTx} 
+                  <TransactionList
+                    transactions={transactions.filter(t => t.type === 'ticket_purchase' && t.recipient_id === user.id)}
+                    loading={loadingTx}
+                    currentUserId={user.id}
                   />
                 </TabsContent>
               )}
               {profile.is_artist && (
                 <TabsContent value="booking-earnings">
-                  <TransactionList 
-                    transactions={transactions.filter(t => t.type === 'booking_payment')} 
-                    loading={loadingTx} 
+                  <TransactionList
+                    transactions={transactions.filter(t => ['booking_payment', 'artist_booking'].includes(t.type) && t.recipient_id === user.id)}
+                    loading={loadingTx}
+                    currentUserId={user.id}
                   />
                 </TabsContent>
               )}
               {profile.is_provider && (
                 <TabsContent value="service-earnings">
-                  <TransactionList 
-                    transactions={transactions.filter(t => t.type === 'vendor_service')} 
-                    loading={loadingTx} 
+                  <TransactionList
+                    transactions={transactions.filter(t => t.type === 'vendor_service' && t.recipient_id === user.id)}
+                    loading={loadingTx}
+                    currentUserId={user.id}
                   />
                 </TabsContent>
               )}
             </Tabs>
           ) : (
-            <TransactionList transactions={transactions} loading={loadingTx} />
+            <TransactionList transactions={transactions} loading={loadingTx} currentUserId={user.id} />
           )}
         </CardContent>
       </Card>
+
+      <WalletDepositDialog
+        open={depositOpen}
+        onOpenChange={setDepositOpen}
+        currentBalance={availableBalance}
+      />
+
+      <WalletWithdrawDialog
+        open={withdrawOpen}
+        onOpenChange={setWithdrawOpen}
+        currentBalance={availableBalance}
+        onSuccess={() => { void handleWalletRefresh() }}
+      />
     </div>
   )
 }
 
-function TransactionList({ transactions, loading }: { transactions: Transaction[], loading: boolean }) {
+function TransactionList({
+  transactions,
+  loading,
+  currentUserId,
+}: {
+  transactions: Transaction[]
+  loading: boolean
+  currentUserId: string
+}) {
   if (loading) {
     return (
       <div className="space-y-3">
@@ -269,7 +369,7 @@ function TransactionList({ transactions, loading }: { transactions: Transaction[
         <Wallet className="h-12 w-12 mx-auto mb-4 opacity-50" />
         <p>No transactions yet</p>
         <p className="text-sm mt-1">
-          Your transaction history will appear here
+          Your wallet activity will appear here.
         </p>
       </div>
     )
@@ -277,47 +377,56 @@ function TransactionList({ transactions, loading }: { transactions: Transaction[
 
   return (
     <div className="space-y-3">
-      {transactions.map((tx) => (
-        <div key={tx.id} className="flex items-center justify-between p-3 border rounded-lg">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${
-              tx.type === 'ticket_purchase' ? 'bg-blue-100' :
-              tx.type === 'event_revenue' ? 'bg-green-100' :
-              tx.type === 'booking_payment' ? 'bg-purple-100' :
-              tx.type === 'vendor_service' ? 'bg-orange-100' :
-              'bg-muted'
-            }`}>
-              {tx.type === 'ticket_purchase' && <Ticket className="h-4 w-4 text-blue-600" />}
-              {tx.type === 'event_revenue' && <TrendingUp className="h-4 w-4 text-green-600" />}
-              {tx.type === 'booking_payment' && <Music className="h-4 w-4 text-purple-600" />}
-              {tx.type === 'vendor_service' && <Wrench className="h-4 w-4 text-orange-600" />}
-              {!['ticket_purchase', 'event_revenue', 'booking_payment', 'vendor_service'].includes(tx.type) && 
-                <Receipt className="h-4 w-4" />
-              }
+      {transactions.map((tx) => {
+        const isCredit = tx.type === 'wallet_deposit' || (tx.recipient_id === currentUserId && tx.type !== 'payout')
+        const label =
+          tx.type === 'ticket_purchase' ? 'Ticket Payment' :
+          tx.type === 'wallet_deposit' ? 'Wallet Deposit' :
+          tx.type === 'booking_payment' ? 'Booking Payment' :
+          tx.type === 'artist_booking' ? 'Artist Booking' :
+          tx.type === 'vendor_service' ? 'Service Payment' :
+          tx.type === 'payout' ? 'Bank Payout' :
+          tx.type
+
+        const iconClass =
+          tx.type === 'ticket_purchase' ? 'bg-blue-100' :
+          tx.type === 'wallet_deposit' ? 'bg-green-100' :
+          tx.type === 'booking_payment' || tx.type === 'artist_booking' ? 'bg-purple-100' :
+          tx.type === 'vendor_service' ? 'bg-orange-100' :
+          tx.type === 'payout' ? 'bg-amber-100' :
+          'bg-muted'
+
+        return (
+          <div key={tx.id} className="flex items-center justify-between p-3 border rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${iconClass}`}>
+                {tx.type === 'ticket_purchase' && <Ticket className="h-4 w-4 text-blue-600" />}
+                {tx.type === 'wallet_deposit' && <Wallet className="h-4 w-4 text-green-600" />}
+                {(tx.type === 'booking_payment' || tx.type === 'artist_booking') && <Music className="h-4 w-4 text-purple-600" />}
+                {tx.type === 'vendor_service' && <Wrench className="h-4 w-4 text-orange-600" />}
+                {tx.type === 'payout' && <ArrowUpRight className="h-4 w-4 text-amber-600" />}
+                {!['ticket_purchase', 'wallet_deposit', 'booking_payment', 'artist_booking', 'vendor_service', 'payout'].includes(tx.type) && (
+                  <Receipt className="h-4 w-4" />
+                )}
+              </div>
+              <div>
+                <p className="font-medium text-sm">{label}</p>
+                <p className="text-xs text-muted-foreground">{formatDate(tx.created_at)}</p>
+              </div>
             </div>
-            <div>
-              <p className="font-medium text-sm">
-                {tx.type === 'ticket_purchase' ? 'Ticket Purchase' :
-                 tx.type === 'event_revenue' ? 'Event Revenue' :
-                 tx.type === 'booking_payment' ? 'Booking Payment' :
-                 tx.type === 'vendor_service' ? 'Service Payment' :
-                 tx.type}
+            <div className="text-right">
+              <p className={`font-semibold ${isCredit ? 'text-green-600' : 'text-red-600'}`}>
+                {isCredit ? '+' : '-'}{formatCurrency(tx.amount / 100)}
               </p>
-              <p className="text-xs text-muted-foreground">{formatDate(tx.created_at)}</p>
+              <Badge variant={tx.state === 'settled' || tx.state === 'released' ? 'default' : 'secondary'} className="text-xs capitalize gap-1">
+                {tx.state === 'held' && <Lock className="h-3 w-3" />}
+                {tx.state === 'released' && <LoaderCircle className="h-3 w-3" />}
+                {tx.state}
+              </Badge>
             </div>
           </div>
-          <div className="text-right">
-            <p className={`font-semibold ${
-              tx.type === 'ticket_purchase' ? 'text-red-600' : 'text-green-600'
-            }`}>
-              {tx.type === 'ticket_purchase' ? '-' : '+'}{formatCurrency(tx.amount)}
-            </p>
-            <Badge variant={tx.status === 'completed' ? 'default' : 'secondary'} className="text-xs">
-              {tx.status}
-            </Badge>
-          </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

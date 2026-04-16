@@ -222,7 +222,7 @@ export function NotificationCenter() {
                 No notifications yet
               </p>
               <p className="text-xs text-muted-foreground/70">
-                You're all caught up!
+                You&apos;re all caught up!
               </p>
             </div>
           ) : (

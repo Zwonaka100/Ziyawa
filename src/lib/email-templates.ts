@@ -121,7 +121,7 @@ export function emailWrapper(content: string): string {
   <div class="container">
     <div class="email-wrapper">
       <div class="header">
-        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://ziyawa.co.za'}" class="logo">
+        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://ziyawa.vercel.app'}" class="logo">
           Ziyawa
         </a>
       </div>

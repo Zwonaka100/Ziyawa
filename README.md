@@ -4,7 +4,7 @@
 
 Ziyawa is a demo event marketplace connecting event organizers, artists, and groovists (event-goers) across South Africa.
 
-![Demo](https://img.shields.io/badge/Status-Demo-yellow)
+![MVP](https://img.shields.io/badge/Status-MVP%20Beta-green)
 ![Next.js](https://img.shields.io/badge/Next.js-14+-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue)
 ![Supabase](https://img.shields.io/badge/Supabase-Database-green)
@@ -196,16 +196,33 @@ Installed components:
 3. Wait for booking requests
 4. Accept or decline bookings
 
-## 🚧 What's Not Included (Demo Scope)
+## � Current Platform Status (April 2026)
 
-- ❌ Real payment processing
-- ❌ Chat/messaging between users
-- ❌ Reviews and ratings
-- ❌ Vendor marketplace
-- ❌ Mobile app
-- ❌ Admin dashboard
-- ❌ Email notifications
-- ❌ Image uploads (using placeholders)
+### Working now
+- ✅ Public event discovery with Ziwaphi
+- ✅ Authentication and role-based dashboards
+- ✅ Organizer event creation and artist booking flows
+- ✅ Ticket purchase flow with Paystack integration in test mode
+- ✅ Admin dashboard for users, events, reports, finance, and support
+- ✅ In-app messaging, reviews, and notifications foundation
+- ✅ Provider/Crew marketplace foundation with booking flows
+
+### Still being hardened before full public launch
+- ⚠️ Final payout and withdrawal UX polish
+- ⚠️ Full smoke/regression coverage
+- ⚠️ Production key rotation, webhook hardening, and monitoring
+- ⚠️ Remaining UI cleanup and mobile polish
+
+## 🧪 Smoke Testing
+
+Run the lightweight launch checks against a running local app:
+
+```bash
+npm run dev
+npm run test:smoke
+```
+
+The smoke suite checks the core launch routes for sign-in, event discovery, event details/ticket purchase visibility, organizer booking protection, wallet access, and support access.
 
 ## 📝 License
 

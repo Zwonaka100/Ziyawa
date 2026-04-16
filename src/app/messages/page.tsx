@@ -13,7 +13,7 @@ export default async function MessagesPage() {
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) {
-    redirect('/login?redirect=/messages');
+    redirect('/auth/signin?redirect=/messages');
   }
 
   // Fetch conversations with participant info

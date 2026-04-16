@@ -1,23 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { Resend } from 'resend'
+import { sendEmail } from '@/lib/email'
 
-// Lazy initialization to avoid build errors
-const getResend = () => {
-  const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey) {
-    return null
-  }
-  return new Resend(apiKey)
-}
+const SUPPORT_FROM_EMAIL = process.env.SUPPORT_FROM_EMAIL || 'Ziyawa Support <support@zande.io>'
+const SUPPORT_REPLY_TO = process.env.SUPPORT_EMAIL || 'support@zande.io'
 
 export async function POST(request: NextRequest) {
   try {
-    const resend = getResend()
-    if (!resend) {
-      return NextResponse.json({ error: 'Email service not configured' }, { status: 503 })
-    }
-
     const supabase = await createClient()
     
     // Check if user is admin
@@ -56,28 +45,29 @@ export async function POST(request: NextRequest) {
     const personalizedBody = body.replace(/\{\{name\}\}/g, recipientName)
 
     // Send email
-    const { error: emailError } = await resend.emails.send({
-      from: 'Ziyawa <noreply@ziyawa.co.za>',
-      to: [to],
-      subject: subject,
+    const emailResult = await sendEmail({
+      from: SUPPORT_FROM_EMAIL,
+      replyTo: SUPPORT_REPLY_TO,
+      to,
+      subject,
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="padding: 20px; background-color: #f5f5f5;">
-            <h1 style="color: #333; margin: 0;">Ziyawa</h1>
+            <h1 style="color: #333; margin: 0;">Ziyawa Support</h1>
           </div>
           <div style="padding: 20px;">
             ${personalizedBody.replace(/\n/g, '<br>')}
           </div>
           <div style="padding: 20px; background-color: #f5f5f5; font-size: 12px; color: #666;">
-            <p>This email was sent from Ziyawa. If you did not expect this email, please ignore it.</p>
+            <p>This email was sent from Ziyawa support. Replies will go to ${SUPPORT_REPLY_TO}.</p>
           </div>
         </div>
       `,
+      tags: [{ name: 'category', value: 'admin-support' }],
     })
 
-    if (emailError) {
-      console.error('Email error:', emailError)
-      throw emailError
+    if (!emailResult.success) {
+      throw new Error(emailResult.error || 'Failed to send email')
     }
 
     // Log the email

@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyWebhookSignature, verifyPayment, generateTicketCode } from '@/lib/paystack';
+import { adjustProfileBalanceBuckets } from '@/lib/payments/escrow';
 
 // Use service role for webhooks (no user context)
 const supabase = createClient(
@@ -195,6 +196,12 @@ async function processTicketPurchase(
       })
       .eq('id', transaction.id);
 
+    if (transaction.recipient_id) {
+      await adjustProfileBalanceBuckets(transaction.recipient_id as string, {
+        heldDelta: ((transaction.net_amount as number) || 0) / 100,
+      });
+    }
+
     console.log(`✅ Ticket purchase completed: ${quantity} tickets for event ${eventId}`);
 
   } catch (error) {
@@ -288,6 +295,12 @@ async function processBookingPayment(
       })
       .eq('id', transaction.id);
 
+    if (transaction.recipient_id) {
+      await adjustProfileBalanceBuckets(transaction.recipient_id as string, {
+        heldDelta: ((transaction.net_amount as number) || 0) / 100,
+      });
+    }
+
     // 2. Update booking state to confirmed
     const tableName = bookingType === 'vendor' ? 'provider_bookings' : 'bookings';
     
@@ -321,6 +334,18 @@ async function processBookingPayment(
 async function handleTransferSuccess(data: { reference: string }) {
   const { reference } = data;
 
+  const { data: transaction } = await supabase
+    .from('transactions')
+    .select('id, type, payer_id, amount, state')
+    .eq('reference', reference)
+    .single();
+
+  if (transaction?.type === 'payout' && transaction.payer_id) {
+    await adjustProfileBalanceBuckets(transaction.payer_id, {
+      pendingPayoutDelta: -(((transaction.amount as number) || 0) / 100),
+    });
+  }
+
   await supabase
     .from('transactions')
     .update({
@@ -337,6 +362,20 @@ async function handleTransferSuccess(data: { reference: string }) {
  */
 async function handleTransferFailed(data: { reference: string; reason: string }) {
   const { reference, reason } = data;
+
+  const { data: transaction } = await supabase
+    .from('transactions')
+    .select('id, type, payer_id, amount')
+    .eq('reference', reference)
+    .single();
+
+  if (transaction?.type === 'payout' && transaction.payer_id) {
+    const refundAmount = ((transaction.amount as number) || 0) / 100;
+    await adjustProfileBalanceBuckets(transaction.payer_id, {
+      walletDelta: refundAmount,
+      pendingPayoutDelta: -refundAmount,
+    });
+  }
 
   await supabase
     .from('transactions')
@@ -355,6 +394,20 @@ async function handleTransferFailed(data: { reference: string; reason: string })
  */
 async function handleTransferReversed(data: { reference: string }) {
   const { reference } = data;
+
+  const { data: transaction } = await supabase
+    .from('transactions')
+    .select('id, type, payer_id, amount')
+    .eq('reference', reference)
+    .single();
+
+  if (transaction?.type === 'payout' && transaction.payer_id) {
+    const refundAmount = ((transaction.amount as number) || 0) / 100;
+    await adjustProfileBalanceBuckets(transaction.payer_id, {
+      walletDelta: refundAmount,
+      pendingPayoutDelta: -refundAmount,
+    });
+  }
 
   await supabase
     .from('transactions')

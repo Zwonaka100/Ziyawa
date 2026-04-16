@@ -59,8 +59,8 @@ type PlatformSettings = {
 const defaultSettings: PlatformSettings = {
   platform_name: 'Ziyawa',
   platform_description: 'South African Events Marketplace',
-  contact_email: 'hello@ziyawa.co.za',
-  support_email: 'support@ziyawa.co.za',
+  contact_email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'info@zande.io',
+  support_email: process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'support@zande.io',
   platform_fee_percentage: 10,
   minimum_payout_amount: 100,
   payout_processing_days: 7,

@@ -87,10 +87,10 @@ export default function AdminSupportPage() {
   const [totalCount, setTotalCount] = useState(0)
 
   useEffect(() => {
-    fetchTickets()
+    void fetchTickets()
   }, [page, statusFilter, categoryFilter])
 
-  const fetchTickets = async () => {
+  async function fetchTickets() {
     setLoading(true)
     const supabase = createClient()
 
@@ -136,7 +136,7 @@ export default function AdminSupportPage() {
   const handleUpdateStatus = async (ticketId: string, status: string) => {
     const supabase = createClient()
     
-    const updateData: any = { status }
+    const updateData: Record<string, string> = { status }
     
     if (status === 'resolved') {
       updateData.resolved_at = new Date().toISOString()

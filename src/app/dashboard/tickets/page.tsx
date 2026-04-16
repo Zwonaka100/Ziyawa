@@ -57,82 +57,90 @@ export default async function TicketsPage() {
         
         {upcomingTickets.length > 0 ? (
           <div className="grid gap-4">
-            {upcomingTickets.map((ticket) => (
-              <Card key={ticket.id}>
-                <CardContent className="p-4">
-                  <div className="flex flex-col md:flex-row gap-4">
-                    {/* Event Image */}
-                    <div className="w-full md:w-48 h-32 bg-gradient-to-br from-primary/20 to-primary/5 rounded-lg flex items-center justify-center">
-                      {ticket.events?.cover_image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={ticket.events.cover_image}
-                          alt={ticket.events.title}
-                          className="w-full h-full object-cover rounded-lg"
-                        />
-                      ) : (
-                        <Calendar className="h-10 w-10 text-primary/40" />
-                      )}
-                    </div>
+            {upcomingTickets.map((ticket) => {
+              const event = ticket.events
 
-                    {/* Event Details */}
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-semibold text-lg">{ticket.events?.title}</h3>
-                        <Badge>
-                          {getDaysUntilEvent(ticket.events?.event_date!) === 0 
-                            ? 'Today!' 
-                            : `In ${getDaysUntilEvent(ticket.events?.event_date!)} days`}
-                        </Badge>
-                      </div>
-                      
-                      <div className="grid sm:grid-cols-2 gap-2 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4" />
-                          <span>{formatDate(ticket.events?.event_date!)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          <span>{formatTime(ticket.events?.start_time!)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4" />
-                          <span>{ticket.events?.venue}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Ticket className="h-4 w-4" />
-                          <span>{PROVINCES[ticket.events?.location as keyof typeof PROVINCES]}</span>
-                        </div>
+              if (!event) {
+                return null
+              }
+
+              const daysUntilEvent = getDaysUntilEvent(event.event_date)
+
+              return (
+                <Card key={ticket.id}>
+                  <CardContent className="p-4">
+                    <div className="flex flex-col md:flex-row gap-4">
+                      {/* Event Image */}
+                      <div className="w-full md:w-48 h-32 bg-gradient-to-br from-primary/20 to-primary/5 rounded-lg flex items-center justify-center">
+                        {event.cover_image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={event.cover_image}
+                            alt={event.title}
+                            className="w-full h-full object-cover rounded-lg"
+                          />
+                        ) : (
+                          <Calendar className="h-10 w-10 text-primary/40" />
+                        )}
                       </div>
 
-                      {/* Ticket Code with QR */}
-                      <div className="mt-4 p-3 bg-muted rounded-lg flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <QrCode className="h-5 w-5" />
-                          <div>
-                            <p className="text-xs text-muted-foreground">Ticket Code</p>
-                            <p className="font-mono font-bold">{ticket.ticket_code}</p>
+                      {/* Event Details */}
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between mb-2">
+                          <h3 className="font-semibold text-lg">{event.title}</h3>
+                          <Badge>
+                            {daysUntilEvent === 0 ? 'Today!' : `In ${daysUntilEvent} days`}
+                          </Badge>
+                        </div>
+                        
+                        <div className="grid sm:grid-cols-2 gap-2 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4" />
+                            <span>{formatDate(event.event_date)}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4" />
+                            <span>{formatTime(event.start_time)}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4" />
+                            <span>{event.venue}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Ticket className="h-4 w-4" />
+                            <span>{PROVINCES[event.location as keyof typeof PROVINCES]}</span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {ticket.checked_in && (
-                            <Badge variant="default" className="bg-green-500">
-                              <CheckCircle className="h-3 w-3 mr-1" />
-                              Checked In
-                            </Badge>
-                          )}
-                          <TicketWithQR 
-                            ticketCode={ticket.ticket_code}
-                            eventId={ticket.events?.id}
-                            ticketId={ticket.id}
-                          />
+
+                        {/* Ticket Code with QR */}
+                        <div className="mt-4 p-3 bg-muted rounded-lg flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <QrCode className="h-5 w-5" />
+                            <div>
+                              <p className="text-xs text-muted-foreground">Ticket Code</p>
+                              <p className="font-mono font-bold">{ticket.ticket_code}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {ticket.checked_in && (
+                              <Badge variant="default" className="bg-green-500">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Checked In
+                              </Badge>
+                            )}
+                            <TicketWithQR 
+                              ticketCode={ticket.ticket_code}
+                              eventId={event.id}
+                              ticketId={ticket.id}
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         ) : (
           <Card>
@@ -155,21 +163,29 @@ export default async function TicketsPage() {
         <section>
           <h2 className="text-xl font-semibold mb-4">Past Events ({pastTickets.length})</h2>
           <div className="grid gap-4">
-            {pastTickets.map((ticket) => (
-              <Card key={ticket.id} className="opacity-70">
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h3 className="font-semibold">{ticket.events?.title}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {formatDate(ticket.events?.event_date!)} • {ticket.events?.venue}
-                      </p>
+            {pastTickets.map((ticket) => {
+              const event = ticket.events
+
+              if (!event) {
+                return null
+              }
+
+              return (
+                <Card key={ticket.id} className="opacity-70">
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h3 className="font-semibold">{event.title}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {formatDate(event.event_date)} • {event.venue}
+                        </p>
+                      </div>
+                      <Badge variant="secondary">Past</Badge>
                     </div>
-                    <Badge variant="secondary">Past</Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         </section>
       )}

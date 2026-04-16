@@ -63,7 +63,7 @@ export function WalletWithdrawDialog({
   const netPayout = fees.netAmount / 100
 
   // Minimum withdrawal
-  const MIN_WITHDRAWAL = 50
+  const MIN_WITHDRAWAL = PLATFORM_FEES.wallet.minimumWithdrawal / 100
   const canWithdraw = withdrawAmount >= MIN_WITHDRAWAL && withdrawAmount <= currentBalance
 
   // Load banks on mount
@@ -145,6 +145,7 @@ export function WalletWithdrawDialog({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount: withdrawAmountCents,
+          amountUnit: 'cents',
           bankCode,
           accountNumber,
           accountName,

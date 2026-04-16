@@ -9,7 +9,8 @@ import * as EmailTemplates from './email-templates';
 
 // Email configuration
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const FROM_EMAIL = process.env.FROM_EMAIL || 'Ziyawa <noreply@ziyawa.co.za>';
+const FROM_EMAIL = process.env.FROM_EMAIL || 'Ziyawa <noreply@zande.io>';
+const DEFAULT_REPLY_TO = process.env.REPLY_TO_EMAIL || process.env.SUPPORT_EMAIL || 'support@zande.io';
 const RESEND_API_URL = 'https://api.resend.com/emails';
 
 interface SendEmailParams {
@@ -17,6 +18,7 @@ interface SendEmailParams {
   subject: string;
   html: string;
   text?: string;
+  from?: string;
   replyTo?: string;
   tags?: { name: string; value: string }[];
 }
@@ -44,12 +46,12 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: FROM_EMAIL,
+        from: params.from || FROM_EMAIL,
         to: Array.isArray(params.to) ? params.to : [params.to],
         subject: params.subject,
         html: params.html,
         text: params.text,
-        reply_to: params.replyTo,
+        reply_to: params.replyTo || DEFAULT_REPLY_TO,
         tags: params.tags,
       }),
     });

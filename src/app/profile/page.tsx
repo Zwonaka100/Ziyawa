@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -46,14 +46,24 @@ function getRoleBadges(profile: { is_admin?: boolean; admin_role?: string | null
 
 export default function ProfilePage() {
   const router = useRouter()
-  const { user, profile, refreshProfile } = useAuth()
+  const { user, profile, refreshProfile, loading: authLoading } = useAuth()
   const [loading, setLoading] = useState(false)
   const [upgrading, setUpgrading] = useState<string | null>(null)
   const [fullName, setFullName] = useState(profile?.full_name || '')
   const [phone, setPhone] = useState(profile?.phone || '')
 
-  if (!user || !profile) {
-    router.push('/auth/signin')
+  useEffect(() => {
+    if (!authLoading && (!user || !profile)) {
+      router.replace('/auth/signin')
+    }
+  }, [authLoading, user, profile, router])
+
+  useEffect(() => {
+    setFullName(profile?.full_name || '')
+    setPhone(profile?.phone || '')
+  }, [profile])
+
+  if (authLoading || !user || !profile) {
     return null
   }
 

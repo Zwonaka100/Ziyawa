@@ -8,13 +8,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createTransferRecipient, initiateTransfer, generatePaymentReference } from '@/lib/paystack';
-import { calculateWithdrawalFee } from '@/lib/constants';
+import { calculateWithdrawalFee, PLATFORM_FEES } from '@/lib/constants';
+import { adjustProfileBalanceBuckets } from '@/lib/payments/escrow';
+
+function resolveRecipientType(profile: { is_artist?: boolean; is_provider?: boolean }) {
+  if (profile.is_artist) return 'artist';
+  if (profile.is_provider) return 'vendor';
+  return 'organizer';
+}
+
+function normalizeAmountToCents(rawAmount: unknown, unit: string = 'cents') {
+  const numericAmount = Number(rawAmount);
+
+  if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+    return 0;
+  }
+
+  return unit === 'rands'
+    ? Math.round(numericAmount * 100)
+    : Math.round(numericAmount);
+}
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
 
-    // Get authenticated user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     
     if (authError || !user) {
@@ -24,10 +42,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user profile with wallet balance
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('id, full_name, email, wallet_balance')
+      .select('id, full_name, email, wallet_balance, held_balance, pending_payout_balance, is_organizer, is_artist, is_provider')
       .eq('id', user.id)
       .single();
 
@@ -39,9 +56,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { amount, bankCode, accountNumber, accountName } = body;
+    const { amount, bankCode, accountNumber, accountName, amountUnit = 'cents' } = body;
 
-    // Validate input
     if (!amount || !bankCode || !accountNumber || !accountName) {
       return NextResponse.json(
         { error: 'Amount, bank code, account number, and account name are required' },
@@ -49,32 +65,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Amount is in cents
-    const amountInCents = parseInt(amount);
+    const amountInCents = normalizeAmountToCents(amount, amountUnit);
     const amountInRands = amountInCents / 100;
+    const minimumWithdrawalRands = PLATFORM_FEES.wallet.minimumWithdrawal / 100;
 
-    // Check minimum withdrawal (R50)
-    if (amountInRands < 50) {
+    if (amountInRands < minimumWithdrawalRands) {
       return NextResponse.json(
-        { error: 'Minimum withdrawal is R50' },
+        { error: `Minimum withdrawal is R${minimumWithdrawalRands}` },
         { status: 400 }
       );
     }
 
-    // Check wallet balance
-    if (amountInRands > profile.wallet_balance) {
+    if (amountInRands > Number(profile.wallet_balance || 0)) {
       return NextResponse.json(
-        { error: 'Insufficient wallet balance' },
+        { error: 'Insufficient available wallet balance' },
         { status: 400 }
       );
     }
 
-    // Calculate fees
     const fees = calculateWithdrawalFee(amountInCents);
     const netPayoutCents = fees.netAmount;
+
+    if (netPayoutCents <= 0) {
+      return NextResponse.json(
+        { error: 'Withdrawal amount is too low after fees' },
+        { status: 400 }
+      );
+    }
+
     const reference = generatePaymentReference('WDR');
 
-    // 1. Create transfer recipient in Paystack
     const recipientResult = await createTransferRecipient({
       name: accountName,
       account_number: accountNumber,
@@ -92,23 +112,23 @@ export async function POST(request: NextRequest) {
 
     const recipientCode = recipientResult.data.recipient_code;
 
-    // 2. Create transaction record (as pending)
     const { data: transaction, error: txnError } = await supabase
       .from('transactions')
       .insert({
         reference,
-        type: 'withdrawal',
+        type: 'payout',
         state: 'initiated',
         payer_id: user.id,
+        recipient_id: user.id,
+        recipient_type: resolveRecipientType(profile),
         amount: amountInCents,
         platform_fee: fees.fee,
         net_amount: netPayoutCents,
-        currency: 'ZAR',
-        metadata: {
-          type: 'wallet_withdrawal',
-          user_id: user.id,
+        gateway_provider: 'paystack',
+        gateway_response: {
+          payout_type: 'wallet_withdrawal',
           bank_code: bankCode,
-          account_number: accountNumber.slice(-4), // Only store last 4 digits
+          account_number_last4: String(accountNumber).slice(-4),
           account_name: accountName,
           recipient_code: recipientCode,
         },
@@ -116,7 +136,7 @@ export async function POST(request: NextRequest) {
       .select()
       .single();
 
-    if (txnError) {
+    if (txnError || !transaction) {
       console.error('Transaction creation error:', txnError);
       return NextResponse.json(
         { error: 'Failed to create withdrawal record' },
@@ -124,42 +144,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Deduct from wallet immediately (will be refunded if transfer fails)
-    const newBalance = profile.wallet_balance - amountInRands;
-    
-    const { error: walletError } = await supabase
-      .from('profiles')
-      .update({ wallet_balance: newBalance })
-      .eq('id', user.id);
+    const bucketUpdate = await adjustProfileBalanceBuckets(user.id, {
+      walletDelta: -amountInRands,
+      pendingPayoutDelta: amountInRands,
+    });
 
-    if (walletError) {
-      // Rollback transaction record
+    if (!bucketUpdate.success) {
       await supabase
         .from('transactions')
-        .update({ state: 'failed', failure_reason: 'Wallet update failed' })
+        .update({ state: 'failed', failure_reason: 'Wallet bucket update failed' })
         .eq('id', transaction.id);
       
       return NextResponse.json(
-        { error: 'Failed to update wallet balance' },
+        { error: 'Failed to reserve funds for payout' },
         { status: 500 }
       );
     }
 
-    // 4. Initiate transfer via Paystack
-    // Note: Paystack transfer amounts are in the smallest currency unit (kobo/cents)
     const transferResult = await initiateTransfer({
-      amount: netPayoutCents, // In cents
+      amount: netPayoutCents,
       recipient_code: recipientCode,
       reason: `Ziyawa wallet withdrawal - ${reference}`,
       reference,
     });
 
     if (!transferResult.status) {
-      // Transfer failed - refund wallet
-      await supabase
-        .from('profiles')
-        .update({ wallet_balance: profile.wallet_balance })
-        .eq('id', user.id);
+      await adjustProfileBalanceBuckets(user.id, {
+        walletDelta: amountInRands,
+        pendingPayoutDelta: -amountInRands,
+      });
 
       await supabase
         .from('transactions')
@@ -171,16 +184,16 @@ export async function POST(request: NextRequest) {
         .eq('id', transaction.id);
 
       return NextResponse.json(
-        { error: 'Transfer failed. Your wallet has been refunded.' },
+        { error: 'Transfer failed. Your available wallet balance has been restored.' },
         { status: 400 }
       );
     }
 
-    // 5. Update transaction with transfer details
     await supabase
       .from('transactions')
       .update({ 
-        state: 'processing',
+        state: 'released',
+        released_at: new Date().toISOString(),
         gateway_response: transferResult.data,
       })
       .eq('id', transaction.id);

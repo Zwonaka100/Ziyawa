@@ -91,7 +91,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    let updateData: Record<string, unknown> = {};
+    const updateData: Record<string, unknown> = {};
 
     if (isOwner) {
       // User updating their own review

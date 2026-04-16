@@ -83,6 +83,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }>
 }
 
 export default function SupportPage() {
+  const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'support@zande.io'
   const { user, profile, loading: authLoading } = useAuth()
   const router = useRouter()
   const supabase = createClient()
@@ -316,7 +317,7 @@ export default function SupportPage() {
                 <div>
                   <h3 className="font-semibold">Email Us</h3>
                   <p className="text-sm text-muted-foreground">
-                    support@ziyawa.co.za
+                    {supportEmail}
                   </p>
                 </div>
               </div>

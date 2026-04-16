@@ -95,10 +95,10 @@ export default function AdminReportsPage() {
   const [totalCount, setTotalCount] = useState(0)
 
   useEffect(() => {
-    fetchReports()
+    void fetchReports()
   }, [page, statusFilter, typeFilter])
 
-  const fetchReports = async () => {
+  async function fetchReports() {
     setLoading(true)
     const supabase = createClient()
 
@@ -142,7 +142,7 @@ export default function AdminReportsPage() {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     
-    const updateData: any = { status }
+    const updateData: Record<string, string | null | undefined> = { status }
     
     if (status === 'resolved' || status === 'dismissed') {
       updateData.resolved_by = user?.id

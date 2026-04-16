@@ -76,10 +76,10 @@ export default function AdminUsersPage() {
   const [totalCount, setTotalCount] = useState(0)
 
   useEffect(() => {
-    fetchUsers()
+    void fetchUsers()
   }, [page, roleFilter, statusFilter])
 
-  const fetchUsers = async () => {
+  async function fetchUsers() {
     setLoading(true)
     const supabase = createClient()
 
