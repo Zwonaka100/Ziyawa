@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -46,8 +46,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
   const [adminRole, setAdminRole] = useState<string | null>(null)
+  const [accessChecked, setAccessChecked] = useState(false)
 
   useEffect(() => {
+    let cancelled = false
+
     if (loading) return
 
     if (!user) {
@@ -55,7 +58,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       return
     }
 
-    // Check if user is admin
     const checkAdmin = async () => {
       const supabase = createClient()
       const { data, error } = await supabase
@@ -64,16 +66,26 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         .eq('id', user.id)
         .single()
 
+      if (cancelled) return
+
       if (error || !data?.is_admin) {
+        setIsAdmin(false)
+        setAdminRole(null)
+        setAccessChecked(true)
         router.push('/')
         return
       }
 
       setIsAdmin(true)
-      setAdminRole(data.admin_role)
+      setAdminRole(data.admin_role || null)
+      setAccessChecked(true)
     }
 
-    checkAdmin()
+    void checkAdmin()
+
+    return () => {
+      cancelled = true
+    }
   }, [user, loading, router])
 
   const handleSignOut = async () => {
@@ -82,7 +94,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     router.push('/')
   }
 
-  if (loading || isAdmin === null) {
+  if (loading || !accessChecked || isAdmin === null) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -197,7 +209,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Page content */}
         <main className="p-4 lg:p-6">
-          {children}
+          <Suspense
+            fallback={
+              <div className="flex min-h-[240px] items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+              </div>
+            }
+          >
+            {children}
+          </Suspense>
         </main>
       </div>
     </div>
