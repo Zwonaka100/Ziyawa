@@ -161,7 +161,7 @@ export default function WalletPage() {
 
       <Card>
         <CardContent className="pt-6">
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <Button
               disabled={!hasRoles || availableBalance < minimumWithdrawal}
               className="flex-1"
@@ -187,6 +187,21 @@ export default function WalletPage() {
               Minimum payout amount is {formatCurrency(minimumWithdrawal)}.
             </p>
           )}
+
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+              <p className="font-medium">1. Earn</p>
+              <p className="text-muted-foreground">Ticket and booking payments first enter escrow for safety.</p>
+            </div>
+            <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+              <p className="font-medium">2. Confirm</p>
+              <p className="text-muted-foreground">Once the event or service is completed, funds move to available balance.</p>
+            </div>
+            <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+              <p className="font-medium">3. Withdraw</p>
+              <p className="text-muted-foreground">Bank payouts usually land within 24 hours after Paystack confirms them.</p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -388,6 +403,32 @@ function TransactionList({
           tx.type === 'payout' ? 'Bank Payout' :
           tx.type
 
+        const stateLabel =
+          tx.state === 'held' ? 'In Escrow' :
+          tx.type === 'payout' && tx.state === 'released' ? 'Processing' :
+          tx.state === 'released' ? 'Available' :
+          tx.state === 'settled' ? 'Settled' :
+          tx.state === 'refunded' ? 'Returned' :
+          tx.state === 'initiated' ? 'Started' :
+          tx.state
+
+        const stateHint =
+          tx.type === 'payout' && tx.state === 'released'
+            ? 'Sent to Paystack for bank transfer.'
+            : tx.type === 'payout' && tx.state === 'failed'
+              ? 'Payout failed and the funds were restored to your wallet.'
+              : tx.type === 'payout' && tx.state === 'refunded'
+                ? 'Transfer reversed and the funds were returned to your wallet.'
+                : tx.state === 'held'
+                  ? 'Protected until completion checks pass.'
+                  : tx.state === 'released'
+                    ? 'Funds are now available in your wallet.'
+                    : tx.state === 'settled'
+                      ? 'Completed successfully.'
+                      : tx.state === 'initiated'
+                        ? 'Waiting for gateway confirmation.'
+                        : ''
+
         const iconClass =
           tx.type === 'ticket_purchase' ? 'bg-blue-100' :
           tx.type === 'wallet_deposit' ? 'bg-green-100' :
@@ -397,8 +438,8 @@ function TransactionList({
           'bg-muted'
 
         return (
-          <div key={tx.id} className="flex items-center justify-between p-3 border rounded-lg">
-            <div className="flex items-center gap-3">
+          <div key={tx.id} className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
               <div className={`p-2 rounded-lg ${iconClass}`}>
                 {tx.type === 'ticket_purchase' && <Ticket className="h-4 w-4 text-blue-600" />}
                 {tx.type === 'wallet_deposit' && <Wallet className="h-4 w-4 text-green-600" />}
@@ -412,16 +453,17 @@ function TransactionList({
               <div>
                 <p className="font-medium text-sm">{label}</p>
                 <p className="text-xs text-muted-foreground">{formatDate(tx.created_at)}</p>
+                {stateHint && <p className="mt-1 text-xs text-muted-foreground">{stateHint}</p>}
               </div>
             </div>
-            <div className="text-right">
+            <div className="text-left sm:text-right">
               <p className={`font-semibold ${isCredit ? 'text-green-600' : 'text-red-600'}`}>
                 {isCredit ? '+' : '-'}{formatCurrency(tx.amount / 100)}
               </p>
               <Badge variant={tx.state === 'settled' || tx.state === 'released' ? 'default' : 'secondary'} className="text-xs capitalize gap-1">
                 {tx.state === 'held' && <Lock className="h-3 w-3" />}
-                {tx.state === 'released' && <LoaderCircle className="h-3 w-3" />}
-                {tx.state}
+                {tx.type === 'payout' && tx.state === 'released' && <LoaderCircle className="h-3 w-3 animate-spin" />}
+                {stateLabel}
               </Badge>
             </div>
           </div>

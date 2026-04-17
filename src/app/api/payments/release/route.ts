@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { releaseEligibleHeldFunds } from '@/lib/payments/escrow'
+import { captureServerError, logOpsEvent } from '@/lib/monitoring'
 
 async function isAdminRequest() {
   const supabase = await createClient()
@@ -35,6 +36,7 @@ async function handleRelease(request: NextRequest) {
   const allowed = hasValidCronSecret(request) || await isAdminRequest()
 
   if (!allowed) {
+    logOpsEvent('payments-release', 'warn', 'Unauthorized release attempt blocked')
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -44,13 +46,24 @@ async function handleRelease(request: NextRequest) {
     bookingId: request.nextUrl.searchParams.get('bookingId') || undefined,
   })
 
+  logOpsEvent('payments-release', 'info', 'Held-funds release run completed', { result })
   return NextResponse.json({ success: true, result })
 }
 
 export async function GET(request: NextRequest) {
-  return handleRelease(request)
+  try {
+    return await handleRelease(request)
+  } catch (error) {
+    captureServerError('payments-release', error)
+    return NextResponse.json({ error: 'Release run failed' }, { status: 500 })
+  }
 }
 
 export async function POST(request: NextRequest) {
-  return handleRelease(request)
+  try {
+    return await handleRelease(request)
+  } catch (error) {
+    captureServerError('payments-release', error)
+    return NextResponse.json({ error: 'Release run failed' }, { status: 500 })
+  }
 }

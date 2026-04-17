@@ -12,12 +12,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyWebhookSignature, verifyPayment, generateTicketCode } from '@/lib/paystack';
 import { adjustProfileBalanceBuckets } from '@/lib/payments/escrow';
+import { createNotification } from '@/lib/notifications';
+import { captureServerError, logOpsEvent } from '@/lib/monitoring';
 
 // Use service role for webhooks (no user context)
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+function formatZarFromCents(amount: number) {
+  return new Intl.NumberFormat('en-ZA', {
+    style: 'currency',
+    currency: 'ZAR',
+  }).format((amount || 0) / 100);
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,7 +36,9 @@ export async function POST(request: NextRequest) {
 
     // Verify webhook signature
     if (!verifyWebhookSignature(payload, signature)) {
-      console.error('Invalid webhook signature');
+      logOpsEvent('paystack-webhook', 'warn', 'Invalid webhook signature received', {
+        hasSignature: Boolean(signature),
+      });
       return NextResponse.json(
         { error: 'Invalid signature' },
         { status: 401 }
@@ -35,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     const event = JSON.parse(payload);
-    console.log('Paystack webhook received:', event.event);
+    logOpsEvent('paystack-webhook', 'info', 'Webhook received', { event: event.event });
 
     switch (event.event) {
       case 'charge.success':
@@ -55,13 +66,13 @@ export async function POST(request: NextRequest) {
         break;
 
       default:
-        console.log('Unhandled webhook event:', event.event);
+        logOpsEvent('paystack-webhook', 'info', 'Unhandled webhook event', { event: event.event });
     }
 
     return NextResponse.json({ received: true });
 
   } catch (error) {
-    console.error('Webhook error:', error);
+    captureServerError('paystack-webhook', error);
     return NextResponse.json(
       { error: 'Webhook processing failed' },
       { status: 500 }
@@ -340,7 +351,22 @@ async function handleTransferSuccess(data: { reference: string }) {
     .eq('reference', reference)
     .single();
 
-  if (transaction?.type === 'payout' && transaction.payer_id) {
+  if (!transaction || transaction.type !== 'payout') {
+    logOpsEvent('paystack-webhook', 'warn', 'Transfer success without matching payout transaction', { reference });
+    return;
+  }
+
+  if (transaction.state === 'settled') {
+    logOpsEvent('paystack-webhook', 'info', 'Ignoring duplicate transfer success', { reference, state: transaction.state });
+    return;
+  }
+
+  if (['failed', 'refunded'].includes(transaction.state)) {
+    logOpsEvent('paystack-webhook', 'warn', 'Ignoring late transfer success after wallet restoration', { reference, state: transaction.state });
+    return;
+  }
+
+  if (transaction.payer_id) {
     await adjustProfileBalanceBuckets(transaction.payer_id, {
       pendingPayoutDelta: -(((transaction.amount as number) || 0) / 100),
     });
@@ -354,7 +380,7 @@ async function handleTransferSuccess(data: { reference: string }) {
     })
     .eq('reference', reference);
 
-  console.log(`✅ Transfer completed: ${reference}`);
+  logOpsEvent('paystack-webhook', 'info', 'Transfer completed', { reference });
 }
 
 /**
@@ -365,15 +391,41 @@ async function handleTransferFailed(data: { reference: string; reason: string })
 
   const { data: transaction } = await supabase
     .from('transactions')
-    .select('id, type, payer_id, amount')
+    .select('id, type, payer_id, amount, state')
     .eq('reference', reference)
     .single();
 
-  if (transaction?.type === 'payout' && transaction.payer_id) {
-    const refundAmount = ((transaction.amount as number) || 0) / 100;
+  if (!transaction || transaction.type !== 'payout') {
+    logOpsEvent('paystack-webhook', 'warn', 'Transfer failure without matching payout transaction', { reference, reason });
+    return;
+  }
+
+  if (['failed', 'refunded'].includes(transaction.state)) {
+    logOpsEvent('paystack-webhook', 'info', 'Ignoring duplicate transfer failure', { reference, state: transaction.state });
+    return;
+  }
+
+  if (transaction.state === 'settled') {
+    logOpsEvent('paystack-webhook', 'warn', 'Ignoring transfer failure after settlement', { reference, state: transaction.state });
+    return;
+  }
+
+  const refundAmount = ((transaction.amount as number) || 0) / 100;
+
+  if (transaction.payer_id) {
     await adjustProfileBalanceBuckets(transaction.payer_id, {
       walletDelta: refundAmount,
       pendingPayoutDelta: -refundAmount,
+    });
+
+    await createNotification({
+      userId: transaction.payer_id,
+      type: 'payment_failed',
+      title: 'Payout failed',
+      message: `Your payout of ${formatZarFromCents((transaction.amount as number) || 0)} could not be completed. The funds have been returned to your wallet.`,
+      link: '/wallet',
+      transactionId: transaction.id,
+      sendEmail: true,
     });
   }
 
@@ -386,7 +438,7 @@ async function handleTransferFailed(data: { reference: string; reason: string })
     })
     .eq('reference', reference);
 
-  console.log(`❌ Transfer failed: ${reference} - ${reason}`);
+  logOpsEvent('paystack-webhook', 'warn', 'Transfer failed and funds restored', { reference, reason });
 }
 
 /**
@@ -397,15 +449,36 @@ async function handleTransferReversed(data: { reference: string }) {
 
   const { data: transaction } = await supabase
     .from('transactions')
-    .select('id, type, payer_id, amount')
+    .select('id, type, payer_id, amount, state')
     .eq('reference', reference)
     .single();
 
-  if (transaction?.type === 'payout' && transaction.payer_id) {
-    const refundAmount = ((transaction.amount as number) || 0) / 100;
+  if (!transaction || transaction.type !== 'payout') {
+    logOpsEvent('paystack-webhook', 'warn', 'Transfer reversal without matching payout transaction', { reference });
+    return;
+  }
+
+  if (transaction.state === 'refunded') {
+    logOpsEvent('paystack-webhook', 'info', 'Ignoring duplicate transfer reversal', { reference, state: transaction.state });
+    return;
+  }
+
+  const refundAmount = ((transaction.amount as number) || 0) / 100;
+
+  if (transaction.payer_id && transaction.state !== 'failed') {
     await adjustProfileBalanceBuckets(transaction.payer_id, {
       walletDelta: refundAmount,
-      pendingPayoutDelta: -refundAmount,
+      pendingPayoutDelta: ['initiated', 'released'].includes(transaction.state) ? -refundAmount : 0,
+    });
+
+    await createNotification({
+      userId: transaction.payer_id,
+      type: 'refund_issued',
+      title: 'Payout reversed',
+      message: `Paystack reversed your payout of ${formatZarFromCents((transaction.amount as number) || 0)}. The funds are now back in your wallet.`,
+      link: '/wallet',
+      transactionId: transaction.id,
+      sendEmail: true,
     });
   }
 
@@ -414,8 +487,9 @@ async function handleTransferReversed(data: { reference: string }) {
     .update({
       state: 'refunded',
       refunded_at: new Date().toISOString(),
+      failure_reason: 'Transfer reversed by Paystack',
     })
     .eq('reference', reference);
 
-  console.log(`↩️ Transfer reversed: ${reference}`);
+  logOpsEvent('paystack-webhook', 'warn', 'Transfer reversed and wallet updated', { reference, previousState: transaction.state });
 }

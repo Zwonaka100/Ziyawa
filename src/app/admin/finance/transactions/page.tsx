@@ -100,21 +100,28 @@ export default function AdminTransactionsPage() {
     totalVolume: 0,
     platformFees: 0,
     pendingCount: 0,
+    heldVolume: 0,
+    issueCount: 0,
   })
 
   const fetchStats = useCallback(async () => {
     const supabase = createClient()
     const { data, count } = await supabase
       .from('transactions')
-      .select('amount, platform_fee, state', { count: 'exact' })
+      .select('amount, net_amount, platform_fee, state', { count: 'exact' })
 
     if (data) {
       const completed = data.filter(t => t.state === 'settled' || t.state === 'released')
+      const held = data.filter(t => t.state === 'held')
+      const issues = data.filter(t => ['failed', 'refunded'].includes(t.state))
+
       setStats({
         totalTransactions: count || 0,
         totalVolume: completed.reduce((sum, t) => sum + (t.amount || 0), 0),
         platformFees: completed.reduce((sum, t) => sum + (t.platform_fee || 0), 0),
         pendingCount: data.filter(t => ['initiated', 'authorized', 'held', 'released'].includes(t.state)).length,
+        heldVolume: held.reduce((sum, t) => sum + (t.net_amount || t.amount || 0), 0),
+        issueCount: issues.length,
       })
     }
   }, [])
@@ -172,6 +179,22 @@ export default function AdminTransactionsPage() {
 
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE)
 
+  const getStatusConfig = (tx: Transaction) => {
+    if (tx.type === 'payout' && tx.state === 'released') {
+      return { label: 'Processing', color: 'bg-blue-100 text-blue-700' }
+    }
+
+    if (tx.state === 'held') {
+      return { label: 'In Escrow', color: 'bg-purple-100 text-purple-700' }
+    }
+
+    if (tx.state === 'released') {
+      return { label: 'Available', color: 'bg-green-100 text-green-700' }
+    }
+
+    return STATUS_CONFIG[tx.state] || { label: tx.state, color: 'bg-neutral-100' }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -195,7 +218,7 @@ export default function AdminTransactionsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Transactions</p>
@@ -205,19 +228,31 @@ export default function AdminTransactionsPage() {
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Volume</p>
-            <p className="text-2xl font-bold">{formatCurrency(stats.totalVolume)}</p>
+            <p className="text-2xl font-bold">{formatCurrency(stats.totalVolume / 100)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Platform Fees</p>
-            <p className="text-2xl font-bold text-green-600">{formatCurrency(stats.platformFees)}</p>
+            <p className="text-2xl font-bold text-green-600">{formatCurrency(stats.platformFees / 100)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Pending</p>
             <p className="text-2xl font-bold text-yellow-600">{stats.pendingCount}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">Held in Escrow</p>
+            <p className="text-2xl font-bold text-purple-600">{formatCurrency(stats.heldVolume / 100)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">Issues</p>
+            <p className="text-2xl font-bold text-red-600">{stats.issueCount}</p>
           </CardContent>
         </Card>
       </div>
@@ -271,6 +306,7 @@ export default function AdminTransactionsPage() {
       {/* Transactions Table */}
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -301,7 +337,7 @@ export default function AdminTransactionsPage() {
               ) : (
                 transactions.map((tx) => {
                   const typeConfig = TYPE_CONFIG[tx.type] || { label: tx.type, icon: CreditCard, color: 'bg-neutral-100' }
-                  const statusConfig = STATUS_CONFIG[tx.state] || { label: tx.state, color: 'bg-neutral-100' }
+                  const statusConfig = getStatusConfig(tx)
                   const TypeIcon = typeConfig.icon
 
                   return (
@@ -358,6 +394,7 @@ export default function AdminTransactionsPage() {
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 

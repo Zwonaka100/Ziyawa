@@ -5,7 +5,7 @@
  * Allows users to withdraw funds from their wallet to their bank account
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -66,23 +66,7 @@ export function WalletWithdrawDialog({
   const MIN_WITHDRAWAL = PLATFORM_FEES.wallet.minimumWithdrawal / 100
   const canWithdraw = withdrawAmount >= MIN_WITHDRAWAL && withdrawAmount <= currentBalance
 
-  // Load banks on mount
-  useEffect(() => {
-    if (open && banks.length === 0) {
-      loadBanks()
-    }
-  }, [open])
-
-  // Verify account when bank and account number are provided
-  useEffect(() => {
-    if (bankCode && accountNumber.length === 10) {
-      verifyAccount()
-    } else {
-      setAccountName('')
-    }
-  }, [bankCode, accountNumber])
-
-  const loadBanks = async () => {
+  const loadBanks = useCallback(async () => {
     setLoadingBanks(true)
     try {
       const response = await fetch('/api/payments/banks')
@@ -96,9 +80,9 @@ export function WalletWithdrawDialog({
     } finally {
       setLoadingBanks(false)
     }
-  }
+  }, [])
 
-  const verifyAccount = async () => {
+  const verifyAccount = useCallback(async () => {
     setVerifying(true)
     setAccountName('')
     
@@ -124,7 +108,23 @@ export function WalletWithdrawDialog({
     } finally {
       setVerifying(false)
     }
-  }
+  }, [accountNumber, bankCode])
+
+  // Load banks on mount
+  useEffect(() => {
+    if (open && banks.length === 0) {
+      void loadBanks()
+    }
+  }, [open, banks.length, loadBanks])
+
+  // Verify account when bank and account number are provided
+  useEffect(() => {
+    if (bankCode && accountNumber.length === 10) {
+      void verifyAccount()
+    } else {
+      setAccountName('')
+    }
+  }, [bankCode, accountNumber, verifyAccount])
 
   const handleWithdraw = async () => {
     if (!canWithdraw) {
@@ -302,6 +302,10 @@ export function WalletWithdrawDialog({
               )}
             </div>
           )}
+
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            Only your available balance can be withdrawn. If Paystack rejects or reverses the transfer, the money is returned to your wallet automatically.
+          </div>
 
           <Separator />
 
