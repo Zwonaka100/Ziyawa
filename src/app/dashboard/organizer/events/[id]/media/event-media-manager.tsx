@@ -152,15 +152,28 @@ export function EventMediaManager({
 
   // Add media
   const handleAddMedia = async () => {
-    if (!newMedia.url) return;
+    if (!trimmedMediaUrl) {
+      toast.error('Please paste a media URL first');
+      return;
+    }
 
     let embedId: string | null = null;
     let thumbnailUrl: string | null = null;
-    
+
     if (newMedia.media_type === 'youtube_video') {
-      embedId = extractYouTubeId(newMedia.url);
-      if (embedId) {
-        thumbnailUrl = getYouTubeThumbnail(embedId);
+      embedId = extractYouTubeId(trimmedMediaUrl);
+      if (!embedId) {
+        toast.error('Please enter a valid YouTube URL');
+        return;
+      }
+      thumbnailUrl = getYouTubeThumbnail(embedId);
+    }
+
+    if (newMedia.media_type === 'tiktok_video') {
+      const isValidTikTokUrl = /tiktok\.com\//i.test(trimmedMediaUrl);
+      if (!isValidTikTokUrl) {
+        toast.error('Please enter a valid TikTok URL');
+        return;
       }
     }
 
@@ -169,7 +182,7 @@ export function EventMediaManager({
       .insert({
         event_id: eventId,
         media_type: newMedia.media_type,
-        url: newMedia.url,
+        url: trimmedMediaUrl,
         thumbnail_url: thumbnailUrl,
         embed_id: embedId,
         title: newMedia.title || null,
@@ -283,6 +296,8 @@ export function EventMediaManager({
 
   const galleryImages = media.filter(m => m.media_type === 'image' && m.is_gallery);
   const promoVideos = media.filter(m => m.media_type !== 'image');
+  const trimmedMediaUrl = newMedia.url.trim();
+  const canSaveMedia = trimmedMediaUrl.length > 0 && !uploading;
 
   const handlePublishEvent = async () => {
     setPublishing(true);
@@ -516,7 +531,7 @@ export function EventMediaManager({
                 <Button 
                   onClick={handleAddMedia} 
                   className="w-full"
-                  disabled={!newMedia.url || uploading}
+                  disabled={!canSaveMedia}
                 >
                   Save Media
                 </Button>
