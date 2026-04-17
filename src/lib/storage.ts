@@ -14,9 +14,9 @@
  * - organizers/{userId}/profile/
  * - organizers/{userId}/cover/
  * - organizers/{userId}/gallery/
- * - events/{eventId}/poster/
- * - events/{eventId}/gallery/
- * - events/{eventId}/promo/
+ * - events/{userId}/{eventId}/poster/
+ * - events/{userId}/{eventId}/gallery/
+ * - events/{userId}/{eventId}/promo/
  */
 
 import { createClient } from '@/lib/supabase/client'
@@ -184,8 +184,17 @@ export async function uploadEventFile(
     }
 
     const supabase = createClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return { success: false, error: 'You must be signed in to upload event media' }
+    }
+
     const filename = generateFilename(file.name)
-    const path = `events/${eventId}/${folder}/${filename}`
+    const path = `events/${user.id}/${eventId}/${folder}/${filename}`
 
     const { error } = await supabase.storage
       .from(BUCKET_NAME)

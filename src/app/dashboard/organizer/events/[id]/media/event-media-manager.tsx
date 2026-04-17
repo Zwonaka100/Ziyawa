@@ -23,10 +23,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -272,7 +272,6 @@ export function EventMediaManager({
 
   const galleryImages = media.filter(m => m.media_type === 'image' && m.is_gallery);
   const promoVideos = media.filter(m => m.media_type !== 'image');
-  const poster = media.find(m => m.is_primary_poster);
 
   return (
     <div className="space-y-8">
@@ -331,6 +330,9 @@ export function EventMediaManager({
                 <li>• High contrast text for readability</li>
                 <li>• JPEG or PNG format, max 10MB</li>
               </ul>
+              <p className="mt-3 text-xs text-primary font-medium">
+                Poster uploads save automatically once the upload finishes.
+              </p>
             </div>
           </div>
         </div>
@@ -353,6 +355,9 @@ export function EventMediaManager({
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>Add Media</DialogTitle>
+                <DialogDescription>
+                  Upload an image or paste a video link, then save it to this event.
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 {/* Media Type */}
@@ -450,7 +455,7 @@ export function EventMediaManager({
                   className="w-full"
                   disabled={!newMedia.url || uploading}
                 >
-                  Add Media
+                  Save Media
                 </Button>
               </div>
             </DialogContent>
