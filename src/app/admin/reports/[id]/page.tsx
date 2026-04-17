@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
@@ -50,9 +50,8 @@ import {
   Eye,
   Loader2,
   Flag,
-  Clock,
-  Shield,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { format, formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
 
@@ -84,10 +83,34 @@ interface Report {
 
 interface ReportedContent {
   type: string
-  data: any
+  data: {
+    id?: string
+    avatar_url?: string
+    full_name?: string
+    email?: string
+    role?: string
+    status?: string
+    title?: string
+    organizer?: {
+      full_name?: string
+    }
+    description?: string
+    rating?: number
+    user?: {
+      full_name?: string
+    }
+    content?: string
+  } | null
 }
 
-const TYPE_ICONS: Record<string, any> = {
+interface RelatedReport {
+  id: string
+  reason: string
+  status: string
+  created_at: string
+}
+
+const TYPE_ICONS: Record<string, LucideIcon> = {
   user: User,
   organizer: User,
   artist: Star,
@@ -124,14 +147,13 @@ const REASON_LABELS: Record<string, string> = {
 
 export default function AdminReportDetailPage() {
   const params = useParams()
-  const router = useRouter()
   const supabase = createClient()
   const reportId = params.id as string
 
   const [report, setReport] = useState<Report | null>(null)
   const [reportedContent, setReportedContent] = useState<ReportedContent | null>(null)
   const [loading, setLoading] = useState(true)
-  const [otherReports, setOtherReports] = useState<any[]>([])
+  const [otherReports, setOtherReports] = useState<RelatedReport[]>([])
 
   // Action dialog
   const [actionOpen, setActionOpen] = useState(false)
@@ -142,7 +164,7 @@ export default function AdminReportDetailPage() {
 
   useEffect(() => {
     fetchReport()
-  }, [reportId])
+  }, [reportId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchReport = async () => {
     setLoading(true)
@@ -254,7 +276,7 @@ export default function AdminReportDetailPage() {
       }
 
       // Update report
-      const updates: Record<string, any> = {
+      const updates: Record<string, unknown> = {
         status: newStatus,
         admin_notes: adminNotes || null,
       }
@@ -293,7 +315,7 @@ export default function AdminReportDetailPage() {
         'Action taken successfully'
       )
       setActionOpen(false)
-      fetchReport()
+      void fetchReport()
     } catch (error) {
       console.error('Action error:', error)
       toast.error('Failed to process action')
@@ -384,7 +406,7 @@ export default function AdminReportDetailPage() {
     })
 
     toast.success('Report marked as under review')
-    fetchReport()
+    void fetchReport()
   }
 
   if (loading) {
@@ -494,6 +516,7 @@ export default function AdminReportDetailPage() {
                   <div className="grid grid-cols-2 gap-2 mt-2">
                     {report.evidence_urls.map((url, i) => (
                       <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={url} alt={`Evidence ${i + 1}`} className="rounded-lg border max-h-40 object-cover" />
                       </a>
                     ))}
@@ -580,7 +603,7 @@ export default function AdminReportDetailPage() {
                             <Star
                               key={star}
                               className={`h-4 w-4 ${
-                                star <= reportedContent.data.rating
+                                star <= (reportedContent.data?.rating ?? 0)
                                   ? 'text-yellow-400 fill-yellow-400'
                                   : 'text-gray-300'
                               }`}
@@ -588,10 +611,10 @@ export default function AdminReportDetailPage() {
                           ))}
                         </div>
                         <span className="text-sm text-muted-foreground">
-                          by {reportedContent.data.user?.full_name}
+                          by {reportedContent.data?.user?.full_name}
                         </span>
                       </div>
-                      <p className="text-sm">{reportedContent.data.content}</p>
+                      <p className="text-sm">{reportedContent.data?.content}</p>
                     </div>
                   )}
                 </div>

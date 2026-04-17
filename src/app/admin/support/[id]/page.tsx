@@ -10,6 +10,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -25,9 +26,7 @@ import {
 } from '@/components/ui/select'
 import {
   ArrowLeft,
-  Clock,
   CheckCircle,
-  AlertCircle,
   Loader2,
   Send,
   User,
@@ -79,21 +78,6 @@ interface SupportTicket {
   }
 }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  open: { label: 'Open', color: 'bg-green-100 text-green-700' },
-  in_progress: { label: 'In Progress', color: 'bg-blue-100 text-blue-700' },
-  waiting: { label: 'Waiting on User', color: 'bg-yellow-100 text-yellow-700' },
-  resolved: { label: 'Resolved', color: 'bg-neutral-100 text-neutral-700' },
-  closed: { label: 'Closed', color: 'bg-neutral-100 text-neutral-700' },
-}
-
-const PRIORITY_COLORS: Record<string, string> = {
-  low: 'bg-neutral-100 text-neutral-700',
-  medium: 'bg-blue-100 text-blue-700',
-  high: 'bg-orange-100 text-orange-700',
-  urgent: 'bg-red-100 text-red-700',
-}
-
 const CATEGORY_LABELS: Record<string, string> = {
   general: 'General Inquiry',
   payment: 'Payment Issue',
@@ -123,7 +107,7 @@ export default function AdminTicketDetailPage() {
   // Fetch ticket and admin info
   useEffect(() => {
     fetchData()
-  }, [ticketId])
+  }, [ticketId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchData = async () => {
     setLoading(true)
@@ -178,7 +162,7 @@ export default function AdminTicketDetailPage() {
   const handleStatusChange = async (newStatus: string) => {
     setStatus(newStatus)
     
-    const updates: Record<string, any> = {
+    const updates: Record<string, unknown> = {
       status: newStatus,
       updated_at: new Date().toISOString(),
     }
@@ -247,7 +231,7 @@ export default function AdminTicketDetailPage() {
     }
 
     toast.success('Ticket assigned to you')
-    fetchData()
+    void fetchData()
   }
 
   // Submit reply
@@ -287,7 +271,7 @@ export default function AdminTicketDetailPage() {
       toast.success('Reply sent!')
       setReplyText('')
       setStatus('waiting')
-      fetchData()
+      void fetchData()
     } catch (error) {
       console.error('Error sending reply:', error)
       toast.error('Failed to send reply')
@@ -308,7 +292,6 @@ export default function AdminTicketDetailPage() {
     return null
   }
 
-  const statusConfig = STATUS_CONFIG[status] || STATUS_CONFIG.open
   const isOpen = !['resolved', 'closed'].includes(status)
 
   return (
@@ -355,7 +338,7 @@ export default function AdminTicketDetailPage() {
               <div className="flex gap-4">
                 <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
                   {ticket.user?.avatar_url ? (
-                    <img src={ticket.user.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                    <Image src={ticket.user.avatar_url} alt="" width={40} height={40} className="w-full h-full rounded-full object-cover" />
                   ) : (
                     <User className="h-5 w-5 text-purple-600" />
                   )}
@@ -382,7 +365,7 @@ export default function AdminTicketDetailPage() {
                     {reply.is_staff ? (
                       <Shield className="h-5 w-5 text-blue-600" />
                     ) : reply.user?.avatar_url ? (
-                      <img src={reply.user.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                      <Image src={reply.user.avatar_url} alt="" width={40} height={40} className="w-full h-full rounded-full object-cover" />
                     ) : (
                       <User className="h-5 w-5 text-purple-600" />
                     )}
@@ -537,7 +520,7 @@ export default function AdminTicketDetailPage() {
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-neutral-200 flex items-center justify-center">
                   {ticket.user?.avatar_url ? (
-                    <img src={ticket.user.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                    <Image src={ticket.user.avatar_url} alt="" width={48} height={48} className="w-full h-full rounded-full object-cover" />
                   ) : (
                     <User className="h-6 w-6 text-muted-foreground" />
                   )}

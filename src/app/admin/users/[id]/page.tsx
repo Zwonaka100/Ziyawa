@@ -1,27 +1,46 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { 
   ArrowLeft, 
   Mail, 
-  Calendar, 
-  MapPin, 
   Shield, 
   AlertTriangle,
   Ban,
   Edit,
   Eye,
-  Ticket,
-  Star,
-  DollarSign
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { UserActions } from './user-actions'
 
 interface PageProps {
   params: Promise<{ id: string }>
+}
+
+interface TicketPurchase {
+  id: string
+  created_at: string
+  events?: {
+    title?: string
+  } | null
+}
+
+interface UserWarning {
+  id: string
+  severity: string
+  created_at: string
+  reason: string
+  description?: string | null
+}
+
+interface UserReport {
+  id: string
+  reason: string
+  status: string
+  description?: string | null
 }
 
 export default async function AdminUserDetailPage({ params }: PageProps) {
@@ -96,7 +115,7 @@ export default async function AdminUserDetailPage({ params }: PageProps) {
             <div className="flex items-start gap-6">
               <div className="w-24 h-24 rounded-full bg-neutral-200 flex items-center justify-center text-3xl font-bold">
                 {user.avatar_url ? (
-                  <img src={user.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                  <Image src={user.avatar_url} alt="" width={96} height={96} className="w-full h-full rounded-full object-cover" />
                 ) : (
                   user.full_name?.charAt(0) || user.email?.charAt(0) || '?'
                 )}
@@ -233,7 +252,7 @@ export default async function AdminUserDetailPage({ params }: PageProps) {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {tickets.map((ticket: any) => (
+              {(tickets as TicketPurchase[]).map((ticket) => (
                 <div key={ticket.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
                   <div>
                     <p className="font-medium">{ticket.events?.title || 'Unknown Event'}</p>
@@ -256,7 +275,7 @@ export default async function AdminUserDetailPage({ params }: PageProps) {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {warnings.map((warning: any) => (
+              {(warnings as UserWarning[]).map((warning) => (
                 <div key={warning.id} className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <span className={`px-2 py-0.5 rounded text-xs ${
@@ -289,7 +308,7 @@ export default async function AdminUserDetailPage({ params }: PageProps) {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {reports.map((report: any) => (
+              {(reports as UserReport[]).map((report) => (
                 <Link key={report.id} href={`/admin/reports/${report.id}`}>
                   <div className="p-3 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors">
                     <div className="flex items-center justify-between mb-2">

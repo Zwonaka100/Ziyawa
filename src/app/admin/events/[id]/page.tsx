@@ -39,30 +39,20 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
   ArrowLeft,
   Calendar,
   MapPin,
   User,
   Ticket,
   DollarSign,
-  Clock,
   ExternalLink,
   CheckCircle,
   XCircle,
   Star,
-  AlertTriangle,
   Ban,
   Eye,
   Loader2,
   Flag,
-  Edit,
   Trash2,
   Users,
 } from 'lucide-react'
@@ -137,7 +127,7 @@ export default function AdminEventDetailPage() {
 
   const [event, setEvent] = useState<EventDetail | null>(null)
   const [bookings, setBookings] = useState<BookingSummary[]>([])
-  const [reports, setReports] = useState<any[]>([])
+  const [reports, setReports] = useState<Array<{ id: string; reason: string; status: string; created_at: string; description?: string | null }>>([])
   const [loading, setLoading] = useState(true)
 
   // Action dialog
@@ -150,7 +140,7 @@ export default function AdminEventDetailPage() {
     fetchEvent()
     fetchBookings()
     fetchReports()
-  }, [eventId])
+  }, [eventId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchEvent = async () => {
     setLoading(true)
@@ -221,7 +211,7 @@ export default function AdminEventDetailPage() {
     try {
       const { data: { user: admin } } = await supabase.auth.getUser()
       
-      let updates: Record<string, any> = {}
+      let updates: Record<string, unknown> = {}
 
       switch (actionType) {
         case 'approve':
@@ -240,14 +230,14 @@ export default function AdminEventDetailPage() {
           })
           toast.success('Event featured successfully')
           setActionOpen(false)
-          fetchEvent()
+          void fetchEvent()
           setProcessing(false)
           return
         case 'unfeature':
           await supabase.from('featured_events').delete().eq('event_id', eventId)
           toast.success('Event removed from featured')
           setActionOpen(false)
-          fetchEvent()
+          void fetchEvent()
           setProcessing(false)
           return
         case 'delete':
@@ -297,7 +287,7 @@ export default function AdminEventDetailPage() {
 
       toast.success(`Event ${actionType}ed successfully`)
       setActionOpen(false)
-      fetchEvent()
+      void fetchEvent()
     } catch (error) {
       console.error('Action error:', error)
       toast.error(`Failed to ${actionType} event`)
@@ -316,7 +306,7 @@ export default function AdminEventDetailPage() {
       toast.error('Failed to update event')
     } else {
       toast.success(publish ? 'Event published' : 'Event unpublished')
-      fetchEvent()
+      void fetchEvent()
     }
   }
 
