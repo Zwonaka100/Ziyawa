@@ -19,6 +19,8 @@ import { createClient } from '@/lib/supabase/client'
 import { PROVINCES } from '@/lib/constants'
 import { toast } from 'sonner'
 import { useAuth } from '@/components/providers/auth-provider'
+import { TicketTierEditor } from '@/components/events/ticket-tier-editor'
+import { createEmptyTier, getEventCapacityFromTiers, getStartingPriceFromTiers, normalizeTierPayload } from '@/lib/ticketing'
 
 export default function NewEventPage() {
   const router = useRouter()
@@ -33,9 +35,14 @@ export default function NewEventPage() {
     event_date: '',
     start_time: '',
     end_time: '',
-    ticket_price: '',
-    capacity: '',
   })
+  const [ticketTiers, setTicketTiers] = useState([
+    createEmptyTier({
+      name: 'General Admission',
+      price: '150',
+      quantity: '100',
+    }),
+  ])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -70,6 +77,14 @@ export default function NewEventPage() {
         return
       }
 
+      const normalizedTiers = normalizeTierPayload(ticketTiers)
+
+      if (normalizedTiers.length === 0) {
+        toast.error('Please add at least one valid ticket tier')
+        setLoading(false)
+        return
+      }
+
       const { data, error } = await supabase
         .from('events')
         .insert({
@@ -81,8 +96,8 @@ export default function NewEventPage() {
           event_date: formData.event_date,
           start_time: formData.start_time,
           end_time: formData.end_time || null,
-          ticket_price: parseFloat(formData.ticket_price) || 0,
-          capacity: parseInt(formData.capacity) || 100,
+          ticket_price: getStartingPriceFromTiers(ticketTiers),
+          capacity: getEventCapacityFromTiers(ticketTiers),
           state: 'draft',
           is_published: false,
         })
@@ -91,7 +106,29 @@ export default function NewEventPage() {
 
       if (error) throw error
 
-      toast.success('Event created successfully. You can add your poster and gallery now.')
+      const { error: tierError } = await supabase
+        .from('event_ticket_types')
+        .insert(
+          normalizedTiers.map((tier) => ({
+            event_id: data.id,
+            name: tier.name,
+            description: tier.description,
+            price: tier.price,
+            quantity: tier.quantity,
+            sold_count: 0,
+            sales_start: tier.sales_start,
+            sales_end: tier.sales_end,
+            sort_order: tier.sort_order,
+            is_active: tier.is_active,
+            is_public: tier.is_public,
+          }))
+        )
+
+      if (tierError && tierError.code !== 'PGRST205') {
+        console.error('Error saving ticket tiers:', tierError)
+      }
+
+      toast.success('Event created successfully. Ticket tiers and media can now be finalized.')
       router.push(`/dashboard/organizer/events/${data.id}/media`)
       
     } catch (error) {
@@ -217,38 +254,10 @@ export default function NewEventPage() {
               </div>
             </div>
 
-            {/* Tickets */}
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="ticket_price">Ticket Price (ZAR) *</Label>
-                <Input
-                  id="ticket_price"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0 for free event"
-                  value={formData.ticket_price}
-                  onChange={(e) => updateField('ticket_price', e.target.value)}
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="capacity">Capacity *</Label>
-                <Input
-                  id="capacity"
-                  type="number"
-                  min="1"
-                  placeholder="e.g. 500"
-                  value={formData.capacity}
-                  onChange={(e) => updateField('capacity', e.target.value)}
-                  required
-                />
-              </div>
-            </div>
+            <TicketTierEditor tiers={ticketTiers} onChange={setTicketTiers} />
 
             <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
-              Your event will be saved as a draft first so you can upload posters, gallery media, and review the final look before publishing.
+              Your event will be saved as a draft first so you can upload posters, gallery media, review your ticket setup, and publish when ready.
             </div>
 
             {/* Submit */}

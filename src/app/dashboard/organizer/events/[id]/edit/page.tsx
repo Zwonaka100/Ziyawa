@@ -20,6 +20,8 @@ import { PROVINCES } from '@/lib/constants'
 import { toast } from 'sonner'
 import { useAuth } from '@/components/providers/auth-provider'
 import { use } from 'react'
+import { TicketTierEditor } from '@/components/events/ticket-tier-editor'
+import { buildFallbackTier, createEmptyTier, getEventCapacityFromTiers, getStartingPriceFromTiers, normalizeTierPayload } from '@/lib/ticketing'
 
 interface EditEventPageProps {
   params: Promise<{
@@ -42,10 +44,15 @@ export default function EditEventPage({ params }: EditEventPageProps) {
     event_date: '',
     start_time: '',
     end_time: '',
-    ticket_price: '',
-    capacity: '',
     state: 'draft',
   })
+  const [ticketTiers, setTicketTiers] = useState([
+    createEmptyTier({
+      name: 'General Admission',
+      price: '150',
+      quantity: '100',
+    }),
+  ])
 
   useEffect(() => {
     if (authLoading) return
@@ -91,10 +98,39 @@ export default function EditEventPage({ params }: EditEventPageProps) {
         event_date: event.event_date || '',
         start_time: event.start_time || '',
         end_time: event.end_time || '',
-        ticket_price: event.ticket_price?.toString() || '0',
-        capacity: event.capacity?.toString() || '100',
         state: event.state || 'draft',
       })
+
+      const { data: tiers, error: tiersError } = await supabase
+        .from('event_ticket_types')
+        .select('*')
+        .eq('event_id', id)
+        .order('sort_order', { ascending: true })
+
+      if (tiersError && tiersError.code !== 'PGRST205') {
+        console.error('Error fetching ticket tiers:', tiersError)
+      }
+
+      const fallbackTier = buildFallbackTier({
+        id: event.id,
+        ticket_price: Number(event.ticket_price || 0),
+        capacity: Number(event.capacity || 0),
+        tickets_sold: Number(event.tickets_sold || 0),
+      })
+
+      const tierRows = (tiers && tiers.length > 0 ? tiers : [fallbackTier]).map((tier) => ({
+        id: tier.id,
+        name: tier.name || 'General Admission',
+        description: tier.description || '',
+        price: String(tier.price ?? ''),
+        quantity: String(tier.quantity ?? 0),
+        sales_start: tier.sales_start ? String(tier.sales_start).slice(0, 16) : '',
+        sales_end: tier.sales_end ? String(tier.sales_end).slice(0, 16) : '',
+        is_active: tier.is_active ?? true,
+        is_public: tier.is_public ?? true,
+      }))
+
+      setTicketTiers(tierRows)
     } catch (error) {
       console.error('Error fetching event:', error)
       toast.error('Failed to load event')
@@ -138,6 +174,14 @@ export default function EditEventPage({ params }: EditEventPageProps) {
         return
       }
 
+      const normalizedTiers = normalizeTierPayload(ticketTiers)
+
+      if (normalizedTiers.length === 0) {
+        toast.error('Please keep at least one valid ticket tier')
+        setSaving(false)
+        return
+      }
+
       const { error } = await supabase
         .from('events')
         .update({
@@ -148,14 +192,60 @@ export default function EditEventPage({ params }: EditEventPageProps) {
           event_date: formData.event_date,
           start_time: formData.start_time,
           end_time: formData.end_time || null,
-          ticket_price: parseFloat(formData.ticket_price) || 0,
-          capacity: parseInt(formData.capacity) || 100,
+          ticket_price: getStartingPriceFromTiers(ticketTiers),
+          capacity: getEventCapacityFromTiers(ticketTiers),
         })
         .eq('id', id)
 
       if (error) throw error
 
-      toast.success('Event updated successfully!')
+      const normalizedIds = normalizedTiers
+        .map((tier) => tier.id)
+        .filter((tierId): tierId is string => Boolean(tierId))
+
+      const { data: existingTierRows } = await supabase
+        .from('event_ticket_types')
+        .select('id')
+        .eq('event_id', id)
+
+      const idsToDelete = (existingTierRows || [])
+        .map((tier) => tier.id)
+        .filter((existingId) => !normalizedIds.includes(existingId))
+
+      if (idsToDelete.length > 0) {
+        await supabase
+          .from('event_ticket_types')
+          .delete()
+          .in('id', idsToDelete)
+      }
+
+      for (const tier of normalizedTiers) {
+        const payload = {
+          event_id: id,
+          name: tier.name,
+          description: tier.description,
+          price: tier.price,
+          quantity: tier.quantity,
+          sales_start: tier.sales_start,
+          sales_end: tier.sales_end,
+          sort_order: tier.sort_order,
+          is_active: tier.is_active,
+          is_public: tier.is_public,
+        }
+
+        if (tier.id) {
+          await supabase
+            .from('event_ticket_types')
+            .update(payload)
+            .eq('id', tier.id)
+        } else {
+          await supabase
+            .from('event_ticket_types')
+            .insert(payload)
+        }
+      }
+
+      toast.success('Event and ticket tiers updated successfully!')
       router.push('/dashboard/organizer')
       
     } catch (error) {
@@ -329,35 +419,7 @@ export default function EditEventPage({ params }: EditEventPageProps) {
               </div>
             </div>
 
-            {/* Tickets */}
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="ticket_price">Ticket Price (ZAR) *</Label>
-                <Input
-                  id="ticket_price"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0 for free event"
-                  value={formData.ticket_price}
-                  onChange={(e) => updateField('ticket_price', e.target.value)}
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="capacity">Capacity *</Label>
-                <Input
-                  id="capacity"
-                  type="number"
-                  min="1"
-                  placeholder="e.g. 500"
-                  value={formData.capacity}
-                  onChange={(e) => updateField('capacity', e.target.value)}
-                  required
-                />
-              </div>
-            </div>
+            <TicketTierEditor tiers={ticketTiers} onChange={setTicketTiers} />
 
             {/* Submit */}
             <div className="flex gap-4">

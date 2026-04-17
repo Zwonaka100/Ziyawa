@@ -148,6 +148,8 @@ async function processTicketPurchase(
   const eventId = metadata.event_id as string;
   const userId = metadata.user_id as string;
   const quantity = (metadata.quantity as number) || 1;
+  const ticketTypeId = (metadata.ticket_type_id as string) || null;
+  const ticketTypeName = (metadata.ticket_type_name as string) || 'General Admission';
 
   // Start a pseudo-transaction (Supabase doesn't support true transactions in client)
   try {
@@ -169,7 +171,7 @@ async function processTicketPurchase(
         user_id: userId,
         transaction_id: transaction.id,
         ticket_code: generateTicketCode(),
-        ticket_type: 'general',
+        ticket_type: ticketTypeName,
         price_paid: (transaction.amount as number) / quantity / 100, // Convert back to Rands
       });
     }
@@ -197,6 +199,21 @@ async function processTicketPurchase(
         total_revenue: (event?.total_revenue || 0) + (transaction.net_amount as number) / 100,
       })
       .eq('id', eventId);
+
+    if (ticketTypeId) {
+      const { data: tierRow } = await supabase
+        .from('event_ticket_types')
+        .select('sold_count')
+        .eq('id', ticketTypeId)
+        .single();
+
+      await supabase
+        .from('event_ticket_types')
+        .update({
+          sold_count: Number(tierRow?.sold_count || 0) + quantity,
+        })
+        .eq('id', ticketTypeId);
+    }
 
     // 4. Move transaction to "held" state (escrow until event completes)
     await supabase

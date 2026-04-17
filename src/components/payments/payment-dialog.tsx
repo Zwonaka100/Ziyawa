@@ -16,6 +16,7 @@ import { calculateTicketSaleBreakdown, PLATFORM_FEES } from '@/lib/constants'
 import { toast } from 'sonner'
 import type { Event, Profile } from '@/types/database'
 import { Loader2, CreditCard, Shield } from 'lucide-react'
+import type { EventTicketTier } from '@/lib/ticketing'
 
 interface PaymentDialogProps {
   open: boolean
@@ -23,14 +24,16 @@ interface PaymentDialogProps {
   event: Event
   user: Profile
   quantity?: number
+  selectedTier?: EventTicketTier
 }
 
-export function PaymentDialog({ open, onOpenChange, event, user, quantity = 1 }: PaymentDialogProps) {
+export function PaymentDialog({ open, onOpenChange, event, user, quantity = 1, selectedTier }: PaymentDialogProps) {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
   // Calculate fees using our fee structure
-  const ticketBasePriceCents = event.ticket_price * 100 * quantity // Convert Rands to cents
+  const unitPrice = Number(selectedTier?.price ?? event.ticket_price ?? 0)
+  const ticketBasePriceCents = unitPrice * 100 * quantity // Convert Rands to cents
   const breakdown = calculateTicketSaleBreakdown(ticketBasePriceCents)
   const totalAmount = breakdown.buyerTotal // This is what the buyer pays (in cents)
 
@@ -47,6 +50,8 @@ export function PaymentDialog({ open, onOpenChange, event, user, quantity = 1 }:
         body: JSON.stringify({
           eventId: event.id,
           quantity: quantity,
+          ticketTypeId: selectedTier?.id && !selectedTier.id.startsWith('legacy-') ? selectedTier.id : undefined,
+          ticketTypeName: selectedTier?.name,
         }),
       })
 
@@ -84,13 +89,19 @@ export function PaymentDialog({ open, onOpenChange, event, user, quantity = 1 }:
         <DialogHeader>
           <DialogTitle>Complete Your Purchase</DialogTitle>
           <DialogDescription>
-            You&apos;re buying {quantity} ticket{quantity > 1 ? 's' : ''} for {event.title}
+            You&apos;re buying {quantity} {selectedTier?.name || 'ticket'}{quantity > 1 ? 's' : ''} for {event.title}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           {/* Order Summary */}
           <div className="space-y-2">
+            {selectedTier && (
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>Tier</span>
+                <span>{selectedTier.name}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span>Ticket Price {quantity > 1 ? `(${quantity}x)` : ''}</span>
               <span>{formatCurrency(breakdown.ticketPrice / 100)}</span>

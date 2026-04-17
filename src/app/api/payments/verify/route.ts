@@ -76,6 +76,7 @@ export async function GET(request: NextRequest) {
     if (paymentType === 'ticket_purchase' && transaction) {
       response.eventName = transaction.events?.title;
       response.quantity = paystackData.metadata?.quantity;
+      response.ticketType = paystackData.metadata?.ticket_type_name;
 
       // Get ticket codes if payment was successful
       if (paystackData.status === 'success') {

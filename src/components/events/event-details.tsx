@@ -17,6 +17,7 @@ import { PaymentDialog } from '@/components/payments/payment-dialog'
 import { ReportDialog } from '@/components/report-dialog'
 import { extractYouTubeId, getYouTubeThumbnail } from '@/types/database'
 import type { Event, Profile, Artist, Booking, EventMedia } from '@/types/database'
+import { buildFallbackTier, isTierOnSale, type EventTicketTier } from '@/lib/ticketing'
 
 interface EventWithOrganizer extends Event {
   profiles: Pick<Profile, 'id' | 'full_name' | 'avatar_url' | 'company_name' | 'location' | 'bio' | 'verified_at'>
@@ -38,14 +39,17 @@ interface EventDetailsProps {
   bookings: BookingWithArtist[]
   media?: EventMedia[]
   organizerStats?: OrganizerStats
+  ticketTiers?: EventTicketTier[]
 }
 
-export function EventDetails({ event, bookings, media = [], organizerStats }: EventDetailsProps) {
+export function EventDetails({ event, bookings, media = [], organizerStats, ticketTiers = [] }: EventDetailsProps) {
   const { user, profile } = useAuth()
   const router = useRouter()
   const [showPayment, setShowPayment] = useState(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
+  const [selectedTierId, setSelectedTierId] = useState(ticketTiers[0]?.id || '')
+  const [ticketQuantity, setTicketQuantity] = useState(1)
 
   const daysUntil = getDaysUntilEvent(event.event_date)
   const ticketsRemaining = event.capacity - event.tickets_sold
@@ -55,6 +59,16 @@ export function EventDetails({ event, bookings, media = [], organizerStats }: Ev
   // Separate media by type
   const galleryImages = media.filter(m => m.media_type === 'image' && m.is_gallery)
   const promoVideos = media.filter(m => m.media_type !== 'image')
+  const fallbackTier = buildFallbackTier({
+    id: event.id,
+    ticket_price: Number(event.ticket_price || 0),
+    capacity: Number(event.capacity || 0),
+    tickets_sold: Number(event.tickets_sold || 0),
+  })
+  const resolvedTicketTiers = ticketTiers.length > 0
+    ? ticketTiers.filter((tier) => tier.is_public !== false)
+    : [fallbackTier]
+  const selectedTier = resolvedTicketTiers.find((tier) => tier.id === selectedTierId) || resolvedTicketTiers[0]
 
   const handleBuyTicket = () => {
     if (!user) {
@@ -341,9 +355,56 @@ export function EventDetails({ event, bookings, media = [], organizerStats }: Ev
             <CardContent className="space-y-4">
               <div className="text-center">
                 <p className="text-3xl font-bold text-primary">
-                  {event.ticket_price === 0 ? 'Free' : formatCurrency(event.ticket_price)}
+                  {selectedTier?.price === 0 ? 'Free' : formatCurrency(selectedTier?.price || event.ticket_price)}
                 </p>
-                <p className="text-sm text-muted-foreground">per ticket</p>
+                <p className="text-sm text-muted-foreground">
+                  {resolvedTicketTiers.length > 1 ? 'selected tier price' : 'per ticket'}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                {resolvedTicketTiers.map((tier) => {
+                  const remaining = Math.max(0, tier.quantity - tier.sold_count)
+                  const isAvailable = isTierOnSale(tier)
+                  const isSelected = selectedTier?.id === tier.id
+
+                  return (
+                    <button
+                      key={tier.id}
+                      type="button"
+                      onClick={() => setSelectedTierId(tier.id)}
+                      className={`w-full rounded-lg border px-3 py-3 text-left transition ${isSelected ? 'border-primary bg-primary/5' : 'border-neutral-200'} ${!isAvailable ? 'opacity-60' : ''}`}
+                      disabled={!isAvailable}
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="font-medium">{tier.name}</p>
+                          {tier.description && (
+                            <p className="text-xs text-muted-foreground mt-1">{tier.description}</p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold">{tier.price === 0 ? 'Free' : formatCurrency(tier.price)}</p>
+                          <p className="text-xs text-muted-foreground">{remaining} left</p>
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="space-y-2 text-sm">
+                <label className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Quantity</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max={Math.max(1, Math.min(10, (selectedTier?.quantity || 1) - (selectedTier?.sold_count || 0)))}
+                    value={ticketQuantity}
+                    onChange={(e) => setTicketQuantity(Math.max(1, Number(e.target.value) || 1))}
+                    className="w-20 rounded-md border border-input bg-background px-2 py-1 text-right"
+                  />
+                </label>
               </div>
 
               <Separator />
@@ -370,10 +431,10 @@ export function EventDetails({ event, bookings, media = [], organizerStats }: Ev
               <Button 
                 className="w-full" 
                 size="lg"
-                disabled={isSoldOut || isPast}
+                disabled={isSoldOut || isPast || !selectedTier || !isTierOnSale(selectedTier)}
                 onClick={handleBuyTicket}
               >
-                {isPast ? 'Event Ended' : isSoldOut ? 'Sold Out' : 'Buy Ticket'}
+                {isPast ? 'Event Ended' : isSoldOut ? 'Sold Out' : selectedTier ? `Buy ${selectedTier.name}` : 'Buy Ticket'}
               </Button>
 
               {!user && (
@@ -408,6 +469,8 @@ export function EventDetails({ event, bookings, media = [], organizerStats }: Ev
           onOpenChange={setShowPayment}
           event={event}
           user={profile}
+          quantity={ticketQuantity}
+          selectedTier={selectedTier}
         />
       )}
 

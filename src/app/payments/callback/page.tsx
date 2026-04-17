@@ -29,6 +29,7 @@ interface PaymentDetails {
   amount: number;
   eventName?: string;
   quantity?: number;
+  ticketType?: string;
   ticketCodes?: string[];
 }
 
@@ -129,6 +130,13 @@ function PaymentCallbackContent() {
                 <div className="flex items-center justify-between py-2 border-t">
                   <span className="text-gray-600">Tickets</span>
                   <span className="font-medium">{details.quantity}x</span>
+                </div>
+              )}
+
+              {details.ticketType && (
+                <div className="flex items-center justify-between py-2 border-t">
+                  <span className="text-gray-600">Tier</span>
+                  <span className="font-medium">{details.ticketType}</span>
                 </div>
               )}
             </div>

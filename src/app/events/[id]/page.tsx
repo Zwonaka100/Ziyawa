@@ -127,6 +127,17 @@ export default async function EventPage({ params }: EventPageProps) {
     .eq('event_id', id)
     .order('display_order')
 
+  // Fetch ticket tiers / releases
+  const { data: ticketTiers, error: ticketTierError } = await supabase
+    .from('event_ticket_types')
+    .select('*')
+    .eq('event_id', id)
+    .order('sort_order', { ascending: true })
+
+  if (ticketTierError && ticketTierError.code !== 'PGRST205') {
+    console.error('Ticket tiers fetch error:', ticketTierError)
+  }
+
   // Check if current user has a ticket for this event
   const { data: { user } } = await supabase.auth.getUser()
   let hasTicket = false
@@ -153,6 +164,7 @@ export default async function EventPage({ params }: EventPageProps) {
         bookings={bookings || []} 
         media={eventMedia || []} 
         organizerStats={organizerStats}
+        ticketTiers={ticketTiers || []}
       />
       
       {/* Reviews Section */}

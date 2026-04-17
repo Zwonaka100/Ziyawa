@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { eventId, quantity = 1 } = body;
+    const { eventId, quantity = 1, ticketTypeId, ticketTypeName } = body;
 
     if (!eventId) {
       return NextResponse.json(
@@ -65,6 +65,66 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    let selectedTier: {
+      id: string;
+      name: string;
+      price: number;
+      quantity: number;
+      sold_count: number;
+      is_active: boolean;
+      sales_start: string | null;
+      sales_end: string | null;
+    } | null = null;
+
+    if (ticketTypeId) {
+      const { data: tier, error: tierError } = await supabase
+        .from('event_ticket_types')
+        .select('id, name, price, quantity, sold_count, is_active, sales_start, sales_end')
+        .eq('id', ticketTypeId)
+        .eq('event_id', eventId)
+        .single();
+
+      if (tierError || !tier) {
+        return NextResponse.json(
+          { error: 'Selected ticket tier was not found' },
+          { status: 404 }
+        );
+      }
+
+      const now = new Date();
+      const tierRemaining = Number(tier.quantity || 0) - Number(tier.sold_count || 0);
+
+      if (!tier.is_active) {
+        return NextResponse.json(
+          { error: 'This ticket tier is not on sale right now' },
+          { status: 400 }
+        );
+      }
+
+      if (tier.sales_start && new Date(tier.sales_start) > now) {
+        return NextResponse.json(
+          { error: 'This ticket tier is not on sale yet' },
+          { status: 400 }
+        );
+      }
+
+      if (tier.sales_end && new Date(tier.sales_end) < now) {
+        return NextResponse.json(
+          { error: 'This ticket tier sale has ended' },
+          { status: 400 }
+        );
+      }
+
+      if (tierRemaining < quantity) {
+        return NextResponse.json(
+          { error: 'Not enough tickets left in this tier' },
+          { status: 400 }
+        );
+      }
+
+      selectedTier = tier;
+    }
+
     // Get user profile for email
     const { data: profile } = await supabase
       .from('profiles')
@@ -80,7 +140,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate fees (ticket_price is stored in cents)
-    const ticketPriceCents = event.ticket_price * 100;
+    const ticketPriceCents = Number(selectedTier?.price ?? event.ticket_price) * 100;
     const breakdown = calculateTicketSaleBreakdown(ticketPriceCents);
     const totalAmount = breakdown.buyerTotal * quantity;
 
@@ -104,6 +164,8 @@ export async function POST(request: NextRequest) {
         gateway_provider: 'paystack',
         gateway_response: {
           quantity,
+          ticket_type_id: selectedTier?.id || null,
+          ticket_type_name: selectedTier?.name || ticketTypeName || 'General Admission',
           ticket_price_cents: ticketPriceCents,
           booking_fee_cents: breakdown.bookingFee,
           breakdown,
@@ -135,6 +197,8 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         user_name: profile.full_name,
         quantity,
+        ticket_type_id: selectedTier?.id || null,
+        ticket_type_name: selectedTier?.name || ticketTypeName || 'General Admission',
         ticket_price: ticketPriceCents,
         booking_fee: breakdown.bookingFee,
         type: 'ticket_purchase',
@@ -160,6 +224,7 @@ export async function POST(request: NextRequest) {
           ticketPrice: ticketPriceCents / 100,
           bookingFee: breakdown.bookingFee / 100,
           quantity,
+          ticketType: selectedTier?.name || ticketTypeName || 'General Admission',
           total: totalAmount / 100,
         },
       },
