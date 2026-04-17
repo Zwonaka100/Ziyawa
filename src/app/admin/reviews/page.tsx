@@ -1,5 +1,7 @@
 'use client'
 
+import Image from 'next/image'
+
 /**
  * ADMIN REVIEWS MODERATION PAGE
  * /admin/reviews
@@ -11,7 +13,7 @@
  * - Delete inappropriate reviews
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent } from '@/components/ui/card'
@@ -67,7 +69,7 @@ import {
   ThumbsUp,
   AlertTriangle,
 } from 'lucide-react'
-import { format, formatDistanceToNow } from 'date-fns'
+import { formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
 
 interface Review {
@@ -96,8 +98,6 @@ interface Review {
 const ITEMS_PER_PAGE = 20
 
 export default function AdminReviewsPage() {
-  const supabase = createClient()
-  
   const [reviews, setReviews] = useState<Review[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -121,12 +121,8 @@ export default function AdminReviewsPage() {
   const [adminNotes, setAdminNotes] = useState('')
   const [processing, setProcessing] = useState(false)
 
-  useEffect(() => {
-    fetchReviews()
-    fetchStats()
-  }, [page, ratingFilter, visibilityFilter, search])
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
+    const supabase = createClient()
     const [all, hidden, reported] = await Promise.all([
       supabase.from('reviews').select('rating'),
       supabase.from('reviews').select('id').eq('is_visible', false),
@@ -144,9 +140,10 @@ export default function AdminReviewsPage() {
       hiddenReviews: hidden.data?.length || 0,
       reportedReviews: reported.data?.length || 0,
     })
-  }
+  }, [])
 
-  const fetchReviews = async () => {
+  const fetchReviews = useCallback(async () => {
+    const supabase = createClient()
     setLoading(true)
 
     let query = supabase
@@ -187,7 +184,12 @@ export default function AdminReviewsPage() {
     }
 
     setLoading(false)
-  }
+  }, [page, ratingFilter, visibilityFilter, search])
+
+  useEffect(() => {
+    void fetchReviews()
+    void fetchStats()
+  }, [fetchReviews, fetchStats])
 
   const openAction = (review: Review, type: 'hide' | 'show' | 'delete') => {
     setSelectedReview(review)
@@ -202,6 +204,7 @@ export default function AdminReviewsPage() {
     setProcessing(true)
 
     try {
+      const supabase = createClient()
       const { data: { user: admin } } = await supabase.auth.getUser()
 
       if (actionType === 'delete') {
@@ -439,9 +442,15 @@ export default function AdminReviewsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-neutral-200 flex items-center justify-center">
+                        <div className="w-6 h-6 rounded-full bg-neutral-200 flex items-center justify-center overflow-hidden">
                           {review.user?.avatar_url ? (
-                            <img src={review.user.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                            <Image
+                              src={review.user.avatar_url}
+                              alt=""
+                              width={24}
+                              height={24}
+                              className="h-full w-full rounded-full object-cover"
+                            />
                           ) : (
                             <User className="h-3 w-3 text-muted-foreground" />
                           )}

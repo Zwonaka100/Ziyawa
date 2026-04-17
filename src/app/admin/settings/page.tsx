@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -17,11 +17,12 @@ import {
   Mail,
   Shield,
   Globe,
-  Bell,
   CreditCard,
   AlertCircle
 } from 'lucide-react'
 import { toast } from 'sonner'
+
+type SettingValue = string | number | boolean
 
 type PlatformSettings = {
   // General
@@ -56,6 +57,20 @@ type PlatformSettings = {
   max_images_per_event: number
 }
 
+function parseSettingValue<K extends keyof PlatformSettings>(key: K, value: string): PlatformSettings[K] {
+  const defaultValue = defaultSettings[key]
+
+  if (typeof defaultValue === 'boolean') {
+    return (value === 'true') as PlatformSettings[K]
+  }
+
+  if (typeof defaultValue === 'number') {
+    return Number(value) as PlatformSettings[K]
+  }
+
+  return value as PlatformSettings[K]
+}
+
 const defaultSettings: PlatformSettings = {
   platform_name: 'Ziyawa',
   platform_description: 'South African Events Marketplace',
@@ -84,14 +99,9 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
 
-  const supabase = createClient()
-
-  useEffect(() => {
-    fetchSettings()
-  }, [])
-
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     setLoading(true)
+    const supabase = createClient()
     const { data, error } = await supabase
       .from('platform_settings')
       .select('key, value')
@@ -100,26 +110,24 @@ export default function SettingsPage() {
       console.error('Error fetching settings:', error)
       toast.error('Failed to load settings')
     } else if (data) {
-      const loadedSettings = { ...defaultSettings }
-      data.forEach(setting => {
+      const loadedSettings: Partial<PlatformSettings> = { ...defaultSettings }
+      const loadedSettingsRecord = loadedSettings as Record<keyof PlatformSettings, SettingValue>
+      data.forEach((setting) => {
         if (setting.key in loadedSettings) {
           const key = setting.key as keyof PlatformSettings
-          // Parse the value based on the type of the default value
-          if (typeof defaultSettings[key] === 'boolean') {
-            (loadedSettings as any)[key] = setting.value === 'true'
-          } else if (typeof defaultSettings[key] === 'number') {
-            (loadedSettings as any)[key] = Number(setting.value)
-          } else {
-            (loadedSettings as any)[key] = setting.value
-          }
+          loadedSettingsRecord[key] = parseSettingValue(key, setting.value)
         }
       })
-      setSettings(loadedSettings)
+      setSettings(loadedSettings as PlatformSettings)
     }
     setLoading(false)
-  }
+  }, [])
 
-  const handleChange = (key: keyof PlatformSettings, value: any) => {
+  useEffect(() => {
+    void fetchSettings()
+  }, [fetchSettings])
+
+  const handleChange = (key: keyof PlatformSettings, value: SettingValue) => {
     setSettings(prev => ({ ...prev, [key]: value }))
     setHasChanges(true)
   }
@@ -128,6 +136,7 @@ export default function SettingsPage() {
     setSaving(true)
     
     try {
+      const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 

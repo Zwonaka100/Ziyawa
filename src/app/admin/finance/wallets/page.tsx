@@ -1,5 +1,7 @@
 'use client'
 
+import Image from 'next/image'
+
 /**
  * ADMIN WALLETS PAGE
  * /admin/finance/wallets
@@ -7,7 +9,7 @@
  * View and manage user wallets
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent } from '@/components/ui/card'
@@ -43,11 +45,9 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
-  Wallet,
   Plus,
   Minus,
   User,
-  ExternalLink,
   Loader2,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/helpers'
@@ -76,8 +76,6 @@ interface WalletWithUser {
 const ITEMS_PER_PAGE = 25
 
 export default function AdminWalletsPage() {
-  const supabase = createClient()
-  
   const [wallets, setWallets] = useState<WalletWithUser[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -101,12 +99,8 @@ export default function AdminWalletsPage() {
     activeWallets: 0,
   })
 
-  useEffect(() => {
-    fetchWallets()
-    fetchStats()
-  }, [page, balanceFilter])
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
+    const supabase = createClient()
     const { data, count } = await supabase
       .from('wallets')
       .select('balance, pending_balance', { count: 'exact' })
@@ -119,9 +113,10 @@ export default function AdminWalletsPage() {
         activeWallets: data.filter(w => w.balance > 0 || w.pending_balance > 0).length,
       })
     }
-  }
+  }, [])
 
-  const fetchWallets = async () => {
+  const fetchWallets = useCallback(async () => {
+    const supabase = createClient()
     setLoading(true)
 
     let query = supabase
@@ -152,12 +147,18 @@ export default function AdminWalletsPage() {
     }
 
     setLoading(false)
-  }
+  }, [page, balanceFilter])
+
+  useEffect(() => {
+    void fetchWallets()
+    void fetchStats()
+  }, [fetchWallets, fetchStats])
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
+    const supabase = createClient()
     if (!searchQuery.trim()) {
-      fetchWallets()
+      void fetchWallets()
       return
     }
 
@@ -219,6 +220,7 @@ export default function AdminWalletsPage() {
     setAdjusting(true)
 
     try {
+      const supabase = createClient()
       const newBalance = adjustmentType === 'credit' 
         ? selectedWallet.balance + amount 
         : selectedWallet.balance - amount
@@ -268,8 +270,8 @@ export default function AdminWalletsPage() {
 
       toast.success(`Successfully ${adjustmentType}ed ${formatCurrency(amount)}`)
       setAdjustmentOpen(false)
-      fetchWallets()
-      fetchStats()
+      void fetchWallets()
+      void fetchStats()
     } catch (error) {
       console.error('Adjustment error:', error)
       toast.error('Failed to process adjustment')
@@ -388,9 +390,15 @@ export default function AdminWalletsPage() {
                   <TableRow key={wallet.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center overflow-hidden">
                           {wallet.user?.avatar_url ? (
-                            <img src={wallet.user.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                            <Image
+                              src={wallet.user.avatar_url}
+                              alt=""
+                              width={32}
+                              height={32}
+                              className="h-full w-full rounded-full object-cover"
+                            />
                           ) : (
                             <User className="h-4 w-4 text-muted-foreground" />
                           )}

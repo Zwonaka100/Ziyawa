@@ -41,6 +41,7 @@ import {
   RefreshCcw,
   CreditCard,
   Download,
+  type LucideIcon,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/helpers'
 import { format } from 'date-fns'
@@ -64,7 +65,7 @@ interface Transaction {
 
 const ITEMS_PER_PAGE = 25
 
-const TYPE_CONFIG: Record<string, { label: string; icon: any; color: string }> = {
+const TYPE_CONFIG: Record<string, { label: string; icon: LucideIcon; color: string }> = {
   ticket_purchase: { label: 'Ticket Sale', icon: Ticket, color: 'bg-green-100 text-green-700' },
   wallet_deposit: { label: 'Wallet Deposit', icon: Wallet, color: 'bg-blue-100 text-blue-700' },
   payout: { label: 'Payout', icon: ArrowUpRight, color: 'bg-orange-100 text-orange-700' },
@@ -128,7 +129,6 @@ export default function AdminTransactionsPage() {
 
   const fetchTransactions = useCallback(async () => {
     const supabase = createClient()
-    setLoading(true)
 
     let query = supabase
       .from('transactions')
@@ -167,6 +167,8 @@ export default function AdminTransactionsPage() {
   }, [page, typeFilter, statusFilter, searchQuery])
 
   useEffect(() => {
+    // These calls load remote admin data when the view state changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchTransactions()
     void fetchStats()
   }, [fetchTransactions, fetchStats])

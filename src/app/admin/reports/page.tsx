@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
@@ -38,7 +38,8 @@ import {
   User,
   Calendar,
   Star,
-  ShoppingBag
+  ShoppingBag,
+  type LucideIcon,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -62,7 +63,7 @@ interface Report {
 
 const ITEMS_PER_PAGE = 20
 
-const TYPE_ICONS: Record<string, any> = {
+const TYPE_ICONS: Record<string, LucideIcon> = {
   user: User,
   organizer: User,
   artist: Star,
@@ -94,12 +95,7 @@ export default function AdminReportsPage() {
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
 
-  useEffect(() => {
-    void fetchReports()
-  }, [page, statusFilter, typeFilter])
-
-  async function fetchReports() {
-    setLoading(true)
+  const fetchReports = useCallback(async () => {
     const supabase = createClient()
 
     let query = supabase
@@ -136,7 +132,13 @@ export default function AdminReportsPage() {
     }
 
     setLoading(false)
-  }
+  }, [page, statusFilter, typeFilter])
+
+  useEffect(() => {
+    // This fetch keeps moderation data in sync with the selected filters.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchReports()
+  }, [fetchReports])
 
   const handleUpdateStatus = async (reportId: string, status: string) => {
     const supabase = createClient()
@@ -158,7 +160,7 @@ export default function AdminReportsPage() {
       toast.error('Failed to update report')
     } else {
       toast.success('Report updated')
-      fetchReports()
+      void fetchReports()
     }
   }
 
@@ -174,7 +176,7 @@ export default function AdminReportsPage() {
       toast.error('Failed to update priority')
     } else {
       toast.success('Priority updated')
-      fetchReports()
+      void fetchReports()
     }
   }
 

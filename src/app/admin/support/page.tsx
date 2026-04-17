@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
@@ -33,9 +33,7 @@ import {
   CheckCircle,
   Clock,
   ChevronLeft,
-  ChevronRight,
-  MessageSquare,
-  Plus
+  ChevronRight
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -86,12 +84,7 @@ export default function AdminSupportPage() {
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
 
-  useEffect(() => {
-    void fetchTickets()
-  }, [page, statusFilter, categoryFilter])
-
-  async function fetchTickets() {
-    setLoading(true)
+  const fetchTickets = useCallback(async () => {
     const supabase = createClient()
 
     let query = supabase
@@ -131,7 +124,13 @@ export default function AdminSupportPage() {
     }
 
     setLoading(false)
-  }
+  }, [page, statusFilter, categoryFilter])
+
+  useEffect(() => {
+    // This fetch refreshes support data when the active filters change.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchTickets()
+  }, [fetchTickets])
 
   const handleUpdateStatus = async (ticketId: string, status: string) => {
     const supabase = createClient()
@@ -153,7 +152,7 @@ export default function AdminSupportPage() {
       toast.error('Failed to update ticket')
     } else {
       toast.success('Ticket updated')
-      fetchTickets()
+      void fetchTickets()
     }
   }
 
@@ -173,7 +172,7 @@ export default function AdminSupportPage() {
       toast.error('Failed to assign ticket')
     } else {
       toast.success('Ticket assigned to you')
-      fetchTickets()
+      void fetchTickets()
     }
   }
 
