@@ -91,8 +91,8 @@ export default function NewEventPage() {
 
       if (error) throw error
 
-      toast.success('Event created successfully!')
-      router.push('/dashboard/organizer')
+      toast.success('Event created successfully. You can add your poster and gallery now.')
+      router.push(`/dashboard/organizer/events/${data.id}/media`)
       
     } catch (error) {
       console.error('Error creating event:', error)
@@ -117,7 +117,7 @@ export default function NewEventPage() {
         <CardHeader>
           <CardTitle>Create New Event</CardTitle>
           <CardDescription>
-            Fill in the details for your event. You can save as draft and publish later.
+            Fill in the details for your event. After the first save, you will go straight to poster and media upload while the event is still in draft.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -270,7 +270,7 @@ export default function NewEventPage() {
                     Creating...
                   </>
                 ) : (
-                  'Create Event'
+                  'Create Event & Add Media'
                 )}
               </Button>
               <Link href="/dashboard/organizer">
