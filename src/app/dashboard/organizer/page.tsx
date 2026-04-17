@@ -187,6 +187,9 @@ export default async function OrganizerDashboardPage() {
                         <Link href={`/dashboard/organizer/events/${event.id}/media`}>
                           <Button variant="outline" size="sm">Media</Button>
                         </Link>
+                        <Link href={`/dashboard/organizer/events/${event.id}/checkin`}>
+                          <Button variant="outline" size="sm">Door / Check-in</Button>
+                        </Link>
                         <Link href={`/dashboard/organizer/events/${event.id}/book`}>
                           <Button size="sm">Book Artist</Button>
                         </Link>

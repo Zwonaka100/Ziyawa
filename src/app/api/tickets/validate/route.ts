@@ -34,8 +34,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const normalizedCode = ticketCode.toUpperCase()
+
     // Find ticket
-    const { data: ticket, error: ticketError } = await supabase
+    const { data: ticket } = await supabase
       .from('tickets')
       .select(`
         id,
@@ -62,22 +64,70 @@ export async function POST(request: NextRequest) {
           avatar_url
         )
       `)
-      .eq('ticket_code', ticketCode.toUpperCase())
+      .eq('ticket_code', normalizedCode)
       .single();
 
-    if (ticketError || !ticket) {
-      return NextResponse.json(
-        { 
-          valid: false,
-          error: 'Ticket not found',
-          message: 'This ticket code does not exist in our system.'
+    let resolvedTicket: Record<string, unknown> | null = ticket as Record<string, unknown> | null
+
+    if (!resolvedTicket) {
+      const { data: pass, error: passError } = await supabase
+        .from('event_access_passes')
+        .select(`
+          id,
+          code,
+          pass_type,
+          checked_in,
+          checked_in_at,
+          checked_in_by,
+          event_id,
+          full_name,
+          events (
+            id,
+            title,
+            date,
+            time,
+            venue,
+            city,
+            organizer_id
+          )
+        `)
+        .eq('code', normalizedCode)
+        .single();
+
+      if (passError || !pass) {
+        return NextResponse.json(
+          { 
+            valid: false,
+            error: 'Ticket not found',
+            message: 'This ticket or guest pass does not exist in our system.'
+          },
+          { status: 404 }
+        )
+      }
+
+      resolvedTicket = {
+        id: pass.id,
+        ticket_code: pass.code,
+        ticket_type: pass.pass_type,
+        price_paid: 0,
+        checked_in: pass.checked_in,
+        checked_in_at: pass.checked_in_at,
+        checked_in_by: pass.checked_in_by,
+        event_id: pass.event_id,
+        user_id: null,
+        events: pass.events,
+        profiles: {
+          id: null,
+          full_name: pass.full_name,
+          avatar_url: null,
         },
-        { status: 404 }
-      );
+      }
     }
 
+    const ticketRow = resolvedTicket
+
     // If eventId provided, verify it matches
-    if (eventId && ticket.event_id !== eventId) {
+    if (eventId && ticketRow.event_id !== eventId) {
       return NextResponse.json(
         { 
           valid: false,
@@ -90,7 +140,7 @@ export async function POST(request: NextRequest) {
 
     // Check if user has permission (must be organizer of the event)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const event = ticket.events as any;
+    const event = ticketRow.events as any;
     if (event?.organizer_id !== user.id) {
       // Also check if user is a staff member (future feature)
       return NextResponse.json(
@@ -110,9 +160,9 @@ export async function POST(request: NextRequest) {
     let status: 'valid' | 'used' | 'early' | 'expired';
     let message: string;
 
-    if (ticket.checked_in) {
+    if (ticketRow.checked_in) {
       status = 'used';
-      message = `Already checked in at ${new Date(ticket.checked_in_at!).toLocaleTimeString()}`;
+      message = `Already checked in at ${new Date(ticketRow.checked_in_at as string).toLocaleTimeString()}`;
     } else if (daysDiff > 1) {
       status = 'early';
       message = `Event is in ${daysDiff} days. Check-in opens on event day.`;
@@ -129,14 +179,14 @@ export async function POST(request: NextRequest) {
       status,
       message,
       ticket: {
-        id: ticket.id,
-        code: ticket.ticket_code,
-        type: ticket.ticket_type,
-        pricePaid: ticket.price_paid,
-        checkedIn: ticket.checked_in,
-        checkedInAt: ticket.checked_in_at,
-        holder: ticket.profiles,
-        event: ticket.events,
+        id: ticketRow.id,
+        code: ticketRow.ticket_code,
+        type: ticketRow.ticket_type,
+        pricePaid: ticketRow.price_paid,
+        checkedIn: ticketRow.checked_in,
+        checkedInAt: ticketRow.checked_in_at,
+        holder: ticketRow.profiles,
+        event: ticketRow.events,
       },
     });
 

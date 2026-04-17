@@ -33,8 +33,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find ticket
-    let query = supabase
+    const normalizedCode = ticketCode ? String(ticketCode).toUpperCase() : null;
+
+    let entryId = '';
+    let entryCode = '';
+    let entryType = '';
+    let entryHolder = 'Guest';
+    let entryCheckedIn = false;
+    let entryCheckedInAt: string | null = null;
+    let entryEventId = '';
+    let organizerId = '';
+    let eventDateValue = '';
+    let sourceTable: 'tickets' | 'event_access_passes' = 'tickets';
+
+    // Try normal ticket first
+    let ticketQuery = supabase
       .from('tickets')
       .select(`
         id,
@@ -56,66 +69,118 @@ export async function POST(request: NextRequest) {
       `);
 
     if (ticketId) {
-      query = query.eq('id', ticketId);
-    } else {
-      query = query.eq('ticket_code', ticketCode.toUpperCase());
+      ticketQuery = ticketQuery.eq('id', ticketId);
+    } else if (normalizedCode) {
+      ticketQuery = ticketQuery.eq('ticket_code', normalizedCode);
     }
 
-    const { data: ticket, error: ticketError } = await query.single();
+    const { data: ticket } = await ticketQuery.single();
 
-    if (ticketError || !ticket) {
-      return NextResponse.json(
-        { 
-          success: false,
-          error: 'Ticket not found',
-          message: 'This ticket code does not exist.'
-        },
-        { status: 404 }
-      );
+    if (ticket) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const event = ticket.events as any;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const profile = ticket.profiles as any;
+
+      entryId = ticket.id;
+      entryCode = ticket.ticket_code;
+      entryType = ticket.ticket_type;
+      entryHolder = profile?.full_name || 'Guest';
+      entryCheckedIn = ticket.checked_in;
+      entryCheckedInAt = ticket.checked_in_at;
+      entryEventId = ticket.event_id;
+      organizerId = event?.organizer_id || '';
+      eventDateValue = event?.date || '';
+      sourceTable = 'tickets';
+    } else {
+      let passQuery = supabase
+        .from('event_access_passes')
+        .select(`
+          id,
+          code,
+          pass_type,
+          checked_in,
+          checked_in_at,
+          event_id,
+          full_name,
+          events (
+            id,
+            title,
+            date,
+            organizer_id
+          )
+        `);
+
+      if (ticketId) {
+        passQuery = passQuery.eq('id', ticketId);
+      } else if (normalizedCode) {
+        passQuery = passQuery.eq('code', normalizedCode);
+      }
+
+      const { data: pass, error: passError } = await passQuery.single();
+
+      if (passError || !pass) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Ticket not found',
+            message: 'This ticket or guest pass does not exist.'
+          },
+          { status: 404 }
+        );
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const event = pass.events as any;
+
+      entryId = pass.id;
+      entryCode = pass.code;
+      entryType = pass.pass_type;
+      entryHolder = pass.full_name || 'Guest';
+      entryCheckedIn = pass.checked_in;
+      entryCheckedInAt = pass.checked_in_at;
+      entryEventId = pass.event_id;
+      organizerId = event?.organizer_id || '';
+      eventDateValue = event?.date || '';
+      sourceTable = 'event_access_passes';
     }
 
     // Verify event matches if provided
-    if (eventId && ticket.event_id !== eventId) {
+    if (eventId && entryEventId !== eventId) {
       return NextResponse.json(
         { 
           success: false,
           error: 'Wrong event',
-          message: 'This ticket is for a different event.'
+          message: 'This pass is for a different event.'
         },
         { status: 400 }
       );
     }
 
-    // Check authorization (must be organizer)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const event = ticket.events as any;
-    if (event?.organizer_id !== user.id) {
+    if (organizerId !== user.id) {
       return NextResponse.json(
-        { error: 'Not authorized to check in tickets for this event' },
+        { error: 'Not authorized to check in entries for this event' },
         { status: 403 }
       );
     }
 
-    // Check if already checked in
-    if (ticket.checked_in) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const profile = ticket.profiles as any;
+    if (entryCheckedIn) {
       return NextResponse.json({
         success: false,
         alreadyCheckedIn: true,
-        message: `Already checked in at ${new Date(ticket.checked_in_at!).toLocaleTimeString()}`,
+        message: `Already checked in at ${new Date(entryCheckedInAt!).toLocaleTimeString()}`,
         ticket: {
-          id: ticket.id,
-          code: ticket.ticket_code,
-          type: ticket.ticket_type,
-          holder: profile?.full_name || 'Guest',
-          checkedInAt: ticket.checked_in_at,
+          id: entryId,
+          code: entryCode,
+          type: entryType,
+          holder: entryHolder,
+          checkedInAt: entryCheckedInAt,
         },
       });
     }
 
     // Check event date (allow check-in on event day and day before)
-    const eventDate = new Date(event?.date);
+    const eventDate = new Date(eventDateValue);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     eventDate.setHours(0, 0, 0, 0);
@@ -142,13 +207,13 @@ export async function POST(request: NextRequest) {
     const checkedInAt = new Date().toISOString();
     
     const { error: updateError } = await supabase
-      .from('tickets')
+      .from(sourceTable)
       .update({
         checked_in: true,
         checked_in_at: checkedInAt,
         checked_in_by: user.id,
       })
-      .eq('id', ticket.id);
+      .eq('id', entryId);
 
     if (updateError) {
       console.error('Check-in update error:', updateError);
@@ -162,30 +227,38 @@ export async function POST(request: NextRequest) {
     const { count: checkedInCount } = await supabase
       .from('tickets')
       .select('*', { count: 'exact', head: true })
-      .eq('event_id', ticket.event_id)
+      .eq('event_id', entryEventId)
       .eq('checked_in', true);
 
     const { count: totalCount } = await supabase
       .from('tickets')
       .select('*', { count: 'exact', head: true })
-      .eq('event_id', ticket.event_id);
+      .eq('event_id', entryEventId);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const profile = ticket.profiles as any;
+    const { count: guestCheckedInCount, error: guestCheckedInError } = await supabase
+      .from('event_access_passes')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', entryEventId)
+      .eq('checked_in', true);
+
+    const { count: guestTotalCount, error: guestTotalError } = await supabase
+      .from('event_access_passes')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', entryEventId);
     
     return NextResponse.json({
       success: true,
       message: 'Check-in successful!',
       ticket: {
-        id: ticket.id,
-        code: ticket.ticket_code,
-        type: ticket.ticket_type,
-        holder: profile?.full_name || 'Guest',
+        id: entryId,
+        code: entryCode,
+        type: entryType,
+        holder: entryHolder,
         checkedInAt,
       },
       attendance: {
-        checkedIn: checkedInCount || 0,
-        total: totalCount || 0,
+        checkedIn: (checkedInCount || 0) + ((guestCheckedInError?.code === 'PGRST205' ? 0 : guestCheckedInCount) || 0),
+        total: (totalCount || 0) + ((guestTotalError?.code === 'PGRST205' ? 0 : guestTotalCount) || 0),
       },
     });
 

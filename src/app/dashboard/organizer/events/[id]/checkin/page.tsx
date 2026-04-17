@@ -16,6 +16,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { toast } from 'sonner'
 import { formatDate, formatTime } from '@/lib/helpers'
 import {
@@ -30,6 +38,8 @@ import {
   User,
   Ticket,
   RefreshCw,
+  UserPlus,
+  Gift,
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -61,6 +71,14 @@ interface AttendanceStats {
   total: number
 }
 
+interface AccessPass {
+  id: string
+  full_name: string
+  code: string
+  pass_type: string
+  checked_in: boolean
+}
+
 export default function EventCheckinPage() {
   const params = useParams()
   const router = useRouter()
@@ -78,6 +96,16 @@ export default function EventCheckinPage() {
     holder: string
     time: string
   }>>([])
+  const [accessPasses, setAccessPasses] = useState<AccessPass[]>([])
+  const [creatingPass, setCreatingPass] = useState(false)
+  const [passForm, setPassForm] = useState({
+    fullName: '',
+    email: '',
+    phone: '',
+    passType: 'guest_list',
+    quantity: '1',
+    notes: '',
+  })
   
   const inputRef = useRef<HTMLInputElement>(null)
   const eventId = params.id as string
@@ -108,8 +136,9 @@ export default function EventCheckinPage() {
 
       setEvent(data)
       
-      // Get attendance stats
+      // Get attendance stats and access list
       await refreshAttendance()
+      await loadGuestList()
       
       setLoading(false)
     }
@@ -132,11 +161,34 @@ export default function EventCheckinPage() {
       .select('*', { count: 'exact', head: true })
       .eq('event_id', eventId)
 
+    const { count: guestCheckedIn, error: guestCheckedInError } = await supabase
+      .from('event_access_passes')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', eventId)
+      .eq('checked_in', true)
+
+    const { count: guestTotal, error: guestTotalError } = await supabase
+      .from('event_access_passes')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', eventId)
+
     setAttendance({
-      checkedIn: checkedIn || 0,
-      total: total || 0,
+      checkedIn: (checkedIn || 0) + ((guestCheckedInError?.code === 'PGRST205' ? 0 : guestCheckedIn) || 0),
+      total: (total || 0) + ((guestTotalError?.code === 'PGRST205' ? 0 : guestTotal) || 0),
     })
   }, [eventId, supabase])
+
+  const loadGuestList = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/events/${eventId}/guest-list`)
+      const data = await response.json()
+      if (response.ok) {
+        setAccessPasses(data.passes || [])
+      }
+    } catch (error) {
+      console.error('Guest list load error:', error)
+    }
+  }, [eventId])
 
   // Handle check-in
   const handleCheckin = async (code: string) => {
@@ -205,6 +257,45 @@ export default function EventCheckinPage() {
       setScanning(false)
       setManualCode('')
       inputRef.current?.focus()
+    }
+  }
+
+  const handleCreatePass = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!passForm.fullName.trim()) {
+      toast.error('Guest name is required')
+      return
+    }
+
+    setCreatingPass(true)
+    try {
+      const response = await fetch(`/api/events/${eventId}/guest-list`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(passForm),
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create guest pass')
+      }
+
+      toast.success(`Created ${data.passes?.length || 1} access pass${(data.passes?.length || 1) > 1 ? 'es' : ''}`)
+      setPassForm({
+        fullName: '',
+        email: '',
+        phone: '',
+        passType: 'guest_list',
+        quantity: '1',
+        notes: '',
+      })
+      await loadGuestList()
+      await refreshAttendance()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create guest pass')
+    } finally {
+      setCreatingPass(false)
     }
   }
 
@@ -392,8 +483,106 @@ export default function EventCheckinPage() {
             )}
           </div>
 
-          {/* Recent Check-ins Sidebar */}
-          <div>
+          {/* Right Sidebar */}
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserPlus className="h-5 w-5 text-purple-600" />
+                  Guest List & Comp Passes
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleCreatePass} className="space-y-3">
+                  <div>
+                    <Input
+                      placeholder="Guest full name"
+                      value={passForm.fullName}
+                      onChange={(e) => setPassForm(prev => ({ ...prev, fullName: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Input
+                      placeholder="Email (optional)"
+                      value={passForm.email}
+                      onChange={(e) => setPassForm(prev => ({ ...prev, email: e.target.value }))}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input
+                      placeholder="Phone"
+                      value={passForm.phone}
+                      onChange={(e) => setPassForm(prev => ({ ...prev, phone: e.target.value }))}
+                    />
+                    <Select
+                      value={passForm.passType}
+                      onValueChange={(value) => setPassForm(prev => ({ ...prev, passType: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="guest_list">Guest List</SelectItem>
+                        <SelectItem value="comp">Complimentary</SelectItem>
+                        <SelectItem value="staff">Staff</SelectItem>
+                        <SelectItem value="media">Media</SelectItem>
+                        <SelectItem value="vip_host">VIP Host</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="20"
+                      placeholder="Quantity"
+                      value={passForm.quantity}
+                      onChange={(e) => setPassForm(prev => ({ ...prev, quantity: e.target.value }))}
+                    />
+                  </div>
+                  <Textarea
+                    rows={2}
+                    placeholder="Notes or special access"
+                    value={passForm.notes}
+                    onChange={(e) => setPassForm(prev => ({ ...prev, notes: e.target.value }))}
+                  />
+                  <Button type="submit" className="w-full" disabled={creatingPass}>
+                    {creatingPass ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating Pass...
+                      </>
+                    ) : (
+                      <>
+                        <Gift className="mr-2 h-4 w-4" />
+                        Add to Guest List
+                      </>
+                    )}
+                  </Button>
+                </form>
+
+                <Separator className="my-4" />
+
+                {accessPasses.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No guest or comp passes yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {accessPasses.slice(0, 8).map((pass) => (
+                      <div key={pass.id} className="rounded-md border p-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-medium text-sm">{pass.full_name}</p>
+                          <Badge variant={pass.checked_in ? 'default' : 'outline'}>
+                            {pass.pass_type.replace('_', ' ')}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground font-mono mt-1">{pass.code}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
