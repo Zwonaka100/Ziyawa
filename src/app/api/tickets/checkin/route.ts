@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
         events (
           id,
           title,
-          date,
+          event_date,
           organizer_id
         ),
         profiles:user_id (
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
       entryCheckedInAt = ticket.checked_in_at;
       entryEventId = ticket.event_id;
       organizerId = event?.organizer_id || '';
-      eventDateValue = event?.date || '';
+      eventDateValue = event?.event_date || '';
       sourceTable = 'tickets';
     } else {
       let passQuery = supabase
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
           events (
             id,
             title,
-            date,
+            event_date,
             organizer_id
           )
         `);
@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
       entryCheckedInAt = pass.checked_in_at;
       entryEventId = pass.event_id;
       organizerId = event?.organizer_id || '';
-      eventDateValue = event?.date || '';
+      eventDateValue = event?.event_date || '';
       sourceTable = 'event_access_passes';
     }
 

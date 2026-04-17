@@ -52,10 +52,10 @@ export async function POST(request: NextRequest) {
         events (
           id,
           title,
-          date,
-          time,
+          event_date,
+          start_time,
           venue,
-          city,
+          location,
           organizer_id
         ),
         profiles:user_id (
@@ -84,10 +84,10 @@ export async function POST(request: NextRequest) {
           events (
             id,
             title,
-            date,
-            time,
+            event_date,
+            start_time,
             venue,
-            city,
+            location,
             organizer_id
           )
         `)
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
       );
     }
     // Check event date
-    const eventDate = new Date(event?.date);
+    const eventDate = new Date(event?.event_date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     eventDate.setHours(0, 0, 0, 0);

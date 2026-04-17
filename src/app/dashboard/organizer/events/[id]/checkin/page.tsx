@@ -47,8 +47,8 @@ import { cn } from '@/lib/utils'
 interface Event {
   id: string
   title: string
-  date: string
-  time: string
+  event_date: string
+  start_time: string
   venue: string
   tickets_sold: number
 }
@@ -117,20 +117,21 @@ export default function EventCheckinPage() {
 
       const { data, error } = await supabase
         .from('events')
-        .select('id, title, date, time, venue, tickets_sold, organizer_id')
+        .select('id, title, event_date, start_time, venue, tickets_sold, organizer_id')
         .eq('id', eventId)
         .single()
 
       if (error || !data) {
+        console.error('Check-in event load error:', error)
         toast.error('Event not found')
-        router.push('/dashboard/organizer/events')
+        router.push('/dashboard/organizer')
         return
       }
 
       // Check authorization
       if (data.organizer_id !== profile?.id) {
         toast.error('Not authorized')
-        router.push('/dashboard/organizer/events')
+        router.push('/dashboard/organizer')
         return
       }
 
@@ -333,7 +334,7 @@ export default function EventCheckinPage() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link href={`/dashboard/organizer/events/${eventId}`}>
+              <Link href="/dashboard/organizer">
                 <Button variant="ghost" size="icon">
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
@@ -341,7 +342,7 @@ export default function EventCheckinPage() {
               <div>
                 <h1 className="font-bold text-lg">{event.title}</h1>
                 <p className="text-sm text-muted-foreground">
-                  {formatDate(event.date)} • {formatTime(event.time)}
+                  {formatDate(event.event_date)} • {formatTime(event.start_time)}
                 </p>
               </div>
             </div>
