@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
@@ -32,11 +32,7 @@ export default function BulkEmailPage() {
     testMode: true, // Send to admin first to test
   })
 
-  useEffect(() => {
-    fetchRecipientCount()
-  }, [formData.audience])
-
-  const fetchRecipientCount = async () => {
+  const fetchRecipientCount = useCallback(async () => {
     const supabase = createClient()
     
     let query = supabase.from('profiles').select('id', { count: 'exact', head: true })
@@ -49,7 +45,11 @@ export default function BulkEmailPage() {
     
     const { count } = await query
     setRecipientCount(count || 0)
-  }
+  }, [formData.audience])
+
+  useEffect(() => {
+    void fetchRecipientCount()
+  }, [fetchRecipientCount])
 
   const handleSend = async () => {
     if (!formData.subject.trim() || !formData.body.trim()) {
@@ -85,7 +85,7 @@ export default function BulkEmailPage() {
       if (!formData.testMode) {
         router.push('/admin/communications')
       }
-    } catch (error) {
+    } catch {
       toast.error('Failed to send emails')
     } finally {
       setSending(false)

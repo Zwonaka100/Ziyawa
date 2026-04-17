@@ -7,10 +7,10 @@
  * Create and manage reusable email templates
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -94,7 +94,6 @@ const VARIABLE_PRESETS = [
 ]
 
 export default function EmailTemplatesPage() {
-  const supabase = createClient()
   
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [loading, setLoading] = useState(true)
@@ -117,11 +116,8 @@ export default function EmailTemplatesPage() {
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewTemplate, setPreviewTemplate] = useState<EmailTemplate | null>(null)
 
-  useEffect(() => {
-    fetchTemplates()
-  }, [categoryFilter])
-
-  const fetchTemplates = async () => {
+  const fetchTemplates = useCallback(async () => {
+    const supabase = createClient()
     setLoading(true)
 
     let query = supabase
@@ -143,7 +139,11 @@ export default function EmailTemplatesPage() {
     }
 
     setLoading(false)
-  }
+  }, [categoryFilter])
+
+  useEffect(() => {
+    void fetchTemplates()
+  }, [fetchTemplates])
 
   const openEditor = (template?: EmailTemplate) => {
     if (template) {
@@ -179,6 +179,7 @@ export default function EmailTemplatesPage() {
     setSaving(true)
 
     try {
+      const supabase = createClient()
       // Extract variables from body
       const variableRegex = /\{\{([^}]+)\}\}/g
       const variables: string[] = []
@@ -221,9 +222,8 @@ export default function EmailTemplatesPage() {
       }
 
       setEditorOpen(false)
-      fetchTemplates()
-    } catch (error) {
-      console.error(error)
+      void fetchTemplates()
+    } catch {
       toast.error('Failed to save template')
     } finally {
       setSaving(false)
@@ -232,6 +232,7 @@ export default function EmailTemplatesPage() {
 
   const handleDuplicate = async (template: EmailTemplate) => {
     try {
+      const supabase = createClient()
       const { error } = await supabase
         .from('email_templates')
         .insert({
@@ -247,8 +248,8 @@ export default function EmailTemplatesPage() {
         })
       if (error) throw error
       toast.success('Template duplicated')
-      fetchTemplates()
-    } catch (error) {
+      void fetchTemplates()
+    } catch {
       toast.error('Failed to duplicate template')
     }
   }
@@ -257,28 +258,30 @@ export default function EmailTemplatesPage() {
     if (!confirm(`Delete template "${template.name}"? This cannot be undone.`)) return
 
     try {
+      const supabase = createClient()
       const { error } = await supabase
         .from('email_templates')
         .delete()
         .eq('id', template.id)
       if (error) throw error
       toast.success('Template deleted')
-      fetchTemplates()
-    } catch (error) {
+      void fetchTemplates()
+    } catch {
       toast.error('Failed to delete template')
     }
   }
 
   const handleToggleActive = async (template: EmailTemplate) => {
     try {
+      const supabase = createClient()
       const { error } = await supabase
         .from('email_templates')
         .update({ is_active: !template.is_active })
         .eq('id', template.id)
       if (error) throw error
       toast.success(template.is_active ? 'Template deactivated' : 'Template activated')
-      fetchTemplates()
-    } catch (error) {
+      void fetchTemplates()
+    } catch {
       toast.error('Failed to update template')
     }
   }

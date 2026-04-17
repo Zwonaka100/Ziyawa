@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Mail, Users, FileText, History, Send } from 'lucide-react'
+import { Users, FileText, History, Send } from 'lucide-react'
 
 export const metadata = {
   title: 'Communications | Admin | Ziyawa',

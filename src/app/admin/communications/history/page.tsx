@@ -7,7 +7,7 @@
  * View all sent emails with delivery status
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent } from '@/components/ui/card'
@@ -49,7 +49,7 @@ import {
   AlertTriangle,
   RefreshCw,
   Send,
-  Users,
+  type LucideIcon,
 } from 'lucide-react'
 import { format, formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
@@ -68,7 +68,7 @@ interface EmailLog {
   delivered_at: string | null
   opened_at: string | null
   email_type: string
-  metadata: Record<string, any>
+  metadata: Record<string, unknown>
   recipient?: {
     full_name: string
     email: string
@@ -84,7 +84,7 @@ interface EmailLog {
 
 const ITEMS_PER_PAGE = 25
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
+const STATUS_CONFIG: Record<string, { label: string; color: string; icon: LucideIcon }> = {
   pending: { label: 'Pending', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
   sent: { label: 'Sent', color: 'bg-blue-100 text-blue-700', icon: Send },
   delivered: { label: 'Delivered', color: 'bg-green-100 text-green-700', icon: CheckCircle },
@@ -101,7 +101,6 @@ const TYPE_CONFIG: Record<string, { label: string; color: string }> = {
 }
 
 export default function EmailHistoryPage() {
-  const supabase = createClient()
   
   const [emails, setEmails] = useState<EmailLog[]>([])
   const [loading, setLoading] = useState(true)
@@ -123,12 +122,8 @@ export default function EmailHistoryPage() {
   const [detailOpen, setDetailOpen] = useState(false)
   const [selectedEmail, setSelectedEmail] = useState<EmailLog | null>(null)
 
-  useEffect(() => {
-    fetchEmails()
-    fetchStats()
-  }, [page, statusFilter, typeFilter, search])
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
+    const supabase = createClient()
     const [total, delivered, failed, opened] = await Promise.all([
       supabase.from('email_logs').select('id', { count: 'exact', head: true }),
       supabase.from('email_logs').select('id', { count: 'exact', head: true }).eq('status', 'delivered'),
@@ -146,9 +141,10 @@ export default function EmailHistoryPage() {
       failed: failed.count || 0,
       openRate: deliveredCount > 0 ? Math.round((openedCount / deliveredCount) * 100) : 0,
     })
-  }
+  }, [])
 
-  const fetchEmails = async () => {
+  const fetchEmails = useCallback(async () => {
+    const supabase = createClient()
     setLoading(true)
 
     let query = supabase
@@ -190,7 +186,12 @@ export default function EmailHistoryPage() {
     }
 
     setLoading(false)
-  }
+  }, [page, statusFilter, typeFilter, search])
+
+  useEffect(() => {
+    void fetchEmails()
+    void fetchStats()
+  }, [fetchEmails, fetchStats])
 
   const handleResend = async (email: EmailLog) => {
     if (!confirm('Resend this email?')) return
@@ -210,9 +211,9 @@ export default function EmailHistoryPage() {
       if (!response.ok) throw new Error('Failed to send')
       
       toast.success('Email resent successfully')
-      fetchEmails()
-      fetchStats()
-    } catch (error) {
+      void fetchEmails()
+      void fetchStats()
+    } catch {
       toast.error('Failed to resend email')
     }
   }

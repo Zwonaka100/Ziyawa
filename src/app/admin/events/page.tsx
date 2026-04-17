@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Card, CardContent } from '@/components/ui/card'
@@ -32,7 +32,6 @@ import {
   Search, 
   MoreHorizontal, 
   Eye, 
-  Edit, 
   Trash2,
   Star,
   CheckCircle,
@@ -76,11 +75,7 @@ export default function AdminEventsPage() {
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
 
-  useEffect(() => {
-    fetchEvents()
-  }, [page, statusFilter])
-
-  const fetchEvents = async () => {
+  const fetchEvents = useCallback(async () => {
     setLoading(true)
     const supabase = createClient()
 
@@ -124,12 +119,18 @@ export default function AdminEventsPage() {
     }
 
     setLoading(false)
-  }
+  }, [page, statusFilter, searchQuery])
+
+  useEffect(() => {
+    // This fetch keeps the admin event list synced with active filters.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchEvents()
+  }, [fetchEvents])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     setPage(1)
-    fetchEvents()
+    void fetchEvents()
   }
 
   const handlePublish = async (eventId: string, publish: boolean) => {
@@ -144,7 +145,7 @@ export default function AdminEventsPage() {
       toast.error('Failed to update event')
     } else {
       toast.success(publish ? 'Event published' : 'Event unpublished')
-      fetchEvents()
+      void fetchEvents()
     }
   }
 
@@ -164,7 +165,7 @@ export default function AdminEventsPage() {
       toast.error('Failed to delete event')
     } else {
       toast.success('Event deleted')
-      fetchEvents()
+      void fetchEvents()
     }
   }
 

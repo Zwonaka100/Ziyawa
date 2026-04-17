@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -37,7 +37,6 @@ export default function SendEmailPage() {
   const searchParams = useSearchParams()
   const toUserId = searchParams.get('to')
   
-  const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [users, setUsers] = useState<User[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
@@ -56,12 +55,6 @@ export default function SendEmailPage() {
       fetchUser(toUserId)
     }
   }, [toUserId])
-
-  useEffect(() => {
-    if (userSearch.length >= 2) {
-      searchUsers()
-    }
-  }, [userSearch])
 
   const fetchTemplates = async () => {
     const supabase = createClient()
@@ -86,7 +79,7 @@ export default function SendEmailPage() {
     }
   }
 
-  const searchUsers = async () => {
+  const searchUsers = useCallback(async () => {
     const supabase = createClient()
     const { data } = await supabase
       .from('profiles')
@@ -96,7 +89,17 @@ export default function SendEmailPage() {
     
     setUsers(data || [])
     setShowUserDropdown(true)
-  }
+  }, [userSearch])
+
+  useEffect(() => {
+    if (userSearch.length >= 2 && !selectedUser) {
+      void searchUsers()
+    }
+    if (userSearch.length < 2) {
+      setShowUserDropdown(false)
+      setUsers([])
+    }
+  }, [userSearch, selectedUser, searchUsers])
 
   const handleTemplateSelect = (templateId: string) => {
     const template = templates.find(t => t.id === templateId)
@@ -140,7 +143,7 @@ export default function SendEmailPage() {
 
       toast.success('Email sent successfully')
       router.push('/admin/communications')
-    } catch (error) {
+    } catch {
       toast.error('Failed to send email')
     } finally {
       setSending(false)
