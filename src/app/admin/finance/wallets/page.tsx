@@ -58,22 +58,56 @@ interface WalletWithUser {
   id: string
   user_id: string
   balance: number
+  held_balance: number
   pending_balance: number
-  total_deposited: number
-  total_withdrawn: number
   created_at: string
   updated_at: string
   user?: {
-    full_name: string
+    full_name: string | null
     email: string
-    avatar_url: string
+    avatar_url: string | null
     is_organizer: boolean
     is_artist: boolean
     is_provider: boolean
   }
 }
 
+interface WalletProfileRow {
+  id: string
+  full_name: string | null
+  email: string
+  avatar_url: string | null
+  is_organizer: boolean
+  is_artist: boolean
+  is_provider: boolean
+  wallet_balance: number | null
+  held_balance: number | null
+  pending_payout_balance: number | null
+  created_at: string
+  updated_at: string
+}
+
 const ITEMS_PER_PAGE = 25
+
+function mapProfileToWallet(profile: WalletProfileRow): WalletWithUser {
+  return {
+    id: profile.id,
+    user_id: profile.id,
+    balance: Number(profile.wallet_balance || 0),
+    held_balance: Number(profile.held_balance || 0),
+    pending_balance: Number(profile.pending_payout_balance || 0),
+    created_at: profile.created_at,
+    updated_at: profile.updated_at,
+    user: {
+      full_name: profile.full_name,
+      email: profile.email,
+      avatar_url: profile.avatar_url,
+      is_organizer: profile.is_organizer,
+      is_artist: profile.is_artist,
+      is_provider: profile.is_provider,
+    },
+  }
+}
 
 export default function AdminWalletsPage() {
   const [wallets, setWallets] = useState<WalletWithUser[]>([])
@@ -102,15 +136,22 @@ export default function AdminWalletsPage() {
   const fetchStats = useCallback(async () => {
     const supabase = createClient()
     const { data, count } = await supabase
-      .from('wallets')
-      .select('balance, pending_balance', { count: 'exact' })
+      .from('profiles')
+      .select('id, wallet_balance, held_balance, pending_payout_balance', { count: 'exact' })
 
     if (data) {
       setStats({
-        totalWallets: count || 0,
-        totalBalance: data.reduce((sum, w) => sum + (w.balance || 0), 0),
-        totalPending: data.reduce((sum, w) => sum + (w.pending_balance || 0), 0),
-        activeWallets: data.filter(w => w.balance > 0 || w.pending_balance > 0).length,
+        totalWallets: count || data.length,
+        totalBalance: data.reduce((sum, profile) => sum + Number(profile.wallet_balance || 0), 0),
+        totalPending: data.reduce(
+          (sum, profile) => sum + Number(profile.held_balance || 0) + Number(profile.pending_payout_balance || 0),
+          0
+        ),
+        activeWallets: data.filter((profile) =>
+          Number(profile.wallet_balance || 0) > 0 ||
+          Number(profile.held_balance || 0) > 0 ||
+          Number(profile.pending_payout_balance || 0) > 0
+        ).length,
       })
     }
   }, [])
@@ -120,19 +161,29 @@ export default function AdminWalletsPage() {
     setLoading(true)
 
     let query = supabase
-      .from('wallets')
+      .from('profiles')
       .select(`
-        *,
-        user:profiles!wallets_user_id_fkey(full_name, email, avatar_url, is_organizer, is_artist, is_provider)
+        id,
+        full_name,
+        email,
+        avatar_url,
+        is_organizer,
+        is_artist,
+        is_provider,
+        wallet_balance,
+        held_balance,
+        pending_payout_balance,
+        created_at,
+        updated_at
       `, { count: 'exact' })
-      .order('balance', { ascending: false })
+      .order('wallet_balance', { ascending: false })
 
     if (balanceFilter === 'positive') {
-      query = query.gt('balance', 0)
+      query = query.or('wallet_balance.gt.0,held_balance.gt.0,pending_payout_balance.gt.0')
     } else if (balanceFilter === 'pending') {
-      query = query.gt('pending_balance', 0)
+      query = query.or('held_balance.gt.0,pending_payout_balance.gt.0')
     } else if (balanceFilter === 'zero') {
-      query = query.eq('balance', 0).eq('pending_balance', 0)
+      query = query.eq('wallet_balance', 0).eq('held_balance', 0).eq('pending_payout_balance', 0)
     }
 
     const from = (page - 1) * ITEMS_PER_PAGE
@@ -141,8 +192,11 @@ export default function AdminWalletsPage() {
 
     const { data, count, error } = await query
 
-    if (!error && data) {
-      setWallets(data)
+    if (error) {
+      console.error('Failed to load wallets:', error)
+      toast.error('Failed to load wallets')
+    } else {
+      setWallets(((data || []) as WalletProfileRow[]).map(mapProfileToWallet))
       setTotalCount(count || 0)
     }
 
@@ -157,36 +211,44 @@ export default function AdminWalletsPage() {
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
     const supabase = createClient()
+
     if (!searchQuery.trim()) {
+      setPage(1)
       void fetchWallets()
       return
     }
 
     setLoading(true)
-    
-    // Search by user email or name
-    const { data: users } = await supabase
+
+    const { data, count, error } = await supabase
       .from('profiles')
-      .select('id')
+      .select(`
+        id,
+        full_name,
+        email,
+        avatar_url,
+        is_organizer,
+        is_artist,
+        is_provider,
+        wallet_balance,
+        held_balance,
+        pending_payout_balance,
+        created_at,
+        updated_at
+      `, { count: 'exact' })
       .or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`)
-      .limit(50)
+      .order('wallet_balance', { ascending: false })
+      .range(0, ITEMS_PER_PAGE - 1)
 
-    if (users && users.length > 0) {
-      const userIds = users.map(u => u.id)
-      const { data, count } = await supabase
-        .from('wallets')
-        .select(`
-          *,
-          user:profiles!wallets_user_id_fkey(full_name, email, avatar_url, is_organizer, is_artist, is_provider)
-        `, { count: 'exact' })
-        .in('user_id', userIds)
-        .order('balance', { ascending: false })
-
-      setWallets(data || [])
-      setTotalCount(count || 0)
-    } else {
+    if (error) {
+      console.error('Failed to search wallets:', error)
+      toast.error('Failed to search wallets')
       setWallets([])
       setTotalCount(0)
+    } else {
+      setWallets(((data || []) as WalletProfileRow[]).map(mapProfileToWallet))
+      setTotalCount(count || 0)
+      setPage(1)
     }
 
     setLoading(false)
@@ -225,31 +287,45 @@ export default function AdminWalletsPage() {
         ? selectedWallet.balance + amount 
         : selectedWallet.balance - amount
 
-      // Update wallet
+      const { data: { user: admin } } = await supabase.auth.getUser()
+      if (!admin) throw new Error('Admin session not found')
+
+      // Update live wallet balance stored on the profile
       const { error: walletError } = await supabase
-        .from('wallets')
+        .from('profiles')
         .update({ 
-          balance: newBalance,
+          wallet_balance: newBalance,
           updated_at: new Date().toISOString()
         })
-        .eq('id', selectedWallet.id)
+        .eq('id', selectedWallet.user_id)
 
       if (walletError) throw walletError
 
       // Create adjustment transaction record
-      const { data: { user: admin } } = await supabase.auth.getUser()
-      
       await supabase.from('transactions').insert({
-        reference: `ADJ-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        type: adjustmentType === 'credit' ? 'adjustment_credit' : 'adjustment_debit',
-        status: 'completed',
+        reference: `ADJ-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        type: adjustmentType === 'credit' ? 'wallet_deposit' : 'payout',
+        state: 'settled',
         amount: amount,
         platform_fee: 0,
         net_amount: amount,
-        payer_id: admin?.id,
+        payer_id: admin.id,
         recipient_id: selectedWallet.user_id,
+        recipient_type: selectedWallet.user?.is_organizer
+          ? 'organizer'
+          : selectedWallet.user?.is_artist
+            ? 'artist'
+            : selectedWallet.user?.is_provider
+              ? 'vendor'
+              : null,
         gateway_provider: 'manual',
-        gateway_response: { reason: adjustmentReason, admin_id: admin?.id },
+        gateway_response: {
+          reason: adjustmentReason,
+          admin_id: admin.id,
+          manual_adjustment: true,
+          adjustment_type: adjustmentType,
+        },
+        settled_at: new Date().toISOString(),
       })
 
       // Log audit
@@ -298,6 +374,10 @@ export default function AdminWalletsPage() {
         </div>
       </div>
 
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+        Every user has a wallet ledger starting at {formatCurrency(0)}. It only becomes active after a deposit, a sale, a release from escrow, or a manual admin adjustment.
+      </div>
+
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
@@ -308,19 +388,19 @@ export default function AdminWalletsPage() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Total Balance</p>
+            <p className="text-sm text-muted-foreground">Available Balance</p>
             <p className="text-2xl font-bold">{formatCurrency(stats.totalBalance)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Pending Balance</p>
+            <p className="text-sm text-muted-foreground">Held + Pending</p>
             <p className="text-2xl font-bold text-yellow-600">{formatCurrency(stats.totalPending)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Active Wallets</p>
+            <p className="text-sm text-muted-foreground">Wallets With Activity</p>
             <p className="text-2xl font-bold text-green-600">{stats.activeWallets}</p>
           </CardContent>
         </Card>
@@ -364,10 +444,9 @@ export default function AdminWalletsPage() {
               <TableRow>
                 <TableHead>User</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead className="text-right">Balance</TableHead>
-                <TableHead className="text-right">Pending</TableHead>
-                <TableHead className="text-right">Total Deposited</TableHead>
-                <TableHead className="text-right">Total Withdrawn</TableHead>
+                <TableHead className="text-right">Available</TableHead>
+                <TableHead className="text-right">Held</TableHead>
+                <TableHead className="text-right">Pending Payout</TableHead>
                 <TableHead>Last Updated</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -375,14 +454,14 @@ export default function AdminWalletsPage() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
+                  <TableCell colSpan={7} className="text-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
                   </TableCell>
                 </TableRow>
               ) : wallets.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    No wallets found
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    No users match the current wallet filters yet
                   </TableCell>
                 </TableRow>
               ) : (
@@ -430,14 +509,11 @@ export default function AdminWalletsPage() {
                     <TableCell className="text-right font-medium">
                       {formatCurrency(wallet.balance)}
                     </TableCell>
+                    <TableCell className="text-right text-amber-600">
+                      {wallet.held_balance > 0 ? formatCurrency(wallet.held_balance) : '-'}
+                    </TableCell>
                     <TableCell className="text-right text-yellow-600">
                       {wallet.pending_balance > 0 ? formatCurrency(wallet.pending_balance) : '-'}
-                    </TableCell>
-                    <TableCell className="text-right text-sm text-muted-foreground">
-                      {formatCurrency(wallet.total_deposited || 0)}
-                    </TableCell>
-                    <TableCell className="text-right text-sm text-muted-foreground">
-                      {formatCurrency(wallet.total_withdrawn || 0)}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {format(new Date(wallet.updated_at), 'MMM d, yyyy')}
