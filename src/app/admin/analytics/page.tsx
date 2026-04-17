@@ -8,7 +8,6 @@ import {
   MapPin,
   Star
 } from 'lucide-react'
-import { formatCurrency } from '@/lib/helpers'
 
 export const metadata = {
   title: 'Analytics | Admin | Ziyawa',

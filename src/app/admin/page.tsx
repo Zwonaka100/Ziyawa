@@ -3,10 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { 
   Users, 
   Calendar, 
-  DollarSign, 
   AlertTriangle, 
   MessageSquare,
-  TrendingUp,
   UserPlus,
   CalendarPlus
 } from 'lucide-react'

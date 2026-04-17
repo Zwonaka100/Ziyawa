@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { 
   DollarSign, 
   Wallet, 
@@ -36,7 +35,6 @@ export default async function AdminFinancePage() {
     .reduce((sum, t) => sum + (t.amount || 0), 0) || 0
 
   const pendingPayouts = wallets?.reduce((sum, w) => sum + (w.pending_balance || 0), 0) || 0
-  const totalWalletBalance = wallets?.reduce((sum, w) => sum + (w.balance || 0), 0) || 0
 
   // Platform commission (10%)
   const platformEarnings = totalRevenue * 0.10
