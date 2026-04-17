@@ -21,7 +21,7 @@ export default async function EventMediaPage({ params }: EventMediaPageProps) {
   // Get event
   const { data: event } = await supabase
     .from('events')
-    .select('id, title, cover_image, organizer_id')
+    .select('id, title, cover_image, organizer_id, state, is_published')
     .eq('id', id)
     .single();
 
@@ -57,6 +57,7 @@ export default async function EventMediaPage({ params }: EventMediaPageProps) {
         <EventMediaManager 
           eventId={event.id}
           eventTitle={event.title}
+          eventState={event.state || (event.is_published ? 'published' : 'draft')}
           coverImage={event.cover_image}
           initialMedia={media || []} 
         />

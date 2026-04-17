@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { 
   uploadEventFile, 
@@ -17,7 +19,9 @@ import {
   Video, 
   ExternalLink,
   Upload,
-  Ticket
+  Ticket,
+  Eye,
+  CheckCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,10 +43,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { EventMedia, MediaType, MEDIA_TYPE_LABELS, extractYouTubeId, getYouTubeThumbnail } from '@/types/database';
+import { toast } from 'sonner';
 
 interface EventMediaManagerProps {
   eventId: string;
   eventTitle: string;
+  eventState: string;
   coverImage?: string | null;
   initialMedia: EventMedia[];
 }
@@ -50,6 +56,7 @@ interface EventMediaManagerProps {
 export function EventMediaManager({ 
   eventId, 
   eventTitle,
+  eventState,
   coverImage: initialCoverImage,
   initialMedia 
 }: EventMediaManagerProps) {
@@ -67,6 +74,8 @@ export function EventMediaManager({
     is_gallery: true,
   });
   const supabase = createClient();
+  const router = useRouter();
+  const [publishing, setPublishing] = useState(false);
 
   // Handle poster/cover image upload
   const handlePosterUpload = async (file: File) => {
@@ -75,7 +84,7 @@ export function EventMediaManager({
       const result: UploadResult = await uploadEventFile(file, eventId, 'poster');
       
       if (!result.success || !result.url) {
-        alert(result.error || 'Failed to upload poster');
+        toast.error(result.error || 'Failed to upload poster');
         return;
       }
 
@@ -87,7 +96,7 @@ export function EventMediaManager({
 
       if (eventError) {
         console.error('Error updating event:', eventError);
-        alert('Failed to save poster');
+        toast.error('Failed to save poster');
         return;
       }
 
@@ -112,9 +121,10 @@ export function EventMediaManager({
       }
 
       setCoverImage(result.url);
+      toast.success('Poster uploaded successfully');
     } catch (error) {
       console.error('Poster upload error:', error);
-      alert('Failed to upload poster');
+      toast.error('Failed to upload poster');
     } finally {
       setUploadingPoster(false);
     }
@@ -127,14 +137,14 @@ export function EventMediaManager({
       const result: UploadResult = await uploadEventFile(file, eventId, 'gallery');
       
       if (!result.success || !result.url) {
-        alert(result.error || 'Failed to upload file');
+        toast.error(result.error || 'Failed to upload file');
         return;
       }
 
       setNewMedia(prev => ({ ...prev, url: result.url! }));
     } catch (error) {
       console.error('Upload error:', error);
-      alert('Failed to upload file');
+      toast.error('Failed to upload file');
     } finally {
       setUploading(false);
     }
@@ -173,11 +183,12 @@ export function EventMediaManager({
 
     if (error) {
       console.error('Error adding media:', error);
-      alert('Failed to add media');
+      toast.error('Failed to save media');
       return;
     }
 
     setMedia(prev => [...prev, data]);
+    toast.success('Media saved to event');
     setNewMedia({
       media_type: 'image',
       url: '',
@@ -273,8 +284,60 @@ export function EventMediaManager({
   const galleryImages = media.filter(m => m.media_type === 'image' && m.is_gallery);
   const promoVideos = media.filter(m => m.media_type !== 'image');
 
+  const handlePublishEvent = async () => {
+    setPublishing(true);
+    try {
+      const { error } = await supabase
+        .from('events')
+        .update({
+          state: 'published',
+          is_published: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', eventId);
+
+      if (error) throw error;
+
+      toast.success('Event published successfully');
+      router.refresh();
+    } catch (error) {
+      console.error('Publish event error:', error);
+      toast.error('Failed to publish event');
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
+      <div className="rounded-xl border bg-muted/30 p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="font-semibold text-neutral-900">Review media before publishing</h2>
+            <p className="text-sm text-muted-foreground">
+              Upload your poster and gallery first, check how everything looks here, then go back to edit details or publish when you are ready.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Link href={`/dashboard/organizer/events/${eventId}/edit`}>
+              <Button variant="outline" className="w-full sm:w-auto">
+                <Eye className="mr-2 h-4 w-4" />
+                Go Back & Edit
+              </Button>
+            </Link>
+            {eventState === 'published' ? (
+              <Button disabled className="w-full sm:w-auto">
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Already Published
+              </Button>
+            ) : (
+              <Button onClick={handlePublishEvent} disabled={publishing} className="w-full sm:w-auto">
+                {publishing ? 'Publishing...' : 'Publish Event'}
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
       {/* Event Poster Section */}
       <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-neutral-100">

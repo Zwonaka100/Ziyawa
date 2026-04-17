@@ -35,7 +35,6 @@ export default function NewEventPage() {
     end_time: '',
     ticket_price: '',
     capacity: '',
-    publish_now: false,
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -84,7 +83,8 @@ export default function NewEventPage() {
           end_time: formData.end_time || null,
           ticket_price: parseFloat(formData.ticket_price) || 0,
           capacity: parseInt(formData.capacity) || 100,
-          state: formData.publish_now ? 'published' : 'draft',
+          state: 'draft',
+          is_published: false,
         })
         .select()
         .single()
@@ -117,7 +117,7 @@ export default function NewEventPage() {
         <CardHeader>
           <CardTitle>Create New Event</CardTitle>
           <CardDescription>
-            Fill in the details for your event. After the first save, you will go straight to poster and media upload while the event is still in draft.
+            Fill in the details for your event. First save the draft, then add media, review everything, and publish when ready.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -247,18 +247,8 @@ export default function NewEventPage() {
               </div>
             </div>
 
-            {/* Publish Option */}
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="publish_now"
-                checked={formData.publish_now}
-                onChange={(e) => updateField('publish_now', e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              <Label htmlFor="publish_now" className="text-sm">
-                Publish immediately (make visible on Ziwaphi?)
-              </Label>
+            <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+              Your event will be saved as a draft first so you can upload posters, gallery media, and review the final look before publishing.
             </div>
 
             {/* Submit */}
