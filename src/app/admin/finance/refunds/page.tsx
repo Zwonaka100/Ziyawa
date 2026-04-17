@@ -1,5 +1,7 @@
 'use client'
 
+import Image from 'next/image'
+
 /**
  * ADMIN REFUNDS PAGE
  * /admin/finance/refunds
@@ -7,7 +9,7 @@
  * Process refund requests and manage refund history
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent } from '@/components/ui/card'
@@ -120,8 +122,6 @@ const REFUND_REASONS: Record<string, string> = {
 }
 
 export default function AdminRefundsPage() {
-  const supabase = createClient()
-  
   const [refunds, setRefunds] = useState<RefundRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -146,12 +146,8 @@ export default function AdminRefundsPage() {
     refundedAmount: 0,
   })
 
-  useEffect(() => {
-    fetchRefunds()
-    fetchStats()
-  }, [page, statusFilter, reasonFilter, search])
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
+    const supabase = createClient()
     const firstOfMonth = new Date()
     firstOfMonth.setDate(1)
     firstOfMonth.setHours(0, 0, 0, 0)
@@ -167,9 +163,10 @@ export default function AdminRefundsPage() {
       refundedThisMonth: refunded.data?.length || 0,
       refundedAmount: refunded.data?.reduce((sum, r) => sum + (r.amount || 0), 0) || 0,
     })
-  }
+  }, [])
 
-  const fetchRefunds = async () => {
+  const fetchRefunds = useCallback(async () => {
+    const supabase = createClient()
     setLoading(true)
 
     let query = supabase
@@ -213,7 +210,12 @@ export default function AdminRefundsPage() {
     }
 
     setLoading(false)
-  }
+  }, [page, statusFilter, reasonFilter, search])
+
+  useEffect(() => {
+    void fetchRefunds()
+    void fetchStats()
+  }, [fetchRefunds, fetchStats])
 
   const openProcess = (refund: RefundRequest, action: 'approve' | 'reject' | 'process') => {
     setSelectedRefund(refund)
@@ -229,6 +231,7 @@ export default function AdminRefundsPage() {
     setProcessing(true)
 
     try {
+      const supabase = createClient()
       const { data: { user: admin } } = await supabase.auth.getUser()
       
       let newStatus = ''
@@ -244,7 +247,7 @@ export default function AdminRefundsPage() {
         }
       }
 
-      const updates: Record<string, any> = {
+      const updates: Record<string, unknown> = {
         status: newStatus,
         admin_notes: adminNotes || null,
         processed_by: admin?.id,
@@ -334,8 +337,8 @@ export default function AdminRefundsPage() {
         `${formatCurrency(refundAmount)} refunded successfully`
       )
       setProcessOpen(false)
-      fetchRefunds()
-      fetchStats()
+      void fetchRefunds()
+      void fetchStats()
     } catch (error) {
       console.error('Process error:', error)
       toast.error('Failed to process refund')
@@ -474,7 +477,13 @@ export default function AdminRefundsPage() {
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center">
                             {refund.user?.avatar_url ? (
-                              <img src={refund.user.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                              <Image
+                                src={refund.user.avatar_url}
+                                alt=""
+                                width={32}
+                                height={32}
+                                className="w-full h-full rounded-full object-cover"
+                              />
                             ) : (
                               <User className="h-4 w-4 text-muted-foreground" />
                             )}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -23,7 +23,8 @@ import {
   Calendar,
   User,
   Settings,
-  Mail
+  Mail,
+  type LucideIcon,
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -32,7 +33,7 @@ type AuditLog = {
   action: string
   entity_type: string
   entity_id: string
-  details: Record<string, any>
+  details: Record<string, unknown>
   ip_address: string
   created_at: string
   admin: {
@@ -41,7 +42,7 @@ type AuditLog = {
   } | null
 }
 
-const entityIcons: Record<string, any> = {
+const entityIcons: Record<string, LucideIcon> = {
   user: User,
   event: Calendar,
   report: Shield,
@@ -71,13 +72,8 @@ export default function AuditLogsPage() {
   const [totalCount, setTotalCount] = useState(0)
   const pageSize = 20
 
-  const supabase = createClient()
-
-  useEffect(() => {
-    fetchLogs()
-  }, [page, actionFilter, entityFilter])
-
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
+    const supabase = createClient()
     setLoading(true)
     
     let query = supabase
@@ -105,7 +101,13 @@ export default function AuditLogsPage() {
       setTotalCount(count || 0)
     }
     setLoading(false)
-  }
+  }, [page, actionFilter, entityFilter, pageSize])
+
+  useEffect(() => {
+    // This fetch keeps logs synced with active paging and filters.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchLogs()
+  }, [fetchLogs])
 
   const filteredLogs = logs.filter(log => {
     if (!search) return true
@@ -129,12 +131,12 @@ export default function AuditLogsPage() {
     return 'bg-gray-100 text-gray-800'
   }
 
-  const formatDetails = (details: Record<string, any>) => {
+  const formatDetails = (details: Record<string, unknown>) => {
     if (!details) return null
     const entries = Object.entries(details).slice(0, 3)
     return entries.map(([key, value]) => (
       <span key={key} className="text-xs text-muted-foreground">
-        {key}: {typeof value === 'object' ? JSON.stringify(value).slice(0, 50) : String(value).slice(0, 50)}
+        {key}: {typeof value === 'object' && value !== null ? JSON.stringify(value).slice(0, 50) : String(value).slice(0, 50)}
       </span>
     ))
   }
@@ -146,7 +148,7 @@ export default function AuditLogsPage() {
           <h2 className="text-2xl font-bold">Audit Logs</h2>
           <p className="text-muted-foreground">Track all admin actions on the platform</p>
         </div>
-        <Button variant="outline" onClick={fetchLogs}>
+        <Button variant="outline" onClick={() => { void fetchLogs() }}>
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>

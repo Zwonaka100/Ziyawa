@@ -1,5 +1,7 @@
 'use client'
 
+import Image from 'next/image'
+
 /**
  * ADMIN PAYOUTS PAGE
  * /admin/finance/payouts
@@ -7,7 +9,7 @@
  * Review and process payout requests
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent } from '@/components/ui/card'
@@ -51,7 +53,6 @@ import {
   MoreHorizontal,
   CheckCircle,
   XCircle,
-  Clock,
   Loader2,
   Building,
   CreditCard,
@@ -95,8 +96,6 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 }
 
 export default function AdminPayoutsPage() {
-  const supabase = createClient()
-  
   const [payouts, setPayouts] = useState<PayoutRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('pending')
@@ -118,12 +117,8 @@ export default function AdminPayoutsPage() {
     processedAmount: 0,
   })
 
-  useEffect(() => {
-    fetchPayouts()
-    fetchStats()
-  }, [page, statusFilter])
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
+    const supabase = createClient()
     const today = new Date().toISOString().split('T')[0]
     
     const [pending, processed] = await Promise.all([
@@ -137,9 +132,10 @@ export default function AdminPayoutsPage() {
       processedToday: processed.data?.length || 0,
       processedAmount: processed.data?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0,
     })
-  }
+  }, [])
 
-  const fetchPayouts = async () => {
+  const fetchPayouts = useCallback(async () => {
+    const supabase = createClient()
     setLoading(true)
 
     let query = supabase
@@ -167,7 +163,12 @@ export default function AdminPayoutsPage() {
     }
 
     setLoading(false)
-  }
+  }, [page, statusFilter])
+
+  useEffect(() => {
+    void fetchPayouts()
+    void fetchStats()
+  }, [fetchPayouts, fetchStats])
 
   const openProcess = (payout: PayoutRequest, action: 'approve' | 'reject' | 'complete') => {
     setSelectedPayout(payout)
@@ -182,6 +183,7 @@ export default function AdminPayoutsPage() {
     setProcessing(true)
 
     try {
+      const supabase = createClient()
       const { data: { user: admin } } = await supabase.auth.getUser()
       
       let newStatus = ''
@@ -189,7 +191,7 @@ export default function AdminPayoutsPage() {
       else if (processAction === 'reject') newStatus = 'rejected'
       else if (processAction === 'complete') newStatus = 'completed'
 
-      const updates: Record<string, any> = {
+      const updates: Record<string, unknown> = {
         status: newStatus,
         admin_notes: adminNotes || null,
         processed_by: admin?.id,
@@ -258,8 +260,8 @@ export default function AdminPayoutsPage() {
 
       toast.success(`Payout ${processAction}${processAction === 'complete' ? 'd' : 'ed'} successfully`)
       setProcessOpen(false)
-      fetchPayouts()
-      fetchStats()
+      void fetchPayouts()
+      void fetchStats()
     } catch (error) {
       console.error('Process error:', error)
       toast.error('Failed to process payout')
@@ -377,7 +379,13 @@ export default function AdminPayoutsPage() {
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center">
                             {payout.user?.avatar_url ? (
-                              <img src={payout.user.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                              <Image
+                                src={payout.user.avatar_url}
+                                alt=""
+                                width={32}
+                                height={32}
+                                className="w-full h-full rounded-full object-cover"
+                              />
                             ) : (
                               <User className="h-4 w-4 text-muted-foreground" />
                             )}
