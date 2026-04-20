@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Bell, Check, CheckCheck, Trash2, X } from 'lucide-react';
+import { Bell, Check, CheckCheck, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -19,7 +19,7 @@ interface Notification {
   title: string;
   message: string;
   read: boolean;
-  action_url: string | null;
+  link: string | null;
   created_at: string;
 }
 
@@ -138,9 +138,9 @@ export function NotificationCenter() {
     if (!notification.read) {
       markAsRead(notification.id);
     }
-    if (notification.action_url) {
+    if (notification.link) {
       setOpen(false);
-      window.location.href = notification.action_url;
+      window.location.href = notification.link;
     }
   };
 
@@ -155,8 +155,11 @@ export function NotificationCenter() {
       payment_failed: { bg: 'bg-red-100', text: 'text-red-600' },
       payout_processed: { bg: 'bg-green-100', text: 'text-green-600' },
       ticket_purchased: { bg: 'bg-purple-100', text: 'text-purple-600' },
+      ticket_checkin: { bg: 'bg-emerald-100', text: 'text-emerald-600' },
       event_reminder: { bg: 'bg-yellow-100', text: 'text-yellow-600' },
+      event_updated: { bg: 'bg-amber-100', text: 'text-amber-700' },
       review_received: { bg: 'bg-pink-100', text: 'text-pink-600' },
+      review_requested: { bg: 'bg-pink-100', text: 'text-pink-600' },
       message_received: { bg: 'bg-indigo-100', text: 'text-indigo-600' },
       system: { bg: 'bg-gray-100', text: 'text-gray-600' },
     };

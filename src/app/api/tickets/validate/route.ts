@@ -7,7 +7,35 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
+import { getEventAccessForUser } from '@/lib/event-team';
+
+const supabaseAdmin = createAdminClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+function resolveScannedInput(value: string | null | undefined) {
+  const raw = String(value || '').trim();
+
+  if (!raw) {
+    return { normalizedCode: '', parsedTicketId: null };
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as { code?: string; ticket?: string };
+    return {
+      normalizedCode: parsed.code ? String(parsed.code).trim().toUpperCase() : raw.toUpperCase(),
+      parsedTicketId: parsed.ticket ? String(parsed.ticket).trim() : null,
+    };
+  } catch {
+    return {
+      normalizedCode: raw.toUpperCase(),
+      parsedTicketId: null,
+    };
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,18 +62,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const normalizedCode = ticketCode.toUpperCase()
+    const { normalizedCode, parsedTicketId } = resolveScannedInput(ticketCode)
 
     // Find ticket
-    const { data: ticket } = await supabase
+    const { data: ticket } = await supabaseAdmin
       .from('tickets')
       .select(`
         id,
         ticket_code,
         ticket_type,
         price_paid,
-        checked_in,
-        checked_in_at,
+        is_used,
+        used_at,
         checked_in_by,
         event_id,
         user_id,
@@ -64,13 +92,19 @@ export async function POST(request: NextRequest) {
           avatar_url
         )
       `)
-      .eq('ticket_code', normalizedCode)
+      .eq(ticketCode && parsedTicketId ? 'id' : 'ticket_code', parsedTicketId || normalizedCode)
       .single();
 
-    let resolvedTicket: Record<string, unknown> | null = ticket as Record<string, unknown> | null
+    let resolvedTicket: Record<string, unknown> | null = ticket
+      ? {
+          ...ticket,
+          checked_in: ticket.is_used,
+          checked_in_at: ticket.used_at,
+        }
+      : null
 
     if (!resolvedTicket) {
-      const { data: pass, error: passError } = await supabase
+      const { data: pass, error: passError } = await supabaseAdmin
         .from('event_access_passes')
         .select(`
           id,
@@ -138,11 +172,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user has permission (must be organizer of the event)
+    // Check if user has permission to validate/check in attendees for the event
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const event = ticketRow.events as any;
-    if (event?.organizer_id !== user.id) {
-      // Also check if user is a staff member (future feature)
+    const access = await getEventAccessForUser(supabaseAdmin, String(event?.id || eventId || ''), user.id);
+    if (!access.isOwner && !access.permissions.canCheckIn) {
       return NextResponse.json(
         { error: 'You are not authorized to validate tickets for this event' },
         { status: 403 }

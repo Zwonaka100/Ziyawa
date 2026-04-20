@@ -1,9 +1,8 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
-import { Calendar, MapPin, CheckCircle, DollarSign, Music, ExternalLink } from 'lucide-react';
-import { ArtistPortfolio, ProviderPortfolio, PortfolioMedia, MediaType } from '@/types/database';
+import { Calendar, MapPin, CheckCircle, DollarSign, Music } from 'lucide-react';
+import { ArtistPortfolio, ProviderPortfolio, PortfolioMedia } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { MediaGallery } from './media-gallery';
 
@@ -21,15 +20,6 @@ export function PortfolioCard({ type, portfolio, media, className }: PortfolioIt
       month: 'short',
       year: 'numeric',
     });
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-ZA', {
-      style: 'currency',
-      currency: 'ZAR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
   };
 
   const artistPortfolio = type === 'artist' ? portfolio as ArtistPortfolio : null;

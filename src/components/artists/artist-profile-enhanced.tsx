@@ -9,15 +9,10 @@ import {
   Music, 
   ArrowLeft, 
   Calendar, 
-  DollarSign, 
-  Star,
   Clock,
   CheckCircle,
-  MessageSquare,
   ExternalLink,
-  ChevronDown,
-  Play,
-  Loader2
+  ChevronDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,7 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency } from '@/lib/helpers';
 import { PROVINCES } from '@/lib/constants';
 import { useAuth } from '@/components/providers/auth-provider';
-import { toast } from 'sonner';
+
 import { 
   SocialLinksRow, 
   MediaGallery, 
@@ -49,7 +44,10 @@ import type {
 } from '@/types/database';
 
 interface ArtistWithProfile extends Artist {
-  profiles: Pick<Profile, 'id' | 'full_name' | 'email' | 'avatar_url'>;
+  profiles: Pick<Profile, 'id' | 'full_name' | 'email' | 'avatar_url'> & {
+    is_verified?: boolean
+    verified_entity_type?: string | null
+  };
 }
 
 interface BookingWithEvent extends Booking {
@@ -83,56 +81,16 @@ export function ArtistProfileEnhanced({
   upcomingBookings
 }: ArtistProfileEnhancedProps) {
   const { profile } = useAuth();
-  const router = useRouter();
+  const _router = useRouter();
   const isOrganizer = profile?.is_organizer || profile?.is_admin;
   const [showFullBio, setShowFullBio] = useState(false);
-  const [startingChat, setStartingChat] = useState(false);
-
-  // Start conversation handler
-  const handleStartConversation = async () => {
-    if (!profile) {
-      toast.error('Please sign in to send messages');
-      router.push('/auth/signin');
-      return;
-    }
-
-    if (!isOrganizer) {
-      toast.error('Only organizers can message artists');
-      return;
-    }
-
-    setStartingChat(true);
-    try {
-      const response = await fetch('/api/conversations/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recipientId: artist.profiles.id,
-          contextType: 'general',
-        }),
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to start conversation');
-      }
-
-      router.push(`/messages?chat=${data.conversationId}`);
-    } catch (error) {
-      console.error('Error starting conversation:', error);
-      toast.error('Failed to start conversation');
-    } finally {
-      setStartingChat(false);
-    }
-  };
 
   // Separate media by type
   const images = media.filter(m => m.media_type === 'image');
   const videos = media.filter(m => 
     ['youtube_video', 'tiktok_video', 'instagram_reel', 'facebook_video', 'video_url'].includes(m.media_type)
   );
-  const featuredMedia = media.filter(m => m.is_featured);
+  const _featuredMedia = media.filter(m => m.is_featured);
   const coverImage = media.find(m => m.is_cover_image);
   const profileImage = media.find(m => m.is_profile_image);
 
@@ -210,6 +168,12 @@ export function ArtistProfileEnhanced({
                       isTrusted={isTrusted}
                       size="md"
                     />
+                  )}
+                  {artist.profiles.is_verified && (
+                    <Badge className="bg-amber-500 text-white">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      {artist.profiles.verified_entity_type === 'business' ? 'Verified Business' : 'Verified'}
+                    </Badge>
                   )}
                 </div>
                 <p className="text-white/80">{artist.profiles.full_name}</p>
@@ -541,20 +505,9 @@ export function ArtistProfileEnhanced({
                         {artist.is_available ? 'Request Booking' : 'Not Available'}
                       </Button>
                     </Link>
-                    <Button 
-                      variant="outline" 
-                      className="w-full" 
-                      size="lg"
-                      onClick={handleStartConversation}
-                      disabled={startingChat}
-                    >
-                      {startingChat ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <MessageSquare className="h-4 w-4 mr-2" />
-                      )}
-                      {startingChat ? 'Opening...' : 'Send Message'}
-                    </Button>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Chat becomes available once you send a booking request.
+                    </p>
                   </div>
                 ) : profile ? (
                   <div className="text-center">

@@ -88,7 +88,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: Lucide
   pending: { label: 'Pending', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
   sent: { label: 'Sent', color: 'bg-blue-100 text-blue-700', icon: Send },
   delivered: { label: 'Delivered', color: 'bg-green-100 text-green-700', icon: CheckCircle },
-  opened: { label: 'Opened', color: 'bg-purple-100 text-purple-700', icon: Eye },
+  opened: { label: 'Opened', color: 'bg-neutral-100 text-neutral-700', icon: Eye },
   failed: { label: 'Failed', color: 'bg-red-100 text-red-700', icon: XCircle },
   bounced: { label: 'Bounced', color: 'bg-orange-100 text-orange-700', icon: AlertTriangle },
 }
@@ -97,7 +97,7 @@ const TYPE_CONFIG: Record<string, { label: string; color: string }> = {
   single: { label: 'Single', color: 'bg-neutral-100 text-neutral-700' },
   bulk: { label: 'Bulk', color: 'bg-blue-100 text-blue-700' },
   transactional: { label: 'Transactional', color: 'bg-green-100 text-green-700' },
-  notification: { label: 'Notification', color: 'bg-purple-100 text-purple-700' },
+  notification: { label: 'Notification', color: 'bg-neutral-100 text-neutral-700' },
 }
 
 export default function EmailHistoryPage() {
@@ -285,8 +285,8 @@ export default function EmailHistoryPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-purple-100">
-                <Eye className="h-5 w-5 text-purple-600" />
+              <div className="p-2 rounded-lg bg-neutral-100">
+                <Eye className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Open Rate</p>
@@ -484,7 +484,7 @@ export default function EmailHistoryPage() {
                 </div>
                 <div className="flex-1 h-0.5 bg-gray-200" />
                 <div className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${selectedEmail.opened_at ? 'bg-purple-500' : 'bg-gray-300'}`} />
+                  <div className={`w-3 h-3 rounded-full ${selectedEmail.opened_at ? 'bg-neutral-500' : 'bg-gray-300'}`} />
                   <span className="text-sm">Opened</span>
                 </div>
               </div>

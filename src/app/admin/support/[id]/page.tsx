@@ -336,11 +336,11 @@ export default function AdminTicketDetailPage() {
             <CardContent className="space-y-6">
               {/* Original message */}
               <div className="flex gap-4">
-                <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center flex-shrink-0">
                   {ticket.user?.avatar_url ? (
                     <Image src={ticket.user.avatar_url} alt="" width={40} height={40} className="w-full h-full rounded-full object-cover" />
                   ) : (
-                    <User className="h-5 w-5 text-purple-600" />
+                    <User className="h-5 w-5 text-primary" />
                   )}
                 </div>
                 <div className="flex-1">
@@ -350,7 +350,7 @@ export default function AdminTicketDetailPage() {
                       {format(new Date(ticket.created_at), 'MMM d, yyyy \'at\' h:mm a')}
                     </span>
                   </div>
-                  <div className="p-4 rounded-lg bg-purple-50 text-sm whitespace-pre-wrap">
+                  <div className="p-4 rounded-lg bg-neutral-50 text-sm whitespace-pre-wrap">
                     {ticket.message}
                   </div>
                 </div>
@@ -360,14 +360,14 @@ export default function AdminTicketDetailPage() {
               {replies.map((reply) => (
                 <div key={reply.id} className="flex gap-4">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    reply.is_staff ? 'bg-blue-100' : 'bg-purple-100'
+                    reply.is_staff ? 'bg-blue-100' : 'bg-neutral-100'
                   }`}>
                     {reply.is_staff ? (
                       <Shield className="h-5 w-5 text-blue-600" />
                     ) : reply.user?.avatar_url ? (
                       <Image src={reply.user.avatar_url} alt="" width={40} height={40} className="w-full h-full rounded-full object-cover" />
                     ) : (
-                      <User className="h-5 w-5 text-purple-600" />
+                      <User className="h-5 w-5 text-primary" />
                     )}
                   </div>
                   <div className="flex-1">
@@ -383,7 +383,7 @@ export default function AdminTicketDetailPage() {
                       </span>
                     </div>
                     <div className={`p-4 rounded-lg text-sm whitespace-pre-wrap ${
-                      reply.is_staff ? 'bg-blue-50' : 'bg-purple-50'
+                      reply.is_staff ? 'bg-blue-50' : 'bg-neutral-50'
                     }`}>
                       {reply.message}
                     </div>

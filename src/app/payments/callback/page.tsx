@@ -82,7 +82,7 @@ function PaymentCallbackContent() {
       <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8">
         {status === 'verifying' && (
           <div className="text-center">
-            <Loader2 className="h-16 w-16 text-purple-600 mx-auto animate-spin" />
+            <Loader2 className="h-16 w-16 text-primary mx-auto animate-spin" />
             <h1 className="mt-6 text-2xl font-bold text-gray-900">
               Verifying Payment
             </h1>
@@ -143,8 +143,8 @@ function PaymentCallbackContent() {
 
             {/* Ticket Codes */}
             {details.ticketCodes && details.ticketCodes.length > 0 && (
-              <div className="mt-4 bg-purple-50 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-purple-900 mb-2">
+              <div className="mt-4 bg-neutral-50 rounded-lg p-4">
+                <h3 className="text-sm font-medium text-neutral-900 mb-2">
                   Your Ticket Code{details.ticketCodes.length > 1 ? 's' : ''}
                 </h3>
                 <div className="space-y-2">
@@ -154,7 +154,7 @@ function PaymentCallbackContent() {
                     </div>
                   ))}
                 </div>
-                <p className="text-xs text-purple-700 mt-2">
+                <p className="text-xs text-neutral-700 mt-2">
                   Save these codes! You&apos;ll need them at the event.
                 </p>
               </div>
@@ -164,7 +164,7 @@ function PaymentCallbackContent() {
             <div className="mt-6">
               <Link
                 href={getRedirectPath(details.type)}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-neutral-900 text-white rounded-lg font-medium hover:bg-neutral-800 transition"
               >
                 {getActionIcon(details.type)}
                 {getActionText(details.type)}
@@ -215,7 +215,7 @@ function PaymentCallbackContent() {
             <div className="mt-6 space-y-3">
               <button
                 onClick={() => router.back()}
-                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition"
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-neutral-900 text-white rounded-lg font-medium hover:bg-neutral-800 transition"
               >
                 Try Again
               </button>
@@ -291,7 +291,7 @@ export default function PaymentCallbackPage() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <Loader2 className="h-12 w-12 text-purple-600 animate-spin" />
+          <Loader2 className="h-12 w-12 text-primary animate-spin" />
         </div>
       }
     >

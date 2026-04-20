@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { Star, ThumbsUp, Flag, MessageSquare, CheckCircle, Play } from 'lucide-react';
+import { Star, ThumbsUp, MessageSquare, CheckCircle, Play } from 'lucide-react';
 import { Review, VideoReview } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';

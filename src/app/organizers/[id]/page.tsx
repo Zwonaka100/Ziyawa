@@ -29,6 +29,8 @@ export default async function OrganizerPage({ params }: OrganizerPageProps) {
       total_organizer_reviews,
       years_organizing,
       verified_at,
+      is_verified,
+      verified_entity_type,
       created_at
     `)
     .eq('id', id)

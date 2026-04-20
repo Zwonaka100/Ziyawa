@@ -21,7 +21,7 @@ export function TrustBadge({
   isTrusted,
   completionRate,
   totalBookings = 0,
-  rating = 0,
+  rating: _rating = 0,
   size = 'md',
   showLabel = true,
   className 

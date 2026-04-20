@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, FileText, History, Send } from 'lucide-react'
+import { Users, FileText, History, Send, MessageSquare } from 'lucide-react'
 
 export const metadata = {
   title: 'Communications | Admin | Ziyawa',
@@ -86,6 +86,25 @@ export default function AdminCommunicationsPage() {
             <CardContent>
               <p className="text-muted-foreground">
                 View all sent emails, delivery status, and open rates.
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        {/* Conversation Logs */}
+        <Link href="/admin/communications/conversations">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer h-full group">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-100 group-hover:bg-amber-200 transition-colors">
+                  <MessageSquare className="h-6 w-6 text-amber-600" />
+                </div>
+                <CardTitle className="text-lg">Conversation Logs</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                View all on-platform conversations for dispute investigation. All messages are stored permanently.
               </p>
             </CardContent>
           </Card>

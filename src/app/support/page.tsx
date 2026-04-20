@@ -7,8 +7,8 @@
  * Users can view their tickets and submit new support requests
  */
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/components/providers/auth-provider'
 import { createClient } from '@/lib/supabase/client'
@@ -27,6 +27,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -74,7 +75,7 @@ const CATEGORIES = [
   { value: 'other', label: 'Other', icon: MessageSquare },
 ]
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
+const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ComponentType }> = {
   open: { label: 'Open', color: 'bg-green-100 text-green-700', icon: AlertCircle },
   in_progress: { label: 'In Progress', color: 'bg-blue-100 text-blue-700', icon: Clock },
   waiting: { label: 'Awaiting Reply', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
@@ -82,10 +83,11 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }>
   closed: { label: 'Closed', color: 'bg-neutral-100 text-neutral-700', icon: CheckCircle },
 }
 
-export default function SupportPage() {
+function SupportPageContent() {
   const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'support@zande.io'
-  const { user, profile, loading: authLoading } = useAuth()
+  const { user, profile: _profile, loading: authLoading } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
 
   const [tickets, setTickets] = useState<SupportTicket[]>([])
@@ -111,7 +113,30 @@ export default function SupportPage() {
     if (user) {
       fetchTickets()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
+
+  useEffect(() => {
+    if (!user) return
+
+    const category = searchParams.get('category') || ''
+    const subject = searchParams.get('subject') || ''
+    const priority = searchParams.get('priority') || 'medium'
+    const message = searchParams.get('message') || ''
+    const openNew = searchParams.get('new') === '1'
+
+    if (!openNew && !category && !subject && !message) {
+      return
+    }
+
+    setFormData((current) => ({
+      category: category || current.category,
+      subject: subject || current.subject,
+      priority: priority || current.priority,
+      message: message || current.message,
+    }))
+    setDialogOpen(true)
+  }, [user, searchParams])
 
   const fetchTickets = async () => {
     setLoading(true)
@@ -149,7 +174,7 @@ export default function SupportPage() {
     try {
       const ticketNumber = generateTicketNumber()
       
-      const { data, error } = await supabase
+      const { data: _data, error } = await supabase
         .from('support_tickets')
         .insert({
           ticket_number: ticketNumber,
@@ -168,6 +193,7 @@ export default function SupportPage() {
       toast.success('Support ticket submitted successfully!')
       setDialogOpen(false)
       setFormData({ subject: '', category: '', priority: 'medium', message: '' })
+      router.replace('/support')
       fetchTickets()
     } catch (error) {
       console.error('Error submitting ticket:', error)
@@ -208,6 +234,9 @@ export default function SupportPage() {
             <DialogContent className="sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>Submit Support Request</DialogTitle>
+                <DialogDescription>
+                  Share the issue clearly and the support team will pick it up faster.
+                </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4 mt-4">
                 <div className="space-y-2">
@@ -327,8 +356,8 @@ export default function SupportPage() {
           <Card className="hover:shadow-md transition-shadow">
             <CardContent className="pt-6">
               <div className="flex items-start gap-4">
-                <div className="p-2 rounded-lg bg-purple-100">
-                  <Clock className="h-6 w-6 text-purple-600" />
+                <div className="p-2 rounded-lg bg-neutral-100">
+                  <Clock className="h-6 w-6 text-primary" />
                 </div>
                 <div>
                   <h3 className="font-semibold">Response Time</h3>
@@ -337,6 +366,20 @@ export default function SupportPage() {
                   </p>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-md transition-shadow md:col-span-3 border-orange-200 bg-orange-50/60">
+            <CardContent className="pt-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="font-semibold">Fast-track disputes and payout issues</h3>
+                <p className="text-sm text-muted-foreground">
+                  Coming from a booking, ticket, or wallet problem? Open a prefilled ticket and our team can review it faster.
+                </p>
+              </div>
+              <Button variant="outline" onClick={() => setDialogOpen(true)}>
+                Open Support Form
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -447,5 +490,19 @@ export default function SupportPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function SupportPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
+      <SupportPageContent />
+    </Suspense>
   )
 }

@@ -1,11 +1,11 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Calendar, DollarSign, Clock, CheckCircle, XCircle, Image as ImageIcon, Music2, Share2, User, Edit } from 'lucide-react'
+import { Calendar, Clock, CheckCircle, XCircle, Image as ImageIcon, Music2, Share2, User, Edit } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/helpers'
 import { BOOKING_STATUS, PROVINCES } from '@/lib/constants'
 import { BookingActions } from '@/components/bookings/booking-actions'
@@ -27,11 +27,11 @@ export default async function ArtistDashboardPage() {
   // Check role - use new boolean flags
   const { data: profileData } = await supabase
     .from('profiles')
-    .select('is_artist, wallet_balance')
+    .select('is_artist')
     .eq('id', user.id)
     .single()
 
-  const profile = profileData as { is_artist: boolean; wallet_balance: number } | null
+  const profile = profileData as { is_artist: boolean } | null
 
   if (!profile || !profile.is_artist) {
     redirect('/profile')
@@ -80,15 +80,20 @@ export default async function ArtistDashboardPage() {
   const pendingBookings = bookings?.filter(b => b.status === 'pending') || []
   const acceptedBookings = bookings?.filter(b => ['accepted', 'paid'].includes(b.status)) || []
   const completedBookings = bookings?.filter(b => b.status === 'completed') || []
-  const totalEarnings = bookings
-    ?.filter(b => ['paid', 'completed'].includes(b.status))
-    .reduce((acc, b) => acc + b.offered_amount, 0) || 0
+  const declinedBookings = bookings?.filter(b => ['declined', 'cancelled'].includes(b.status)) || []
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold">Artist Dashboard</h1>
-        <p className="text-muted-foreground">Welcome back, {artist.stage_name}!</p>
+        <div className="flex flex-wrap items-center gap-2 mb-1">
+          <h1 className="text-3xl font-bold">Artist Dashboard</h1>
+          <Badge variant={artist.is_available ? 'default' : 'secondary'} className={artist.is_available ? 'bg-green-100 text-green-700 hover:bg-green-100' : ''}>
+            {artist.is_available ? 'Available' : 'Paused'}
+          </Badge>
+        </div>
+        <p className="text-muted-foreground">
+          Welcome back, {artist.stage_name}! {artist.is_available ? `Open for bookings • ${artist.advance_notice_days || 0} days notice` : 'Bookings are paused right now.'}
+        </p>
       </div>
 
       {/* Quick Links to Profile Management */}
@@ -211,10 +216,10 @@ export default async function ArtistDashboardPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
-              <DollarSign className="h-8 w-8 text-primary" />
+              <XCircle className="h-8 w-8 text-rose-500" />
               <div>
-                <p className="text-2xl font-bold">{formatCurrency(profile.wallet_balance)}</p>
-                <p className="text-sm text-muted-foreground">Balance</p>
+                <p className="text-2xl font-bold">{declinedBookings.length}</p>
+                <p className="text-sm text-muted-foreground">Declined</p>
               </div>
             </div>
           </CardContent>
@@ -253,12 +258,31 @@ export default async function ArtistDashboardPage() {
                           <p className="font-medium text-foreground">
                             Offer: {formatCurrency(booking.offered_amount)}
                           </p>
+                          <p className="text-xs text-muted-foreground">
+                            You can accept this offer as-is or use messages to negotiate the details.
+                          </p>
                           {booking.organizer_notes && (
                             <p className="italic mt-2">&quot;{booking.organizer_notes}&quot;</p>
                           )}
                         </div>
                       </div>
-                      <BookingActions booking={booking} />
+                      <div className="flex flex-col gap-2 items-start sm:items-end">
+                        <BookingActions booking={booking} />
+                        <Link
+                          href={{
+                            pathname: '/support',
+                            query: {
+                              new: '1',
+                              category: 'event',
+                              priority: 'high',
+                              subject: `Artist booking issue: ${booking.events?.title || 'Booking'}`,
+                              message: `I need help with this artist booking. Event: ${booking.events?.title || 'Unknown'}. Status: ${booking.status}.`,
+                            },
+                          }}
+                        >
+                          <Button variant="outline" size="sm">Need help</Button>
+                        </Link>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -298,6 +322,20 @@ export default async function ArtistDashboardPage() {
                           <p>Payment: {formatCurrency(booking.offered_amount)}</p>
                         </div>
                       </div>
+                      <Link
+                        href={{
+                          pathname: '/support',
+                          query: {
+                            new: '1',
+                            category: 'event',
+                            priority: 'medium',
+                            subject: `Artist booking follow-up: ${booking.events?.title || 'Booking'}`,
+                            message: `I need help with this booking. Event: ${booking.events?.title || 'Unknown'}. Status: ${booking.status}.`,
+                          },
+                        }}
+                      >
+                        <Button variant="outline" size="sm">Get support</Button>
+                      </Link>
                     </div>
                   </CardContent>
                 </Card>

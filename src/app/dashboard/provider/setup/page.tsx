@@ -14,13 +14,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Loader2, Wrench, ArrowRight } from 'lucide-react'
+import { Loader2, Users, ArrowRight, ArrowLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/components/providers/auth-provider'
-import { 
-  type ServiceCategory, 
+import {
+  type ServiceCategory,
   type SaProvince,
-  SERVICE_CATEGORY_LABELS 
+  type PriceType,
+  type CrewWorkMode,
+  SERVICE_CATEGORY_LABELS,
 } from '@/types/database'
 import { toast } from 'sonner'
 
@@ -52,7 +54,14 @@ export default function ProviderSetupPage() {
   const [businessPhone, setBusinessPhone] = useState('')
   const [businessEmail, setBusinessEmail] = useState('')
   const [website, setWebsite] = useState('')
+  const [isAvailable, setIsAvailable] = useState(true)
   const [advanceNoticeDays, setAdvanceNoticeDays] = useState(3)
+  const [workMode, setWorkMode] = useState<CrewWorkMode>('offering_services')
+  const [activeSection, setActiveSection] = useState<'work' | 'services'>('work')
+  const [baseRate, setBaseRate] = useState('')
+  const [rateType, setRateType] = useState<PriceType>('daily')
+  const [availabilityNotes, setAvailabilityNotes] = useState('')
+  const [workRoles, setWorkRoles] = useState('')
 
   useEffect(() => {
     if (!profile) {
@@ -60,13 +69,8 @@ export default function ProviderSetupPage() {
       return
     }
 
-    if (!profile.is_provider) {
-      router.push('/profile')
-      toast.error('You need to become a provider first')
-      return
-    }
-
     checkExistingProvider()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, router])
 
   const checkExistingProvider = async () => {
@@ -89,7 +93,14 @@ export default function ProviderSetupPage() {
         setBusinessPhone(data.business_phone || '')
         setBusinessEmail(data.business_email || '')
         setWebsite(data.website || '')
+        setIsAvailable(data.is_available !== false)
         setAdvanceNoticeDays(data.advance_notice_days)
+        setWorkMode(data.work_mode || 'offering_services')
+        setActiveSection(data.work_mode === 'offering_services' ? 'services' : 'work')
+        setBaseRate(data.base_rate ? String(data.base_rate) : '')
+        setRateType(data.rate_type || 'daily')
+        setAvailabilityNotes(data.availability_notes || '')
+        setWorkRoles(Array.isArray(data.work_roles) ? data.work_roles.join(', ') : '')
         setIsEditing(true)
       }
     } catch (error) {
@@ -111,7 +122,12 @@ export default function ProviderSetupPage() {
     try {
       const supabase = createClient()
       
-      const providerData = {
+      await supabase
+        .from('profiles')
+        .update({ is_provider: true })
+        .eq('id', profile!.id)
+
+      const legacyProviderData = {
         profile_id: profile!.id,
         business_name: businessName.trim(),
         description: description.trim() || null,
@@ -120,32 +136,54 @@ export default function ProviderSetupPage() {
         business_phone: businessPhone.trim() || null,
         business_email: businessEmail.trim() || null,
         website: website.trim() || null,
+        is_available: isAvailable,
         advance_notice_days: advanceNoticeDays,
       }
 
-      if (isEditing) {
-        // Update existing
-        const { error } = await supabase
-          .from('providers')
-          .update(providerData)
-          .eq('profile_id', profile!.id)
-
-        if (error) throw error
-        toast.success('Provider profile updated!')
-      } else {
-        // Create new
-        const { error } = await supabase
-          .from('providers')
-          .insert(providerData)
-
-        if (error) throw error
-        toast.success('Provider profile created! 🎉')
+      const providerData = {
+        ...legacyProviderData,
+        work_mode: workMode,
+        base_rate: baseRate.trim() ? Number(baseRate) : null,
+        rate_type: rateType,
+        availability_notes: availabilityNotes.trim() || null,
+        work_roles: workRoles.split(',').map((role) => role.trim()).filter(Boolean),
       }
 
+      const saveProvider = async (payload: typeof providerData | typeof legacyProviderData) => {
+        if (isEditing) {
+          return supabase
+            .from('providers')
+            .update(payload)
+            .eq('profile_id', profile!.id)
+        }
+
+        return supabase
+          .from('providers')
+          .insert(payload)
+      }
+
+      let saveResult = await saveProvider(providerData)
+      let usedLegacyFallback = false
+
+      if (saveResult.error && String(saveResult.error.message || '').toLowerCase().includes('work_mode')) {
+        saveResult = await saveProvider(legacyProviderData)
+        usedLegacyFallback = !saveResult.error
+      }
+
+      if (saveResult.error) throw saveResult.error
+
+      await refreshProfile()
+      toast.success(
+        usedLegacyFallback
+          ? 'Crew profile saved. Apply the latest Crew migration to unlock rates and availability fields.'
+          : isEditing
+            ? 'Crew profile updated!'
+            : 'Crew profile created! 🎉'
+      )
       router.push('/dashboard/provider')
     } catch (error) {
-      console.error('Error saving provider:', error)
-      toast.error('Failed to save provider profile')
+      console.error('Error saving crew profile:', error)
+      toast.error('Failed to save crew profile')
     } finally {
       setLoading(false)
     }
@@ -161,72 +199,123 @@ export default function ProviderSetupPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
+      {isEditing && (
+        <button
+          onClick={() => router.push('/dashboard/provider')}
+          className="inline-flex items-center text-muted-foreground hover:text-foreground mb-6 text-sm"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Dashboard
+        </button>
+      )}
       <div className="text-center mb-8">
         <div className="inline-flex items-center justify-center p-3 bg-orange-100 rounded-full mb-4">
-          <Wrench className="h-8 w-8 text-orange-600" />
+          <Users className="h-8 w-8 text-orange-600" />
         </div>
         <h1 className="text-3xl font-bold mb-2">
-          {isEditing ? 'Edit Provider Profile' : 'Set Up Your Provider Profile'}
+          {isEditing ? 'Edit Crew Profile' : 'Set Up Your Crew Profile'}
         </h1>
         <p className="text-muted-foreground">
-          {isEditing 
-            ? 'Update your business information' 
-            : 'Tell organisers about your services'}
+          {isEditing
+            ? 'Update your crew identity, rates, and availability'
+            : 'Choose whether you want My Work, My Services, or both on Ziyawa.'}
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Business Information</CardTitle>
+          <CardTitle>Crew Profile Information</CardTitle>
           <CardDescription>
-            This information will be displayed on your public profile
+            Start with one focus now if you want, and enable the other later from your Crew Dashboard.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Business Name */}
+
+            {/* ── STEP 1: Work Mode (always at top) ── */}
+            <div className="rounded-lg border-2 border-orange-200 bg-orange-50/40 p-4 space-y-3">
+              <p className="font-semibold text-sm text-foreground">How do you want to work on Ziyawa?</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {([
+                  { value: 'looking_for_work', label: 'My Work', desc: 'Get hired for event staff roles' },
+                  { value: 'offering_services', label: 'My Services', desc: 'Offer bookable services' },
+                  { value: 'both', label: 'Both', desc: 'Work and services' },
+                ] as { value: CrewWorkMode; label: string; desc: string }[]).map(({ value, label, desc }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => {
+                      setWorkMode(value)
+                      if (value === 'looking_for_work') setActiveSection('work')
+                      if (value === 'offering_services') setActiveSection('services')
+                    }}
+                    className={`rounded-lg border-2 p-3 text-left transition-colors ${
+                      workMode === value
+                        ? 'border-orange-500 bg-white shadow-sm'
+                        : 'border-neutral-200 bg-white hover:border-neutral-300'
+                    }`}
+                  >
+                    <p className="font-medium text-sm">{label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{desc}</p>
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                This stays synced with My Work and My Services in your Crew Dashboard.
+              </p>
+            </div>
+
+            {/* ── STEP 2: Section toggle for "Both" mode ── */}
+            {workMode === 'both' && (
+              <div className="flex rounded-lg border bg-muted/20 p-1 gap-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveSection('work')}
+                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                    activeSection === 'work'
+                      ? 'bg-white shadow-sm text-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Work Profile Settings
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveSection('services')}
+                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                    activeSection === 'services'
+                      ? 'bg-white shadow-sm text-foreground'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Services Settings
+                </button>
+              </div>
+            )}
+
+            {/* ── COMMON FIELDS (always visible) ── */}
             <div>
-              <Label htmlFor="businessName">Business Name *</Label>
+              <Label htmlFor="businessName">Display Name or Business Name *</Label>
               <Input
                 id="businessName"
-                placeholder="e.g., SoundPro SA"
+                placeholder="e.g., SoundPro SA or Sipho Crew"
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
                 required
               />
             </div>
 
-            {/* Description */}
             <div>
-              <Label htmlFor="description">About Your Business</Label>
+              <Label htmlFor="description">About You or Your Business</Label>
               <Textarea
                 id="description"
-                placeholder="Tell organisers what makes your services special..."
+                placeholder="Tell organisers what you do well, how you work, and what makes your business reliable..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={4}
               />
             </div>
 
-            {/* Primary Category */}
-            <div>
-              <Label htmlFor="category">Primary Service Category *</Label>
-              <Select value={primaryCategory} onValueChange={(v) => setPrimaryCategory(v as ServiceCategory)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(SERVICE_CATEGORY_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                You can offer services in multiple categories
-              </p>
-            </div>
-
-            {/* Location */}
             <div>
               <Label htmlFor="location">Location *</Label>
               <Select value={location} onValueChange={(v) => setLocation(v as SaProvince)}>
@@ -241,7 +330,6 @@ export default function ProviderSetupPage() {
               </Select>
             </div>
 
-            {/* Contact Information */}
             <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="phone">Business Phone</Label>
@@ -265,7 +353,6 @@ export default function ProviderSetupPage() {
               </div>
             </div>
 
-            {/* Website */}
             <div>
               <Label htmlFor="website">Website</Label>
               <Input
@@ -277,21 +364,117 @@ export default function ProviderSetupPage() {
               />
             </div>
 
-            {/* Advance Notice */}
-            <div>
-              <Label htmlFor="notice">Minimum Advance Notice (days)</Label>
-              <Input
-                id="notice"
-                type="number"
-                min={0}
-                max={90}
-                value={advanceNoticeDays}
-                onChange={(e) => setAdvanceNoticeDays(parseInt(e.target.value) || 0)}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                How many days notice do you need before a booking?
-              </p>
-            </div>
+            {/* ── WORK PROFILE FIELDS ── */}
+            {(workMode === 'looking_for_work' || (workMode === 'both' && activeSection === 'work')) && (
+              <div className="space-y-4 rounded-lg border border-neutral-200 p-4 bg-muted/20">
+                <p className="text-sm font-semibold text-foreground">Work Profile</p>
+                <div className="rounded-lg border border-dashed bg-muted/30 p-3 text-xs text-muted-foreground">
+                  This rate is only used when organizers hire you for event work. Service prices are set per service in My Services.
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label htmlFor="baseRate">Starting rate for event work</Label>
+                    <Input
+                      id="baseRate"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      placeholder="500"
+                      value={baseRate}
+                      onChange={(e) => setBaseRate(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="rateType">Rate type</Label>
+                    <Select value={rateType} onValueChange={(v) => setRateType(v as PriceType)}>
+                      <SelectTrigger id="rateType">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="hourly">Per hour</SelectItem>
+                        <SelectItem value="daily">Per day</SelectItem>
+                        <SelectItem value="fixed">Fixed price</SelectItem>
+                        <SelectItem value="negotiable">Negotiable</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="workRoles">Skills &amp; Roles</Label>
+                  <Input
+                    id="workRoles"
+                    placeholder="e.g. Door staff, Guest list, Runner, Ops, MC support"
+                    value={workRoles}
+                    onChange={(e) => setWorkRoles(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Comma-separated list of roles you can fill at events.
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="availabilityNotes">Availability and work notes</Label>
+                  <Textarea
+                    id="availabilityNotes"
+                    placeholder="Available on weekends, open to Gauteng and nearby travel, own transport, short-notice okay..."
+                    value={availabilityNotes}
+                    onChange={(e) => setAvailabilityNotes(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* ── SERVICES FIELDS ── */}
+            {(workMode === 'offering_services' || (workMode === 'both' && activeSection === 'services')) && (
+              <div className="space-y-4 rounded-lg border border-neutral-200 p-4 bg-muted/20">
+                <p className="text-sm font-semibold text-foreground">Services Settings</p>
+                <div>
+                  <Label htmlFor="category">Primary Service Category *</Label>
+                  <Select value={primaryCategory} onValueChange={(v) => setPrimaryCategory(v as ServiceCategory)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(SERVICE_CATEGORY_LABELS).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    You can list services in multiple categories. This is your main one.
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="availability">Booking Availability</Label>
+                  <Select value={isAvailable ? 'available' : 'paused'} onValueChange={(value) => setIsAvailable(value === 'available')}>
+                    <SelectTrigger id="availability">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="available">Available for bookings</SelectItem>
+                      <SelectItem value="paused">Pause bookings for now</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Toggle this anytime when your team is fully booked.
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="notice">Minimum Advance Notice (days)</Label>
+                  <Input
+                    id="notice"
+                    type="number"
+                    min={0}
+                    max={90}
+                    value={advanceNoticeDays}
+                    onChange={(e) => setAdvanceNoticeDays(parseInt(e.target.value) || 0)}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    How many days notice do you need before a service booking?
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Submit */}
             <Button 
@@ -304,7 +487,7 @@ export default function ProviderSetupPage() {
               ) : (
                 <ArrowRight className="h-4 w-4 mr-2" />
               )}
-              {isEditing ? 'Save Changes' : 'Create Provider Profile'}
+              {isEditing ? 'Save Crew Changes' : 'Create Crew Profile'}
             </Button>
           </form>
         </CardContent>

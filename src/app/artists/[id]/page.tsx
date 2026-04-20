@@ -1,6 +1,9 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ArtistProfileEnhanced } from '@/components/artists/artist-profile-enhanced'
+import { Metadata } from 'next'
+
+const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ziyawa.co.za'
 
 interface ArtistPageProps {
   params: Promise<{
@@ -8,25 +11,43 @@ interface ArtistPageProps {
   }>
 }
 
-export async function generateMetadata({ params }: ArtistPageProps) {
+export async function generateMetadata({ params }: ArtistPageProps): Promise<Metadata> {
   const { id } = await params
   const supabase = await createClient()
   
   const { data: artist } = await supabase
     .from('artists')
-    .select('stage_name, bio, genre')
+    .select('stage_name, bio, genre, profile_image')
     .eq('id', id)
     .single()
 
   if (!artist) {
-    return { title: 'Artist Not Found | Ziyawa' }
+    return { title: 'Artist Not Found' }
   }
 
-  const artistData = artist as { stage_name: string; bio: string | null; genre: string }
+  const a = artist as { stage_name: string; bio: string | null; genre: string; profile_image: string | null }
+  const desc = a.bio || `${a.stage_name} — ${a.genre} artist on Ziyawa`
+  const images = a.profile_image ? [{ url: a.profile_image, width: 600, height: 600, alt: a.stage_name }] : []
 
   return {
-    title: `${artistData.stage_name} | Ziyawa`,
-    description: artistData.bio || `${artistData.stage_name} - ${artistData.genre} artist on Ziyawa`,
+    title: a.stage_name,
+    description: desc,
+    openGraph: {
+      title: `${a.stage_name} — ${a.genre}`,
+      description: desc,
+      type: 'profile',
+      url: `${siteUrl}/artists/${id}`,
+      images,
+    },
+    twitter: {
+      card: 'summary',
+      title: a.stage_name,
+      description: desc,
+      images: a.profile_image ? [a.profile_image] : [],
+    },
+    alternates: {
+      canonical: `${siteUrl}/artists/${id}`,
+    },
   }
 }
 
@@ -43,7 +64,9 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
         id,
         full_name,
         email,
-        avatar_url
+        avatar_url,
+        is_verified,
+        verified_entity_type
       )
     `)
     .eq('id', id)
@@ -114,8 +137,23 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
     .gte('events.event_date', new Date().toISOString().split('T')[0])
     .order('events.event_date')
 
+  // JSON-LD for artist
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Person',
+    name: artist.stage_name,
+    description: artist.bio || '',
+    ...(artist.profile_image && { image: artist.profile_image }),
+    url: `${siteUrl}/artists/${id}`,
+    knowsAbout: artist.genre,
+  }
+
   return (
     <div className="min-h-screen bg-white">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <ArtistProfileEnhanced 
         artist={artist} 
         socialLinks={socialLinks || []}

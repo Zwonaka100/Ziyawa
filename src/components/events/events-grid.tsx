@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Calendar, MapPin, Clock, Users, Ticket } from 'lucide-react'
 import { formatCurrency, formatDate, formatTime, getDaysUntilEvent } from '@/lib/helpers'
 import { PROVINCES } from '@/lib/constants'
-import type { Event, Profile, SaProvince } from '@/types/database'
+import type { Profile, SaProvince } from '@/types/database'
 
 interface EventWithOrganizer {
   id: string

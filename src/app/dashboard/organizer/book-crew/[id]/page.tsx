@@ -21,7 +21,6 @@ import {
   ArrowLeft,
   Loader2,
   Calendar,
-  Clock,
   MapPin,
   CheckCircle,
   AlertCircle
@@ -55,6 +54,8 @@ const PROVINCE_LABELS: Record<SaProvince, string> = {
 interface ProviderWithProfile extends Provider {
   profile?: {
     full_name: string | null
+    email?: string | null
+    phone?: string | null
   }
 }
 
@@ -65,6 +66,7 @@ export default function BookCrewPage() {
   const { profile } = useAuth()
   const providerId = params.id as string
   const preselectedEventId = searchParams.get('event')
+  const requestedMode = searchParams.get('mode') === 'work' ? 'work' : 'services'
 
   const [provider, setProvider] = useState<ProviderWithProfile | null>(null)
   const [services, setServices] = useState<ProviderService[]>([])
@@ -73,8 +75,10 @@ export default function BookCrewPage() {
   const [submitting, setSubmitting] = useState(false)
 
   // Form state
+  const [bookingMode, setBookingMode] = useState<'services' | 'work'>(requestedMode)
   const [selectedEventId, setSelectedEventId] = useState(preselectedEventId || '')
   const [selectedServiceId, setSelectedServiceId] = useState('')
+  const [workRole, setWorkRole] = useState('event_ops')
   const [offeredAmount, setOfferedAmount] = useState('')
   const [quantity, setQuantity] = useState(1)
   const [specialRequirements, setSpecialRequirements] = useState('')
@@ -92,6 +96,7 @@ export default function BookCrewPage() {
     }
 
     fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, providerId, router])
 
   const fetchData = async () => {
@@ -106,7 +111,7 @@ export default function BookCrewPage() {
         .from('providers')
         .select(`
           *,
-          profile:profiles(full_name)
+          profile:profiles(full_name, email, phone)
         `)
         .eq('id', providerId)
         .single()
@@ -119,6 +124,16 @@ export default function BookCrewPage() {
 
       setProvider(providerData)
 
+      const supportsWork = providerData.work_mode === 'looking_for_work' || providerData.work_mode === 'both'
+      const supportsServices = providerData.work_mode === 'offering_services' || providerData.work_mode === 'both'
+
+      if (requestedMode === 'work' && !supportsWork && supportsServices) {
+        setBookingMode('services')
+      }
+      if (requestedMode === 'services' && !supportsServices && supportsWork) {
+        setBookingMode('work')
+      }
+
       // Fetch services
       const { data: servicesData } = await supabase
         .from('provider_services')
@@ -128,6 +143,16 @@ export default function BookCrewPage() {
         .order('base_price', { ascending: true })
 
       setServices(servicesData || [])
+
+      const supportsWorkAfterLoad = providerData.work_mode === 'looking_for_work' || providerData.work_mode === 'both'
+      const supportsServicesAfterLoad = providerData.work_mode === 'offering_services' || providerData.work_mode === 'both' || (servicesData?.length || 0) > 0
+
+      if (requestedMode === 'work' && !supportsWorkAfterLoad && supportsServicesAfterLoad) {
+        setBookingMode('services')
+      }
+      if (requestedMode === 'services' && !supportsServicesAfterLoad && supportsWorkAfterLoad) {
+        setBookingMode('work')
+      }
 
       // Pre-select first service and set default amount
       if (servicesData && servicesData.length > 0) {
@@ -186,7 +211,7 @@ export default function BookCrewPage() {
       return
     }
 
-    if (!selectedServiceId) {
+    if (bookingMode === 'services' && !selectedServiceId) {
       toast.error('Please select a service')
       return
     }
@@ -206,7 +231,32 @@ export default function BookCrewPage() {
     try {
       const supabase = createClient()
 
-      const { error } = await supabase
+      if (bookingMode === 'work') {
+        const response = await fetch(`/api/events/${selectedEventId}/team`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'invite',
+            fullName: provider?.profile?.full_name || provider?.business_name || 'Crew member',
+            email: provider?.profile?.email || provider?.business_email || '',
+            phone: provider?.profile?.phone || provider?.business_phone || '',
+            role: workRole,
+            offeredRate: parseFloat(offeredAmount),
+            inviteMessage: specialRequirements.trim() || '',
+          }),
+        })
+
+        const data = await response.json()
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to send work invite')
+        }
+
+        toast.success('Event work invite sent!')
+        router.push(`/dashboard/organizer/events/${selectedEventId}/team`)
+        return
+      }
+
+      const { data: newBooking, error } = await supabase
         .from('provider_bookings')
         .insert({
           event_id: selectedEventId,
@@ -219,6 +269,8 @@ export default function BookCrewPage() {
           special_requirements: specialRequirements.trim() || null,
           organizer_notes: specialRequirements.trim() || null,
         })
+        .select('id')
+        .single()
 
       if (error) {
         if (error.code === '23505') {
@@ -230,6 +282,26 @@ export default function BookCrewPage() {
       }
 
       toast.success('Booking request sent! 🎉')
+
+      // Auto-open conversation linked to this booking
+      try {
+        const convoRes = await fetch('/api/conversations/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipientId: provider?.profile_id,
+            contextType: 'provider_booking',
+            contextId: newBooking.id,
+          }),
+        })
+        const convoData = await convoRes.json()
+        if (convoData.conversationId) {
+          router.push(`/messages?chat=${convoData.conversationId}`)
+          return
+        }
+      } catch {
+        // fallback to crew dashboard if chat fails
+      }
       router.push('/dashboard/organizer/crew')
     } catch (error) {
       console.error('Error creating booking:', error)
@@ -274,9 +346,17 @@ export default function BookCrewPage() {
             </Avatar>
             <div>
               <h2 className="text-xl font-semibold">{provider.business_name}</h2>
-              <Badge variant="outline" className="mt-1">
-                {SERVICE_CATEGORY_LABELS[provider.primary_category]}
-              </Badge>
+              <div className="mt-1 flex flex-wrap gap-2">
+                <Badge variant="outline">
+                  {SERVICE_CATEGORY_LABELS[provider.primary_category]}
+                </Badge>
+                {(provider.work_mode === 'looking_for_work' || provider.work_mode === 'both') && (
+                  <Badge variant="secondary">Event Staff</Badge>
+                )}
+                {(provider.work_mode === 'offering_services' || provider.work_mode === 'both' || services.length > 0) && (
+                  <Badge variant="outline">Service Provider</Badge>
+                )}
+              </div>
               <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
                 <MapPin className="h-3 w-3" />
                 {PROVINCE_LABELS[provider.location]}
@@ -289,9 +369,11 @@ export default function BookCrewPage() {
       {/* Booking Form */}
       <Card>
         <CardHeader>
-          <CardTitle>Book This Provider</CardTitle>
+          <CardTitle>{bookingMode === 'work' ? 'Hire for Event Work' : 'Book Services'}</CardTitle>
           <CardDescription>
-            Send a booking request for your event
+            {bookingMode === 'work'
+              ? 'Send a staff hire invite with your offered rate. They can accept or negotiate in messages.'
+              : 'Send a service booking request for your event. They can accept or negotiate in messages.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -316,6 +398,25 @@ export default function BookCrewPage() {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
+              {(provider.work_mode === 'both' || (provider.work_mode === 'looking_for_work' && services.length > 0)) && (
+                <div className="grid gap-2 md:grid-cols-2">
+                  <Button
+                    type="button"
+                    variant={bookingMode === 'work' ? 'default' : 'outline'}
+                    onClick={() => setBookingMode('work')}
+                  >
+                    Hire for Event Work
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={bookingMode === 'services' ? 'default' : 'outline'}
+                    onClick={() => setBookingMode('services')}
+                  >
+                    Book Services
+                  </Button>
+                </div>
+              )}
+
               {/* Select Event */}
               <div>
                 <Label htmlFor="event">Select Event *</Label>
@@ -341,52 +442,71 @@ export default function BookCrewPage() {
                 )}
               </div>
 
-              {/* Select Service */}
-              <div>
-                <Label htmlFor="service">Select Service *</Label>
-                <Select value={selectedServiceId} onValueChange={handleServiceChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choose a service" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {services.map((service) => (
-                      <SelectItem key={service.id} value={service.id}>
-                        <div className="flex justify-between items-center w-full">
-                          <span>{service.service_name}</span>
-                          <span className="text-muted-foreground ml-2">
-                            {formatCurrency(service.base_price)} ({PRICE_TYPE_LABELS[service.price_type]})
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedService?.description && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {selectedService.description}
-                  </p>
-                )}
-              </div>
+              {bookingMode === 'services' ? (
+                <>
+                  <div>
+                    <Label htmlFor="service">Select Service *</Label>
+                    <Select value={selectedServiceId} onValueChange={handleServiceChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose a service" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {services.map((service) => (
+                          <SelectItem key={service.id} value={service.id}>
+                            <div className="flex justify-between items-center w-full">
+                              <span>{service.service_name}</span>
+                              <span className="text-muted-foreground ml-2">
+                                {formatCurrency(service.base_price)} ({PRICE_TYPE_LABELS[service.price_type]})
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedService?.description && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {selectedService.description}
+                      </p>
+                    )}
+                  </div>
 
-              {/* Quantity */}
-              <div>
-                <Label htmlFor="quantity">Quantity</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={quantity}
-                  onChange={(e) => handleQuantityChange(parseInt(e.target.value) || 1)}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  How many units/hours/days do you need?
-                </p>
-              </div>
+                  <div>
+                    <Label htmlFor="quantity">Quantity</Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={quantity}
+                      onChange={(e) => handleQuantityChange(parseInt(e.target.value) || 1)}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      How many units/hours/days do you need?
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <Label htmlFor="work-role">Staff role needed *</Label>
+                  <Select value={workRole} onValueChange={setWorkRole}>
+                    <SelectTrigger id="work-role">
+                      <SelectValue placeholder="Choose a role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="door_staff">Door Staff</SelectItem>
+                      <SelectItem value="guest_list_staff">Guest List Staff</SelectItem>
+                      <SelectItem value="event_ops">Event Ops Lead</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Send the role and shift offer you want this crew member to review.
+                  </p>
+                </div>
+              )}
 
               {/* Offered Amount */}
               <div>
-                <Label htmlFor="amount">Your Offer (R) *</Label>
+                <Label htmlFor="amount">{bookingMode === 'work' ? 'Your Rate Offer (R) *' : 'Your Offer (R) *'}</Label>
                 <Input
                   id="amount"
                   type="number"
@@ -396,9 +516,14 @@ export default function BookCrewPage() {
                   onChange={(e) => setOfferedAmount(e.target.value)}
                   required
                 />
-                {selectedService && (
+                {bookingMode === 'services' && selectedService && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    Provider&apos;s base rate: {formatCurrency(selectedService.base_price)} × {quantity} = {formatCurrency(selectedService.base_price * quantity)}
+                    Listed service price: {formatCurrency(selectedService.base_price)} × {quantity} = {formatCurrency(selectedService.base_price * quantity)}. You can still send a different offer.
+                  </p>
+                )}
+                {bookingMode === 'work' && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Send the shift rate you want to offer. They can accept it or message you to negotiate.
                   </p>
                 )}
               </div>
@@ -416,25 +541,33 @@ export default function BookCrewPage() {
               </div>
 
               {/* Summary */}
-              {selectedEvent && selectedService && (
+              {selectedEvent && (bookingMode === 'work' || selectedService) && (
                 <Card className="bg-orange-50 border-orange-200">
                   <CardContent className="pt-4">
                     <h4 className="font-semibold mb-2">Booking Summary</h4>
                     <div className="space-y-1 text-sm">
                       <p><strong>Event:</strong> {selectedEvent.title}</p>
                       <p><strong>Date:</strong> {new Date(selectedEvent.event_date).toLocaleDateString()}</p>
-                      <p><strong>Service:</strong> {selectedService.service_name}</p>
-                      <p><strong>Quantity:</strong> {quantity}</p>
+                      {bookingMode === 'work' ? (
+                        <>
+                          <p><strong>Hire type:</strong> Event Work</p>
+                          <p><strong>Role:</strong> {workRole.replaceAll('_', ' ')}</p>
+                        </>
+                      ) : (
+                        <>
+                          <p><strong>Service:</strong> {selectedService?.service_name}</p>
+                          <p><strong>Quantity:</strong> {quantity}</p>
+                        </>
+                      )}
                       <p className="text-lg font-bold text-orange-600 mt-2">
-                        Total: {formatCurrency(parseFloat(offeredAmount) || 0)}
+                        Offer: {formatCurrency(parseFloat(offeredAmount) || 0)}
                       </p>
                     </div>
                   </CardContent>
                 </Card>
               )}
 
-              {/* Submit */}
-              <Button 
+              <Button
                 type="submit" 
                 className="w-full bg-orange-500 hover:bg-orange-600"
                 disabled={submitting}
@@ -444,11 +577,13 @@ export default function BookCrewPage() {
                 ) : (
                   <CheckCircle className="h-4 w-4 mr-2" />
                 )}
-                Send Booking Request
+                {bookingMode === 'work' ? 'Send Event Work Invite' : 'Send Booking Request'}
               </Button>
 
               <p className="text-xs text-center text-muted-foreground">
-                The provider will review your request and respond. Payment is only required after they accept.
+                {bookingMode === 'work'
+                  ? 'They can accept your invite or message you to discuss rate and details.'
+                  : 'The provider can accept your offer or message you to negotiate before payment.'}
               </p>
             </form>
           )}

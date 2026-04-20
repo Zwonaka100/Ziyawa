@@ -63,6 +63,7 @@ export default function EditEventPage({ params }: EditEventPageProps) {
     }
 
     fetchEvent()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, profile, authLoading, router])
 
   const fetchEvent = async () => {
@@ -87,6 +88,13 @@ export default function EditEventPage({ params }: EditEventPageProps) {
       if (event.organizer_id !== profile?.id) {
         toast.error('You do not have permission to edit this event')
         router.push('/dashboard/organizer')
+        return
+      }
+
+      const today = new Date().toISOString().split('T')[0]
+      if (event.event_date < today) {
+        toast.error('Past events can no longer be edited')
+        router.push(`/dashboard/organizer/events/${id}/manage`)
         return
       }
 

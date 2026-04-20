@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react'
 
 const phrases = [
-  "Hello Southa!",
+  "Hello South Ah! 🇿🇦",
   "Ziwaphi?",
-  "Well, you've come to the right place",
+  "Well, you've come to the right place.",
   "Clicka daar!",
 ]
 
@@ -13,7 +13,7 @@ export function TypewriterHero() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [currentText, setCurrentText] = useState('')
   const [isTyping, setIsTyping] = useState(true)
-  const [showCursor, setShowCursor] = useState(true)
+  const [_showCursor, setShowCursor] = useState(true)
 
   useEffect(() => {
     if (currentIndex >= phrases.length) {
@@ -56,11 +56,11 @@ export function TypewriterHero() {
 
   const getTextStyle = () => {
     switch (currentIndex) {
-      case 0: return 'text-foreground'
-      case 1: return 'text-primary'
-      case 2: return 'text-foreground'
-      case 3: return 'text-primary text-4xl md:text-6xl lg:text-7xl'
-      default: return 'text-foreground'
+      case 0: return 'text-white'
+      case 1: return 'text-white'
+      case 2: return 'text-white/90'
+      case 3: return 'text-white text-4xl md:text-6xl lg:text-7xl'
+      default: return 'text-white'
     }
   }
 

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Search } from 'lucide-react';
+import { Search, Lock } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { 
   ConversationItem, 
@@ -20,6 +20,8 @@ interface ConversationWithParticipant extends Conversation {
     full_name: string | null;
     avatar_url: string | null;
   };
+  is_closed?: boolean;
+  closed_reason?: string | null;
 }
 
 interface MessagesPageClientProps {
@@ -239,8 +241,17 @@ export function MessagesPageClient({
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Message Input */}
-            <MessageInput onSend={handleSendMessage} />
+            {/* Closed banner or Message Input */}
+            {selectedConvo.is_closed ? (
+              <div className="border-t border-neutral-200 bg-neutral-50 p-4 flex items-center gap-3 text-sm text-muted-foreground">
+                <Lock className="h-4 w-4 shrink-0" />
+                <p>
+                  This conversation is closed — the booking has been completed and paid. All messages are saved for record-keeping.
+                </p>
+              </div>
+            ) : (
+              <MessageInput onSend={handleSendMessage} />
+            )}
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center">

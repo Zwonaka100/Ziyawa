@@ -35,6 +35,11 @@ export default async function BookArtistPage({ params }: BookArtistPageProps) {
     notFound()
   }
 
+  const today = new Date().toISOString().split('T')[0]
+  if (event.event_date < today) {
+    redirect(`/dashboard/organizer/events/${eventId}/manage`)
+  }
+
   // Fetch available artists
   const { data: artists } = await supabase
     .from('artists')

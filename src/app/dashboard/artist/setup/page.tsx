@@ -34,6 +34,7 @@ export default function ArtistSetupPage() {
     genre: '',
     base_price: '',
     location: '',
+    is_available: 'true',
     advance_notice_days: '3',
     years_active: '',
     record_label: '',
@@ -53,6 +54,7 @@ export default function ArtistSetupPage() {
     }
 
     checkExistingArtist()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, router])
 
   const checkExistingArtist = async () => {
@@ -75,6 +77,7 @@ export default function ArtistSetupPage() {
           genre: data.genre || '',
           base_price: data.base_price?.toString() || '',
           location: data.location || '',
+          is_available: data.is_available === false ? 'false' : 'true',
           advance_notice_days: data.advance_notice_days?.toString() || '3',
           years_active: data.years_active?.toString() || '',
           record_label: data.record_label || '',
@@ -114,11 +117,11 @@ export default function ArtistSetupPage() {
         genre: formData.genre,
         base_price: parseFloat(formData.base_price) || 0,
         location: formData.location,
+        is_available: formData.is_available !== 'false',
         advance_notice_days: parseInt(formData.advance_notice_days) || 3,
         years_active: formData.years_active ? parseInt(formData.years_active) : null,
         record_label: formData.record_label.trim() || null,
         management_contact: formData.management_contact.trim() || null,
-        is_available: true,
       }
 
       if (isEditing && artistId) {
@@ -283,6 +286,26 @@ export default function ArtistSetupPage() {
               />
               <p className="text-sm text-muted-foreground mt-1">
                 This is your minimum rate. Organizers can offer more.
+              </p>
+            </div>
+
+            {/* Availability */}
+            <div>
+              <Label htmlFor="is_available">Booking Availability</Label>
+              <Select
+                value={formData.is_available}
+                onValueChange={(value) => updateField('is_available', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Available for bookings</SelectItem>
+                  <SelectItem value="false">Pause bookings for now</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground mt-1">
+                Let organisers know if you are open for new requests right now.
               </p>
             </div>
 

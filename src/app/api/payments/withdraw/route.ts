@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('id, full_name, email, wallet_balance, held_balance, pending_payout_balance, is_organizer, is_artist, is_provider')
+      .select('id, full_name, email, wallet_balance, held_balance, pending_payout_balance, is_organizer, is_artist, is_provider, is_verified')
       .eq('id', user.id)
       .single();
 
@@ -52,6 +52,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'User profile not found' },
         { status: 404 }
+      );
+    }
+
+    // Identity verification required before withdrawal
+    if (!profile.is_verified) {
+      return NextResponse.json(
+        {
+          error: 'Identity verification required before withdrawing funds. Please complete verification in your account settings.',
+          verificationRequired: true,
+          link: '/dashboard/settings?tab=verification',
+        },
+        { status: 403 }
       );
     }
 

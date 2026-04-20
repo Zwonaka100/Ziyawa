@@ -2,6 +2,9 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { EventDetails } from '@/components/events/event-details'
 import { EventReviewsSection } from '@/components/events/event-reviews-section'
+import { Metadata } from 'next'
+
+const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ziyawa.co.za'
 
 interface EventPageProps {
   params: Promise<{
@@ -9,25 +12,52 @@ interface EventPageProps {
   }>
 }
 
-export async function generateMetadata({ params }: EventPageProps) {
+export async function generateMetadata({ params }: EventPageProps): Promise<Metadata> {
   const { id } = await params
   const supabase = await createClient()
   
   const { data: event } = await supabase
     .from('events')
-    .select('title, description')
+    .select('title, description, cover_image, event_date, venue, location, ticket_price')
     .eq('id', id)
     .single()
 
   if (!event) {
-    return { title: 'Event Not Found | Ziyawa' }
+    return { title: 'Event Not Found' }
   }
 
-  const eventData = event as { title: string; description: string | null }
+  const e = event as {
+    title: string
+    description: string | null
+    cover_image: string | null
+    event_date: string
+    venue: string
+    location: string
+    ticket_price: number | null
+  }
+
+  const desc = e.description || `Get tickets for ${e.title} at ${e.venue}, ${e.location}`
+  const images = e.cover_image ? [{ url: e.cover_image, width: 1200, height: 630, alt: e.title }] : []
 
   return {
-    title: `${eventData.title} | Ziyawa`,
-    description: eventData.description || `Get tickets for ${eventData.title}`,
+    title: e.title,
+    description: desc,
+    openGraph: {
+      title: e.title,
+      description: desc,
+      type: 'website',
+      url: `${siteUrl}/events/${id}`,
+      images,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: e.title,
+      description: desc,
+      images: e.cover_image ? [e.cover_image] : [],
+    },
+    alternates: {
+      canonical: `${siteUrl}/events/${id}`,
+    },
   }
 }
 
@@ -157,8 +187,48 @@ export default async function EventPage({ params }: EventPageProps) {
   // Check if event has ended
   const eventEnded = new Date(event.end_date || event.event_date) < new Date()
 
+  // JSON-LD structured data for event
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Event',
+    name: event.title,
+    description: event.description || '',
+    startDate: event.event_date,
+    ...(event.end_date && { endDate: event.end_date }),
+    location: {
+      '@type': 'Place',
+      name: event.venue,
+      address: {
+        '@type': 'PostalAddress',
+        addressLocality: event.location,
+        addressCountry: 'ZA',
+      },
+    },
+    ...(event.cover_image && { image: event.cover_image }),
+    organizer: {
+      '@type': 'Organization',
+      name: (event.profiles as { full_name: string })?.full_name || 'Organizer',
+    },
+    ...(event.ticket_price != null && {
+      offers: {
+        '@type': 'Offer',
+        priceCurrency: 'ZAR',
+        price: (event.ticket_price / 100).toFixed(2),
+        availability: event.state === 'published' ? 'https://schema.org/InStock' : 'https://schema.org/SoldOut',
+        url: `${siteUrl}/events/${id}`,
+      },
+    }),
+    eventStatus: event.state === 'cancelled'
+      ? 'https://schema.org/EventCancelled'
+      : 'https://schema.org/EventScheduled',
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <EventDetails 
         event={event} 
         bookings={bookings || []} 

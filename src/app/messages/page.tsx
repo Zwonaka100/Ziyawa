@@ -1,5 +1,8 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { MessagesPageClient } from './messages-client';
 
 export const metadata = {
@@ -14,6 +17,39 @@ export default async function MessagesPage() {
   
   if (!user) {
     redirect('/auth/signin?redirect=/messages');
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_admin, is_organizer, is_artist, is_provider')
+    .eq('id', user.id)
+    .single();
+
+  const canUseMessaging = Boolean(
+    profile?.is_admin || profile?.is_organizer || profile?.is_artist || profile?.is_provider
+  );
+
+  if (!canUseMessaging) {
+    return (
+      <div className="container mx-auto px-4 py-10">
+        <Card className="max-w-2xl mx-auto">
+          <CardHeader>
+            <CardTitle>Messaging is for organisers, artists, and providers</CardTitle>
+            <CardDescription>
+              Groovists can contact an organiser directly from their purchased tickets.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-3">
+            <Link href="/dashboard/tickets">
+              <Button>Go to My Tickets</Button>
+            </Link>
+            <Link href="/ziwaphi">
+              <Button variant="outline">Browse Events</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   // Fetch conversations with participant info

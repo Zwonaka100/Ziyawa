@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -15,7 +15,6 @@ import {
   AlertCircle,
   Loader2,
   Calendar,
-  ArrowRight,
   DollarSign
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -64,6 +63,7 @@ export default function OrganiserCrewPage() {
     }
 
     fetchBookings()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, router])
 
   const fetchBookings = async () => {

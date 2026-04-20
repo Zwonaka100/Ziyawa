@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
+import { getEventAccessForUser } from '@/lib/event-team'
+
+const supabaseAdmin = createAdminClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 function generateAccessCode() {
   return `GL-${Math.random().toString(36).slice(2, 6).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
@@ -18,17 +25,16 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: event } = await supabase
-      .from('events')
-      .select('id, organizer_id')
-      .eq('id', eventId)
-      .single()
+    const access = await getEventAccessForUser(supabaseAdmin, eventId, user.id)
+    if (!access.event) {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 })
+    }
 
-    if (!event || event.organizer_id !== user.id) {
+    if (!access.isOwner && !access.permissions.canViewAttendees) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('event_access_passes')
       .select('*')
       .eq('event_id', eventId)
@@ -61,13 +67,12 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: event } = await supabase
-      .from('events')
-      .select('id, organizer_id')
-      .eq('id', eventId)
-      .single()
+    const access = await getEventAccessForUser(supabaseAdmin, eventId, user.id)
+    if (!access.event) {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 })
+    }
 
-    if (!event || event.organizer_id !== user.id) {
+    if (!access.isOwner && !access.permissions.canManageGuestList) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
     }
 

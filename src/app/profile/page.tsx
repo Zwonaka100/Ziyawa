@@ -1,56 +1,135 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import { 
-  Loader2, 
-  Wallet, 
-  Calendar, 
-  Music, 
-  Ticket, 
-  ArrowRight, 
-  CheckCircle,
-  Sparkles,
-  Users,
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import {
+  Loader2,
+  Wallet,
+  Calendar,
+  Music,
+  Ticket,
+  ArrowRight,
   Wrench,
-  Shield
+  Shield,
+  Settings,
+  CheckCircle,
+  Info,
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/components/providers/auth-provider'
 import { formatCurrency } from '@/lib/helpers'
-import { toast } from 'sonner'
 
 // Get all roles as badges
-function getRoleBadges(profile: { is_admin?: boolean; admin_role?: string | null; is_organizer?: boolean; is_artist?: boolean; is_provider?: boolean }) {
+function getRoleBadges(profile: {
+  is_admin?: boolean
+  admin_role?: string | null
+  is_organizer?: boolean
+  is_artist?: boolean
+  is_provider?: boolean
+  is_verified?: boolean
+}) {
   const badges = []
   if (profile.is_admin) {
-    badges.push({ 
-      label: profile.admin_role === 'super_admin' ? 'Super Admin' : 'Admin', 
-      variant: 'destructive' as const 
+    badges.push({
+      label: profile.admin_role === 'super_admin' ? 'Super Admin' : 'Admin',
+      variant: 'destructive' as const,
     })
   }
   if (profile.is_organizer) badges.push({ label: 'Organiser', variant: 'default' as const })
   if (profile.is_artist) badges.push({ label: 'Artist', variant: 'secondary' as const })
-  if (profile.is_provider) badges.push({ label: 'Provider', variant: 'outline' as const, className: 'border-orange-500 text-orange-600' })
+  if (profile.is_provider) badges.push({ label: 'Crew', variant: 'outline' as const })
   if (badges.length === 0) badges.push({ label: 'Groovist', variant: 'outline' as const })
   return badges
 }
 
+type ProfileLike = {
+  is_organizer?: boolean
+  is_artist?: boolean
+  is_provider?: boolean
+  is_verified?: boolean
+}
+
+function RoleExplainer({ profile }: { profile: ProfileLike }) {
+  const isOrganizer = !!profile.is_organizer
+  const isArtist = !!profile.is_artist
+  const isProvider = !!profile.is_provider
+  const isVerified = !!profile.is_verified
+  const activeRoles = [isOrganizer, isArtist, isProvider].filter(Boolean).length
+
+  // Lines describing what each active role does
+  const activeLines: string[] = []
+  if (isOrganizer) activeLines.push('As an Organiser, you can create events, sell tickets, and manage your lineup.')
+  if (isArtist) activeLines.push('As an Artist, you can receive booking requests and manage your performance schedule.')
+  if (isProvider) activeLines.push('As Crew, you can offer event services and get hired for gigs across the platform.')
+  if (activeRoles === 0) activeLines.push('As a Groovist, you can discover events and manage your tickets.')
+
+  // Suggestions for roles not yet active
+  const suggestions: { label: string; hint: string }[] = []
+  if (!isOrganizer) suggestions.push({ label: 'Organiser', hint: 'host your own events and sell tickets' })
+  if (!isArtist) suggestions.push({ label: 'Artist', hint: 'get booked for gigs and performances' })
+  if (!isProvider) suggestions.push({ label: 'Crew', hint: 'offer technical or creative services at events' })
+
+  const verificationNote = !isVerified
+    ? 'Verify your identity in Settings to unlock withdrawals and get a verified badge on your public profile.'
+    : null
+
+  return (
+    <Card className="mb-6 bg-muted/40 border-muted">
+      <CardContent className="pt-5 pb-5">
+        <div className="flex gap-3">
+          <div className="mt-0.5 shrink-0">
+            <Info className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div className="space-y-2 text-sm">
+            {/* What you can do now */}
+            <div className="space-y-1">
+              {activeLines.map((line) => (
+                <p key={line} className="text-foreground">{line}</p>
+              ))}
+            </div>
+
+            {/* Upgrade suggestions */}
+            {suggestions.length > 0 && (
+              <p className="text-muted-foreground">
+                Want to do more?{' '}
+                {suggestions.map((s, i) => (
+                  <span key={s.label}>
+                    <span className="font-medium text-foreground">Activate {s.label}</span>
+                    {' '}to {s.hint}
+                    {i < suggestions.length - 1 ? ', or ' : '.'}
+                  </span>
+                ))}
+                {' '}Head to{' '}
+                <Link href="/dashboard/settings?tab=account" className="underline underline-offset-2 text-foreground font-medium">
+                  Settings → Account
+                </Link>
+                {' '}to activate.
+              </p>
+            )}
+
+            {/* Verification nudge */}
+            {verificationNote && (
+              <p className="text-muted-foreground">
+                {verificationNote}{' '}
+                <Link href="/dashboard/settings?tab=verification" className="underline underline-offset-2 text-foreground font-medium">
+                  Verify now →
+                </Link>
+              </p>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function ProfilePage() {
   const router = useRouter()
-  const { user, profile, refreshProfile, loading: authLoading } = useAuth()
-  const [loading, setLoading] = useState(false)
-  const [upgrading, setUpgrading] = useState<string | null>(null)
-  const [fullName, setFullName] = useState(profile?.full_name || '')
-  const [phone, setPhone] = useState(profile?.phone || '')
+  const { user, profile, loading: authLoading } = useAuth()
 
   useEffect(() => {
     if (!authLoading && (!user || !profile)) {
@@ -58,83 +137,19 @@ export default function ProfilePage() {
     }
   }, [authLoading, user, profile, router])
 
-  useEffect(() => {
-    setFullName(profile?.full_name || '')
-    setPhone(profile?.phone || '')
-  }, [profile])
-
   if (authLoading || !user || !profile) {
-    return null
+    return (
+      <div className="flex justify-center items-center min-h-[50vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
-  const handleUpgrade = async (role: 'organizer' | 'artist' | 'provider') => {
-    setUpgrading(role)
-    try {
-      const supabase = createClient()
-      const updateData = role === 'organizer' 
-        ? { is_organizer: true }
-        : role === 'artist'
-        ? { is_artist: true }
-        : { is_provider: true }
-      
-      const { error } = await supabase
-        .from('profiles')
-        .update(updateData)
-        .eq('id', profile.id)
-
-      if (error) throw error
-
-      await refreshProfile()
-      toast.success(
-        role === 'organizer' 
-          ? 'You are now an Event Organiser! 🎉' 
-          : role === 'artist'
-          ? 'You are now an Artist! 🎤'
-          : 'You are now a Provider! 🔧'
-      )
-      
-      // Redirect to provider setup if becoming a provider
-      if (role === 'provider') {
-        router.push('/dashboard/provider/setup')
-      }
-    } catch (error) {
-      console.error('Error upgrading profile:', error)
-      toast.error('Failed to upgrade. Please try again.')
-    } finally {
-      setUpgrading(null)
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-
-    try {
-      const supabase = createClient()
-
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          full_name: fullName,
-          phone: phone || null,
-        })
-        .eq('id', profile.id)
-
-      if (error) throw error
-
-      await refreshProfile()
-      toast.success('Profile updated!')
-      
-    } catch (error) {
-      console.error('Error updating profile:', error)
-      toast.error('Failed to update profile. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const isProvider = (profile as { is_provider?: boolean }).is_provider
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
+
       {/* Profile Header */}
       <Card className="mb-6">
         <CardContent className="pt-6">
@@ -146,7 +161,14 @@ export default function ProfilePage() {
               </AvatarFallback>
             </Avatar>
             <div className="flex-1">
-              <h1 className="text-2xl font-bold">{profile.full_name || 'User'}</h1>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-2xl font-bold">{profile.full_name || 'User'}</h1>
+                {profile.is_verified && (
+                  <Badge className="bg-amber-500 text-white">
+                    <CheckCircle className="h-3 w-3 mr-1" />Verified
+                  </Badge>
+                )}
+              </div>
               <p className="text-muted-foreground">{profile.email}</p>
               <div className="flex gap-2 mt-2 flex-wrap">
                 {getRoleBadges(profile).map((badge) => (
@@ -158,7 +180,7 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Admin Dashboard Link - Only for admins */}
+      {/* Admin panel link */}
       {profile.is_admin && (
         <Card className="mb-6 border-red-200 bg-red-50">
           <CardContent className="pt-6">
@@ -169,9 +191,7 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-lg">Admin Dashboard</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Manage users, events, reports, and platform settings
-                  </p>
+                  <p className="text-sm text-muted-foreground">Manage users, events, reports, and platform settings</p>
                 </div>
               </div>
               <Link href="/admin">
@@ -185,8 +205,8 @@ export default function ProfilePage() {
         </Card>
       )}
 
-      {/* Quick Actions based on roles */}
-      <div className="grid md:grid-cols-3 gap-4 mb-6">
+      {/* Quick dashboard links */}
+      <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
         <Link href="/dashboard/tickets">
           <Card className="hover:border-primary transition-colors cursor-pointer h-full">
             <CardContent className="pt-6 flex items-center gap-3">
@@ -200,7 +220,7 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
         </Link>
-        
+
         {profile.is_organizer && (
           <Link href="/dashboard/organizer">
             <Card className="hover:border-primary transition-colors cursor-pointer h-full">
@@ -233,7 +253,7 @@ export default function ProfilePage() {
           </Link>
         )}
 
-        {profile.is_provider && (
+        {isProvider && (
           <Link href="/dashboard/provider">
             <Card className="hover:border-orange-500 transition-colors cursor-pointer h-full">
               <CardContent className="pt-6 flex items-center gap-3">
@@ -241,8 +261,8 @@ export default function ProfilePage() {
                   <Wrench className="h-5 w-5 text-orange-600" />
                 </div>
                 <div>
-                  <p className="font-medium">Provider Dashboard</p>
-                  <p className="text-sm text-muted-foreground">Manage services</p>
+                  <p className="font-medium">Crew Dashboard</p>
+                  <p className="text-sm text-muted-foreground">Manage work and services</p>
                 </div>
               </CardContent>
             </Card>
@@ -264,260 +284,32 @@ export default function ProfilePage() {
         </Link>
       </div>
 
-      {/* Role Upgrade Cards - HIDDEN FOR ADMINS */}
-      {profile.is_admin !== true && (!profile.is_organizer || !profile.is_artist || !profile.is_provider) && (
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            Upgrade Your Profile
-          </h2>
-          <div className="grid md:grid-cols-3 gap-4">
-            {/* Become an Organiser */}
-            {!profile.is_organizer && (
-              <Card className="border-2 border-dashed hover:border-primary transition-colors">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-primary/10 rounded-xl">
-                      <Calendar className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg">Become an Organiser</CardTitle>
-                      <CardDescription>Host events on Ziyawa</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2 mb-4">
-                    <li className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      Create and manage events
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      Book artists for your events
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      Sell tickets and earn revenue
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      Track earnings & request payouts
-                    </li>
-                  </ul>
-                  <Button 
-                    className="w-full" 
-                    onClick={() => handleUpgrade('organizer')}
-                    disabled={upgrading === 'organizer'}
-                  >
-                    {upgrading === 'organizer' ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <ArrowRight className="h-4 w-4 mr-2" />
-                    )}
-                    Become an Organiser
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
+      {/* Contextual role explainer */}
+      <RoleExplainer profile={profile} />
 
-            {/* Become an Artist */}
-            {!profile.is_artist && (
-              <Card className="border-2 border-dashed hover:border-primary transition-colors">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-secondary/50 rounded-xl">
-                      <Music className="h-6 w-6 text-primary" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg">Become an Artist</CardTitle>
-                      <CardDescription>Get booked for events</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2 mb-4">
-                    <li className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      Create your artist profile
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      Get discovered by organisers
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      Accept or decline bookings
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      Earn from performances
-                    </li>
-                  </ul>
-                  <Button 
-                    variant="secondary"
-                    className="w-full" 
-                    onClick={() => handleUpgrade('artist')}
-                    disabled={upgrading === 'artist'}
-                  >
-                    {upgrading === 'artist' ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <ArrowRight className="h-4 w-4 mr-2" />
-                    )}
-                    Become an Artist
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Become a Provider */}
-            {!profile.is_provider && (
-              <Card className="border-2 border-dashed hover:border-orange-500 transition-colors">
-                <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-orange-500/10 rounded-xl">
-                      <Wrench className="h-6 w-6 text-orange-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg">Become a Provider</CardTitle>
-                      <CardDescription>Join the crew</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2 mb-4">
-                    <li className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      Offer your services
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      Get hired by organisers
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      Grow your business
-                    </li>
-                    <li className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                      Earn from events
-                    </li>
-                  </ul>
-                  <Button 
-                    variant="outline"
-                    className="w-full border-orange-500 text-orange-600 hover:bg-orange-50" 
-                    onClick={() => handleUpgrade('provider')}
-                    disabled={upgrading === 'provider'}
-                  >
-                    {upgrading === 'provider' ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <ArrowRight className="h-4 w-4 mr-2" />
-                    )}
-                    Become a Provider
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Already unlocked roles status - HIDDEN FOR ADMINS */}
-      {profile.is_admin !== true && (profile.is_organizer || profile.is_artist || profile.is_provider) && (
-        <Card className="mb-6 bg-muted/50">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Users className="h-4 w-4" />
-              <span>
-                You&apos;re a {[
-                  profile.is_organizer && 'Organiser',
-                  profile.is_artist && 'Artist',
-                  profile.is_provider && 'Provider'
-                ].filter(Boolean).join(', ')} — 
-                {!profile.is_organizer && !profile.is_artist && !profile.is_provider && ' unlock more roles above!'}
-                {profile.is_organizer && profile.is_artist && profile.is_provider && ' you have access to all features!'}
-                {!(profile.is_organizer && profile.is_artist && profile.is_provider) && (
-                  <>
-                    {!profile.is_organizer && ' upgrade to Organiser to create events.'}
-                    {!profile.is_artist && ' upgrade to Artist to get booked.'}
-                    {!profile.is_provider && ' upgrade to Provider to offer services.'}
-                  </>
-                )}
-              </span>
+      {/* Settings CTA */}
+      <Card className="border-dashed">
+        <CardContent className="pt-6 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-muted rounded-lg">
+              <Settings className="h-5 w-5 text-muted-foreground" />
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Edit Profile */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Edit Profile</CardTitle>
-          <CardDescription>
-            Update your personal information
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                value={profile.email}
-                disabled
-                autoComplete="email"
-                className="bg-muted"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Email cannot be changed
+              <p className="font-medium">Account Settings</p>
+              <p className="text-sm text-muted-foreground">
+                Edit your profile, upgrade your account, verify your identity, manage security
               </p>
             </div>
-
-            <div>
-              <Label htmlFor="fullName">Full Name</Label>
-              <Input
-                id="fullName"
-                name="fullName"
-                type="text"
-                placeholder="Your full name"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                autoComplete="name"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="phone">Phone Number</Label>
-              <Input
-                id="phone"
-                name="phone"
-                type="tel"
-                placeholder="+27 XX XXX XXXX"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                autoComplete="tel"
-              />
-            </div>
-
-            <Separator />
-
-            <Button type="submit" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                'Save Changes'
-              )}
+          </div>
+          <Link href="/dashboard/settings">
+            <Button variant="outline">
+              Go to Settings
+              <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
-          </form>
+          </Link>
         </CardContent>
       </Card>
     </div>
   )
 }
+

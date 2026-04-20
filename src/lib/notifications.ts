@@ -33,6 +33,7 @@ export type NotificationType =
   | 'event_reminder'
   | 'event_cancelled'
   | 'event_updated'
+  | 'review_requested'
   | 'welcome'
   | 'profile_verified'
   | 'review_received'
@@ -312,7 +313,7 @@ export async function getUnreadCount(userId: string): Promise<number> {
 
     if (error) return 0;
     return count || 0;
-  } catch (error) {
+  } catch {
     return 0;
   }
 }
@@ -334,7 +335,7 @@ export async function deleteOldNotifications(daysOld: number = 90): Promise<numb
 
     if (error) return 0;
     return data?.length || 0;
-  } catch (error) {
+  } catch {
     return 0;
   }
 }

@@ -14,11 +14,9 @@ import {
   Trash2, 
   Calendar,
   MapPin,
-  Upload,
   Briefcase,
+  Upload,
   Image as ImageIcon,
-  ExternalLink,
-  Star
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

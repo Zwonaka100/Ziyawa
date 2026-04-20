@@ -24,7 +24,6 @@ import {
   ArrowLeft,
   Trash2,
   Edit,
-  Upload,
   ImageIcon,
   X
 } from 'lucide-react'
@@ -73,6 +72,7 @@ export default function ProviderServicesPage() {
     }
 
     fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, router])
 
   const fetchData = async () => {

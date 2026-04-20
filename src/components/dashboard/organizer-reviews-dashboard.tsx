@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 import { Star, MessageSquare, TrendingUp, Clock, Filter, ChevronRight } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -100,7 +100,7 @@ export function OrganizerReviewsDashboard({
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const _data = await res.json();
         setReviews((prev) =>
           prev.map((r) =>
             r.id === respondingTo.id
@@ -279,17 +279,17 @@ export function OrganizerReviewsDashboard({
                         </div>
                       </div>
 
-                      {/* Respond Button */}
-                      {!review.organizer_response && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setRespondingTo(review)}
-                        >
-                          <MessageSquare className="h-4 w-4 mr-2" />
-                          Respond
-                        </Button>
-                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setRespondingTo(review)
+                          setResponse(review.organizer_response || '')
+                        }}
+                      >
+                        <MessageSquare className="h-4 w-4 mr-2" />
+                        {review.organizer_response ? 'Edit Response' : 'Respond'}
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>

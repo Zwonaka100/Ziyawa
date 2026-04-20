@@ -8,7 +8,6 @@ import {
   Trash2, 
   Music2,
   Calendar,
-  ExternalLink,
   Upload,
   Disc3
 } from 'lucide-react';
@@ -412,7 +411,7 @@ export function DiscographyManager({ artistId, initialReleases }: DiscographyMan
         <ul className="text-sm text-neutral-600 space-y-1">
           <li>• Add cover art to make your releases stand out</li>
           <li>• Link to streaming platforms so organisers can preview your music</li>
-          <li>• Keep your discography up-to-date to show you're active</li>
+          <li>• Keep your discography up-to-date to show you&apos;re active</li>
         </ul>
       </div>
     </div>

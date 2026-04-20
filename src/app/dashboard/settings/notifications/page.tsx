@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Bell, Mail, Smartphone, Save, Loader2 } from 'lucide-react';
+import { Mail, Smartphone, Save, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -42,6 +42,7 @@ export default function NotificationSettingsPage() {
 
   useEffect(() => {
     fetchPreferences();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchPreferences = async () => {

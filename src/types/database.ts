@@ -78,6 +78,11 @@ export type ServiceCategory =
 // Price type for services
 export type PriceType = 'fixed' | 'hourly' | 'daily' | 'negotiable';
 
+export type CrewWorkMode =
+  | 'looking_for_work'
+  | 'offering_services'
+  | 'both';
+
 // PROVIDER BOOKING LIFECYCLE
 export type ProviderBookingState = 
   | 'pending'    // Request sent, waiting for provider
@@ -324,6 +329,14 @@ export interface Ticket {
   is_used: boolean;
   used_at: string | null;
   checked_in_by: string | null;
+  buyer_name?: string | null;
+  buyer_email?: string | null;
+  attendee_name?: string | null;
+  attendee_email?: string | null;
+  attendee_phone?: string | null;
+  claim_token?: string | null;
+  claimed_at?: string | null;
+  delivery_status?: string | null;
   original_owner_id: string | null;
   transferred_at: string | null;
   created_at: string;
@@ -340,6 +353,11 @@ export interface Provider {
   tagline: string | null;
   description: string | null;
   primary_category: ServiceCategory;
+  work_mode?: CrewWorkMode | null;
+  base_rate?: number | null;
+  rate_type?: PriceType | null;
+  availability_notes?: string | null;
+  work_roles?: string[] | null;
   location: SaProvince;
   profile_image: string | null;
   business_phone: string | null;
@@ -422,6 +440,7 @@ export interface PublicProvider {
   id: string;
   business_name: string;
   description: string | null;
+  work_mode?: CrewWorkMode | null;
   primary_category: ServiceCategory;
   location: SaProvince;
   profile_image: string | null;
@@ -457,6 +476,12 @@ export const PRICE_TYPE_LABELS: Record<PriceType, string> = {
   hourly: 'Per Hour',
   daily: 'Per Day',
   negotiable: 'Negotiable',
+};
+
+export const CREW_WORK_MODE_LABELS: Record<CrewWorkMode, string> = {
+  looking_for_work: 'Looking for work',
+  offering_services: 'Offering services',
+  both: 'Looking for work and offering services',
 };
 
 // STATE TRANSITIONS

@@ -119,7 +119,7 @@ export function WalletDepositDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Wallet className="h-5 w-5 text-purple-600" />
+            <Wallet className="h-5 w-5 text-primary" />
             Add Funds to Wallet
           </DialogTitle>
           <DialogDescription>
@@ -131,7 +131,7 @@ export function WalletDepositDialog({
           {/* Current Balance */}
           <div className="bg-gray-50 rounded-lg p-4 text-center">
             <p className="text-sm text-muted-foreground">Current Balance</p>
-            <p className="text-2xl font-bold text-purple-600">
+            <p className="text-2xl font-bold text-primary">
               {formatCurrency(currentBalance)}
             </p>
           </div>

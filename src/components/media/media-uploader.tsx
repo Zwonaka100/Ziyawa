@@ -8,6 +8,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react'
+import Image from 'next/image'
 import { Upload, X, Image as ImageIcon, Video, Music, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -126,6 +127,7 @@ export function MediaUploader({
         }
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [multiple, maxSize, accept, onUpload])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -226,9 +228,11 @@ export function MediaUploader({
               {/* Preview or Icon */}
               <div className="flex-shrink-0 w-12 h-12 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
                 {item.preview ? (
-                  <img 
+                  <Image 
                     src={item.preview} 
                     alt="" 
+                    width={48}
+                    height={48}
                     className="w-full h-full object-cover" 
                   />
                 ) : (

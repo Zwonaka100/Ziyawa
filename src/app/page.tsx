@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Calendar, Music, Users, Ticket, ArrowRight, MapPin, Wrench, Star, Shield, CreditCard } from 'lucide-react'
+import { Calendar, Music, Ticket, ArrowRight, MapPin, Wrench, Star, Shield, CreditCard } from 'lucide-react'
 import { TypewriterHero } from '@/components/home/typewriter-hero'
 import { createClient } from '@/lib/supabase/server'
 import { formatDate, formatCurrency } from '@/lib/helpers'
@@ -10,8 +10,8 @@ import Image from 'next/image'
 export default async function HomePage() {
   const supabase = await createClient()
 
-  // Fetch upcoming events (limit 6)
-  let { data: events } = await supabase
+  // Fetch upcoming events only (limit 6)
+  const { data: events } = await supabase
     .from('events')
     .select(`
       id,
@@ -29,36 +29,27 @@ export default async function HomePage() {
     .order('event_date', { ascending: true })
     .limit(6)
 
-  // If no upcoming events, show recent events instead
-  if (!events || events.length === 0) {
-    const { data: recentEvents } = await supabase
-      .from('events')
-      .select(`
-        id,
-        title,
-        event_date,
-        venue,
-        location,
-        ticket_price,
-        cover_image,
-        profiles:organizer_id (
-          full_name
-        )
-      `)
-      .order('event_date', { ascending: false })
-      .limit(6)
-    events = recentEvents
-  }
-
-  // Check if we're showing upcoming or recent events
-  const hasUpcomingEvents = events && events.length > 0 && 
-    events.some(e => new Date(e.event_date) >= new Date(new Date().toISOString().split('T')[0]))
 
   return (
     <div className="flex flex-col">
       {/* Hero Section */}
-      <section className="relative py-20 md:py-32 bg-neutral-50">
-        <div className="container mx-auto px-4 text-center">
+      <section className="relative min-h-[80vh] md:min-h-screen flex items-center justify-center overflow-hidden bg-black">
+        {/* Background Video */}
+        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          className="absolute inset-0 w-full h-full object-cover"
+        >
+          <source src="/hero.mp4" type="video/mp4" />
+        </video>
+        {/* Dark Overlay */}
+        <div className="absolute inset-0 bg-black/55" />
+        
+        <div className="container mx-auto px-4 text-center relative z-10">
           <TypewriterHero />
           <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
             <Link href="/ziwaphi">
@@ -68,7 +59,7 @@ export default async function HomePage() {
               </Button>
             </Link>
             <Link href="/artists">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto">
+              <Button size="lg" className="w-full sm:w-auto bg-transparent border-2 border-white text-white hover:bg-white hover:text-black">
                 <Music className="mr-2 h-5 w-5" />
                 Browse Artists
               </Button>
@@ -82,7 +73,7 @@ export default async function HomePage() {
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl md:text-3xl font-bold">
-              {hasUpcomingEvents ? 'Upcoming Events' : 'Recent Events'}
+              Upcoming Events
             </h2>
             <Link href="/ziwaphi" className="text-sm font-medium flex items-center gap-1 hover:underline">
               View all <ArrowRight className="h-4 w-4" />
@@ -127,9 +118,9 @@ export default async function HomePage() {
             </div>
           ) : (
             <div className="text-center py-12">
-              <p className="text-muted-foreground">No events yet. Be the first to create one!</p>
-              <Link href="/dashboard/organizer/events/new">
-                <Button className="mt-4">Create Event</Button>
+              <p className="text-muted-foreground">No upcoming events right now. Check back soon or browse our event discovery page.</p>
+              <Link href="/ziwaphi">
+                <Button className="mt-4">Browse Events</Button>
               </Link>
             </div>
           )}
@@ -265,10 +256,20 @@ export default async function HomePage() {
             From Johannesburg to Cape Town, Durban to Pretoria - find and create events anywhere in South Africa.
           </p>
           <div className="flex flex-wrap justify-center gap-3 text-sm">
-            {['Gauteng', 'Western Cape', 'KwaZulu-Natal', 'Eastern Cape', 'Free State', 'Limpopo', 'Mpumalanga', 'North West', 'Northern Cape'].map((province) => (
-              <span key={province} className="px-4 py-2 bg-neutral-100 rounded-full text-neutral-700">
-                {province}
-              </span>
+            {[
+              { label: 'Gauteng', key: 'gauteng' },
+              { label: 'Western Cape', key: 'western_cape' },
+              { label: 'KwaZulu-Natal', key: 'kwazulu_natal' },
+              { label: 'Eastern Cape', key: 'eastern_cape' },
+              { label: 'Free State', key: 'free_state' },
+              { label: 'Limpopo', key: 'limpopo' },
+              { label: 'Mpumalanga', key: 'mpumalanga' },
+              { label: 'North West', key: 'north_west' },
+              { label: 'Northern Cape', key: 'northern_cape' },
+            ].map((province) => (
+              <Link key={province.key} href={`/ziwaphi?location=${province.key}`} className="px-4 py-2 bg-neutral-100 rounded-full text-neutral-700 hover:bg-neutral-200 transition-colors">
+                {province.label}
+              </Link>
             ))}
           </div>
         </div>

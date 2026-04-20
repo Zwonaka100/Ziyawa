@@ -204,7 +204,7 @@ Once set up, organizers can find and book you! 🎵`,
 
 1. Go to your **Profile** settings
 2. Enable "I provide event services"
-3. Complete your provider setup:
+3. Complete your crew setup:
    - Add your services (sound, lighting, catering, etc.)
    - Set your rates
    - Upload portfolio photos
@@ -214,7 +214,7 @@ Organizers will find you when planning events! 🔧`,
     category: 'vendors',
     links: [
       { text: 'Profile Settings', href: '/profile' },
-      { text: 'Provider Setup', href: '/dashboard/provider/setup' }
+      { text: 'Crew Setup', href: '/dashboard/provider/setup' }
     ]
   },
 

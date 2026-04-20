@@ -96,6 +96,37 @@ export async function GET(request: NextRequest) {
 
     const { data: events, error, count } = await dbQuery;
 
+    // If RLS causes recursion error, retry without joins
+    if (error && error.message?.includes('infinite recursion')) {
+      console.warn('RLS recursion detected, retrying without joins');
+      let fallbackQuery = supabase
+        .from('events')
+        .select('*', { count: 'exact' })
+        .eq('is_published', true);
+
+      if (query) {
+        fallbackQuery = fallbackQuery.or(`title.ilike.%${query}%,description.ilike.%${query}%,venue.ilike.%${query}%`);
+      }
+      if (location) {
+        fallbackQuery = fallbackQuery.eq('location', location);
+      }
+      if (dateFrom) {
+        fallbackQuery = fallbackQuery.gte('event_date', dateFrom);
+      }
+      if (dateTo) {
+        fallbackQuery = fallbackQuery.lte('event_date', dateTo);
+      }
+
+      fallbackQuery = fallbackQuery.order('event_date', { ascending: true }).range(offset, offset + limit - 1);
+      const { data: fallbackEvents, count: fallbackCount } = await fallbackQuery;
+
+      return NextResponse.json({
+        events: fallbackEvents || [],
+        pagination: { page, limit, total: fallbackCount || 0, totalPages: Math.ceil((fallbackCount || 0) / limit) },
+        filters: { locations: [], priceRange: { min: 0, max: 1000 } }
+      });
+    }
+
     if (error) throw error;
 
     // Get unique locations for filter options (all events)

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -23,7 +23,6 @@ import {
   Search, 
   MapPin, 
   Calendar as CalendarIcon, 
-  Filter, 
   X,
   SlidersHorizontal
 } from 'lucide-react';

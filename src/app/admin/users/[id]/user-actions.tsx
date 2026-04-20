@@ -24,8 +24,6 @@ import {
   AlertTriangle, 
   Ban, 
   CheckCircle,
-  Shield,
-  Trash2,
   UserX
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -79,7 +77,7 @@ export function UserActions({ user }: UserActionsProps) {
       // Update warnings count
       await supabase
         .from('profiles')
-        .update({ warnings_count: (user as any).warnings_count + 1 })
+        .update({ warnings_count: ((user as UserActionsProps['user'] & { warnings_count?: number }).warnings_count || 0) + 1 })
         .eq('id', user.id)
 
       toast.success('Warning issued')

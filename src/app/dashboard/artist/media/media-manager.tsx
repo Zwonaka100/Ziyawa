@@ -21,8 +21,7 @@ import {
   ExternalLink,
   Upload,
   Loader2,
-  Camera,
-  Play
+  Camera
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,7 +47,6 @@ import {
   deleteFile as deleteStorageFile,
   getPathFromUrl,
   extractYouTubeId,
-  extractTikTokId,
   getYouTubeThumbnail
 } from '@/lib/storage';
 import { ArtistMedia, MediaType, MEDIA_TYPE_LABELS } from '@/types/database';

@@ -10,6 +10,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -291,7 +292,7 @@ export default function AdminUserEditPage() {
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-neutral-200 flex items-center justify-center">
                     {user.avatar_url ? (
-                      <img src={user.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                      <Image src={user.avatar_url} alt="" width={48} height={48} className="w-full h-full rounded-full object-cover" />
                     ) : (
                       <User className="h-6 w-6 text-muted-foreground" />
                     )}

@@ -16,7 +16,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import {
   ArrowLeft,
   Clock,
@@ -24,7 +23,6 @@ import {
   AlertCircle,
   Loader2,
   Send,
-  MessageSquare,
   User,
   Shield,
 } from 'lucide-react'
@@ -58,7 +56,7 @@ interface SupportTicket {
   resolved_at: string | null
 }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
+const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
   open: { label: 'Open', color: 'bg-green-100 text-green-700', icon: AlertCircle },
   in_progress: { label: 'In Progress', color: 'bg-blue-100 text-blue-700', icon: Clock },
   waiting: { label: 'Awaiting Your Reply', color: 'bg-yellow-100 text-yellow-700', icon: Clock },
@@ -109,6 +107,7 @@ export default function UserTicketDetailPage() {
     if (user && ticketId) {
       fetchTicket()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, ticketId])
 
   const fetchTicket = async () => {
@@ -247,8 +246,8 @@ export default function UserTicketDetailPage() {
           <CardContent className="space-y-6">
             {/* Original message */}
             <div className="flex gap-4">
-              <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
-                <User className="h-5 w-5 text-purple-600" />
+              <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center flex-shrink-0">
+                <User className="h-5 w-5 text-primary" />
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
@@ -257,7 +256,7 @@ export default function UserTicketDetailPage() {
                     {format(new Date(ticket.created_at), 'MMM d, yyyy \'at\' h:mm a')}
                   </span>
                 </div>
-                <div className="p-4 rounded-lg bg-purple-50 text-sm whitespace-pre-wrap">
+                <div className="p-4 rounded-lg bg-neutral-50 text-sm whitespace-pre-wrap">
                   {ticket.message}
                 </div>
               </div>
@@ -267,12 +266,12 @@ export default function UserTicketDetailPage() {
             {replies.map((reply) => (
               <div key={reply.id} className="flex gap-4">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  reply.is_staff ? 'bg-blue-100' : 'bg-purple-100'
+                  reply.is_staff ? 'bg-blue-100' : 'bg-neutral-100'
                 }`}>
                   {reply.is_staff ? (
                     <Shield className="h-5 w-5 text-blue-600" />
                   ) : (
-                    <User className="h-5 w-5 text-purple-600" />
+                    <User className="h-5 w-5 text-primary" />
                   )}
                 </div>
                 <div className="flex-1">
@@ -288,7 +287,7 @@ export default function UserTicketDetailPage() {
                     </span>
                   </div>
                   <div className={`p-4 rounded-lg text-sm whitespace-pre-wrap ${
-                    reply.is_staff ? 'bg-blue-50' : 'bg-purple-50'
+                    reply.is_staff ? 'bg-blue-50' : 'bg-neutral-50'
                   }`}>
                     {reply.message}
                   </div>

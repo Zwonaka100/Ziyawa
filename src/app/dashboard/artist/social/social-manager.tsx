@@ -387,7 +387,7 @@ export function ArtistSocialManager({ artistId, initialLinks }: ArtistSocialMana
       <div className="p-4 bg-neutral-100 rounded-xl">
         <h4 className="font-medium text-neutral-900 mb-2">💡 Pro Tips</h4>
         <ul className="text-sm text-neutral-600 space-y-1">
-          <li>• Set your most active platform as "Primary" - it will be shown first</li>
+          <li>• Set your most active platform as &quot;Primary&quot; - it will be shown first</li>
           <li>• Add your Spotify/Apple Music links so fans can stream your music</li>
           <li>• Instagram and TikTok help organisers see your audience engagement</li>
         </ul>

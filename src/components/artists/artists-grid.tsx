@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -6,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { MapPin, Music } from 'lucide-react'
 import { formatCurrency } from '@/lib/helpers'
 import { PROVINCES } from '@/lib/constants'
-import type { Artist, Profile, SaProvince } from '@/types/database'
+import type { Profile, SaProvince } from '@/types/database'
 
 interface ArtistWithProfile {
   id: string
@@ -38,13 +39,13 @@ function ArtistCard({ artist }: { artist: ArtistWithProfile }) {
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
       {/* Profile Image */}
-      <div className="relative h-48 bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+      <div className="relative h-48 bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center overflow-hidden">
         {artist.profile_image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <Image
             src={artist.profile_image}
             alt={artist.stage_name}
-            className="w-full h-full object-cover"
+            fill
+            className="object-cover"
           />
         ) : (
           <Avatar className="h-24 w-24">

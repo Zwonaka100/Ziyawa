@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Send, 
   Bot, 
@@ -14,7 +14,6 @@ import {
   Calendar, 
   MapPin, 
   Clock,
-  Ticket,
   ExternalLink,
   Sparkles
 } from 'lucide-react';
@@ -443,9 +442,11 @@ function EventCard({ event }: { event: EventResult }) {
           {/* Image */}
           <div className="w-24 h-24 flex-shrink-0 bg-muted">
             {event.image_url ? (
-              <img
+              <Image
                 src={event.image_url}
                 alt={event.title}
+                width={96}
+                height={96}
                 className="w-full h-full object-cover"
               />
             ) : (

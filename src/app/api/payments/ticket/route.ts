@@ -10,6 +10,12 @@ import { createClient } from '@/lib/supabase/server';
 import { initializePayment, generatePaymentReference } from '@/lib/paystack';
 import { calculateTicketSaleBreakdown } from '@/lib/constants';
 
+interface TicketAttendeeInput {
+  fullName?: string;
+  email?: string;
+  phone?: string;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -26,7 +32,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { eventId, quantity = 1, ticketTypeId, ticketTypeName } = body;
+    const { eventId, quantity = 1, ticketTypeId, ticketTypeName, attendees = [] } = body;
 
     if (!eventId) {
       return NextResponse.json(
@@ -139,6 +145,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const normalizedAttendees = Array.from({ length: quantity }, (_, index) => {
+      const attendee = Array.isArray(attendees) ? (attendees[index] as TicketAttendeeInput | undefined) : undefined;
+      return {
+        fullName: String(attendee?.fullName || profile.full_name || `Ticket Holder ${index + 1}`).trim(),
+        email: String(attendee?.email || profile.email).trim().toLowerCase(),
+        phone: String(attendee?.phone || '').trim(),
+      };
+    });
+
+    if (normalizedAttendees.some((attendee) => !attendee.fullName || !attendee.email)) {
+      return NextResponse.json(
+        { error: 'Each ticket holder needs a full name and email address' },
+        { status: 400 }
+      );
+    }
+
     // Calculate fees (ticket_price is stored in cents)
     const ticketPriceCents = Number(selectedTier?.price ?? event.ticket_price) * 100;
     const breakdown = calculateTicketSaleBreakdown(ticketPriceCents);
@@ -164,6 +186,9 @@ export async function POST(request: NextRequest) {
         gateway_provider: 'paystack',
         gateway_response: {
           quantity,
+          attendees: normalizedAttendees,
+          buyer_name: profile.full_name || 'Ticket Buyer',
+          buyer_email: profile.email,
           ticket_type_id: selectedTier?.id || null,
           ticket_type_name: selectedTier?.name || ticketTypeName || 'General Admission',
           ticket_price_cents: ticketPriceCents,
@@ -197,6 +222,9 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         user_name: profile.full_name,
         quantity,
+        attendees: normalizedAttendees,
+        buyer_email: profile.email,
+        buyer_name: profile.full_name || 'Ticket Buyer',
         ticket_type_id: selectedTier?.id || null,
         ticket_type_name: selectedTier?.name || ticketTypeName || 'General Admission',
         ticket_price: ticketPriceCents,

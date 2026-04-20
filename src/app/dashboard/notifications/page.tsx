@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Bell, Check, CheckCheck, Trash2, Filter, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -21,7 +21,7 @@ interface Notification {
   title: string;
   message: string;
   read: boolean;
-  action_url: string | null;
+  link: string | null;
   created_at: string;
 }
 
@@ -60,7 +60,7 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [total, setTotal] = useState(0);
+  const [, setTotal] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
@@ -162,8 +162,8 @@ export default function NotificationsPage() {
     if (!notification.read) {
       markAsRead(notification.id);
     }
-    if (notification.action_url) {
-      window.location.href = notification.action_url;
+    if (notification.link) {
+      window.location.href = notification.link;
     }
   };
 

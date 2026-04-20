@@ -1,17 +1,35 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Calendar, Plus, Users, DollarSign, Clock, Wrench, Star } from 'lucide-react'
+import { Calendar, Plus, Users, Clock, Wrench, Star } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/helpers'
 import { BOOKING_STATUS, PROVINCES } from '@/lib/constants'
 
 export const metadata = {
   title: 'Organizer Dashboard | Ziyawa',
   description: 'Manage your events and bookings',
+}
+
+function getEventTimingStatus(eventDate: string) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const targetDate = new Date(eventDate)
+  targetDate.setHours(0, 0, 0, 0)
+
+  if (targetDate.getTime() === today.getTime()) {
+    return { label: 'Live today', className: 'bg-green-100 text-green-700 hover:bg-green-100' }
+  }
+
+  if (targetDate < today) {
+    return { label: 'Past event', className: 'bg-slate-100 text-slate-700 hover:bg-slate-100' }
+  }
+
+  return { label: 'Upcoming', className: 'bg-blue-100 text-blue-700 hover:bg-blue-100' }
 }
 
 export default async function OrganizerDashboardPage() {
@@ -26,7 +44,7 @@ export default async function OrganizerDashboardPage() {
   // Check role - use new boolean flags
   const { data: profile } = await supabase
     .from('profiles')
-    .select('is_organizer, is_admin, wallet_balance')
+    .select('is_organizer, is_admin')
     .eq('id', user.id)
     .single()
 
@@ -60,10 +78,22 @@ export default async function OrganizerDashboardPage() {
 
   const pendingCrewBookings = crewBookings?.filter(b => b.state === 'pending' || b.state === 'accepted') || []
 
-  const upcomingEvents = events?.filter(e => new Date(e.event_date) >= new Date()) || []
-  const pastEvents = events?.filter(e => new Date(e.event_date) < new Date()) || []
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const upcomingEvents = events?.filter((e) => {
+    const eventDate = new Date(e.event_date)
+    eventDate.setHours(0, 0, 0, 0)
+    return eventDate >= today
+  }) || []
+
+  const _pastEvents = events?.filter((e) => {
+    const eventDate = new Date(e.event_date)
+    eventDate.setHours(0, 0, 0, 0)
+    return eventDate < today
+  }) || []
+
   const pendingBookings = bookings?.filter(b => b.status === 'pending') || []
-  const totalRevenue = events?.reduce((acc, e) => acc + (e.tickets_sold * e.ticket_price), 0) || 0
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -123,10 +153,10 @@ export default async function OrganizerDashboardPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
-              <DollarSign className="h-8 w-8 text-primary" />
+              <Wrench className="h-8 w-8 text-primary" />
               <div>
-                <p className="text-2xl font-bold">{formatCurrency(profile.wallet_balance)}</p>
-                <p className="text-sm text-muted-foreground">Wallet Balance</p>
+                <p className="text-2xl font-bold">{pendingCrewBookings.length}</p>
+                <p className="text-sm text-muted-foreground">Crew Active</p>
               </div>
             </div>
           </CardContent>
@@ -157,53 +187,62 @@ export default async function OrganizerDashboardPage() {
         <TabsContent value="events" className="space-y-4">
           {events && events.length > 0 ? (
             <div className="grid gap-4">
-              {events.map((event) => (
-                <Card key={event.id}>
-                  <CardContent className="p-4">
-                    <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-semibold">{event.title}</h3>
-                          <Badge variant={event.is_published ? 'default' : 'secondary'}>
-                            {event.is_published ? 'Published' : 'Draft'}
-                          </Badge>
+              {events.map((event) => {
+                const timingStatus = getEventTimingStatus(event.event_date)
+                const isPastEvent = timingStatus.label === 'Past event'
+
+                return (
+                  <Card key={event.id}>
+                    <CardContent className="p-4">
+                      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
+                            <h3 className="font-semibold">{event.title}</h3>
+                            <Badge variant={event.is_published ? 'default' : 'secondary'}>
+                              {event.is_published ? 'Published' : 'Draft'}
+                            </Badge>
+                            <Badge variant="outline" className={timingStatus.className}>
+                              {timingStatus.label}
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-muted-foreground space-y-1">
+                            <p>{formatDate(event.event_date)} • {event.venue}</p>
+                            <p>{PROVINCES[event.location as keyof typeof PROVINCES]}</p>
+                            <p>
+                              {event.tickets_sold} / {event.capacity} tickets sold •
+                              {' '}{formatCurrency(event.ticket_price)} per ticket
+                            </p>
+                          </div>
                         </div>
-                        <div className="text-sm text-muted-foreground space-y-1">
-                          <p>{formatDate(event.event_date)} • {event.venue}</p>
-                          <p>{PROVINCES[event.location as keyof typeof PROVINCES]}</p>
-                          <p>
-                            {event.tickets_sold} / {event.capacity} tickets sold • 
-                            {formatCurrency(event.ticket_price)} per ticket
-                          </p>
+                        <div className="flex gap-2 flex-wrap">
+                          <Link href={`/events/${event.id}`}>
+                            <Button variant="outline" size="sm">View</Button>
+                          </Link>
+                          <Link href={`/dashboard/organizer/events/${event.id}/manage`}>
+                            <Button size="sm">Manage Event</Button>
+                          </Link>
+                          {!isPastEvent && (
+                            <>
+                              <Link href={`/dashboard/organizer/events/${event.id}/edit`}>
+                                <Button variant="outline" size="sm">Edit</Button>
+                              </Link>
+                              <Link href={`/dashboard/organizer/events/${event.id}/book`}>
+                                <Button variant="outline" size="sm">Book Artist</Button>
+                              </Link>
+                              <Link href="/crew">
+                                <Button size="sm" variant="outline" className="border-orange-300 text-orange-600 hover:bg-orange-50">
+                                  <Wrench className="h-3 w-3 mr-1" />
+                                  Book Crew
+                                </Button>
+                              </Link>
+                            </>
+                          )}
                         </div>
                       </div>
-                      <div className="flex gap-2 flex-wrap">
-                        <Link href={`/events/${event.id}`}>
-                          <Button variant="outline" size="sm">View</Button>
-                        </Link>
-                        <Link href={`/dashboard/organizer/events/${event.id}/edit`}>
-                          <Button variant="outline" size="sm">Edit</Button>
-                        </Link>
-                        <Link href={`/dashboard/organizer/events/${event.id}/media`}>
-                          <Button variant="outline" size="sm">Media</Button>
-                        </Link>
-                        <Link href={`/dashboard/organizer/events/${event.id}/checkin`}>
-                          <Button variant="outline" size="sm">Door / Check-in</Button>
-                        </Link>
-                        <Link href={`/dashboard/organizer/events/${event.id}/book`}>
-                          <Button size="sm">Book Artist</Button>
-                        </Link>
-                        <Link href={`/crew`}>
-                          <Button size="sm" variant="outline" className="border-orange-300 text-orange-600 hover:bg-orange-50">
-                            <Wrench className="h-3 w-3 mr-1" />
-                            Book Crew
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
           ) : (
             <Card>

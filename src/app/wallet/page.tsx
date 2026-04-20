@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/components/providers/auth-provider'
 import { createClient } from '@/lib/supabase/client'
@@ -78,6 +79,7 @@ export default function WalletPage() {
     if (user) {
       void fetchTransactions()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 
   if (loading) {
@@ -104,6 +106,37 @@ export default function WalletPage() {
   const handleWalletRefresh = async () => {
     await fetchTransactions()
     router.refresh()
+  }
+
+  const handleExportStatement = () => {
+    if (transactions.length === 0) {
+      return
+    }
+
+    const rows = transactions.map((tx) => ({
+      date: tx.created_at,
+      type: tx.type,
+      state: tx.state,
+      direction: tx.recipient_id === user.id && tx.type !== 'payout' ? 'credit' : 'debit',
+      amount_zar: (tx.amount / 100).toFixed(2),
+      reference: tx.id,
+    }))
+
+    const headers = ['date', 'type', 'state', 'direction', 'amount_zar', 'reference']
+    const csv = [
+      headers.join(','),
+      ...rows.map((row) => headers.map((header) => `"${String(row[header as keyof typeof row] ?? '').replace(/"/g, '""')}"`).join(',')),
+    ].join('\n')
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `ziyawa-wallet-statement-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
   }
 
   return (
@@ -147,7 +180,7 @@ export default function WalletPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Payouts Processing</CardDescription>
-            <CardTitle className="text-3xl font-bold text-purple-600">
+            <CardTitle className="text-3xl font-bold text-primary">
               {formatCurrency(pendingPayoutBalance)}
             </CardTitle>
           </CardHeader>
@@ -174,6 +207,10 @@ export default function WalletPage() {
               <ArrowDownLeft className="h-4 w-4 mr-2" />
               Add Funds
             </Button>
+            <Button variant="outline" className="flex-1" onClick={handleExportStatement} disabled={loadingTx || transactions.length === 0}>
+              <Receipt className="h-4 w-4 mr-2" />
+              Download Statement
+            </Button>
           </div>
 
           {!hasRoles && (
@@ -187,6 +224,23 @@ export default function WalletPage() {
               Minimum payout amount is {formatCurrency(minimumWithdrawal)}.
             </p>
           )}
+
+          <div className="mt-3 flex justify-center">
+            <Link
+              href={{
+                pathname: '/support',
+                query: {
+                  new: '1',
+                  category: 'payment',
+                  priority: 'high',
+                  subject: 'Wallet payout or balance issue',
+                  message: 'Please review my wallet or payout issue. Include the payout amount, date, and what happened.',
+                },
+              }}
+            >
+              <Button variant="link" className="text-sm">Need help with a payout or balance?</Button>
+            </Link>
+          </div>
 
           <div className="mt-4 grid gap-2 sm:grid-cols-3">
             <div className="rounded-lg border bg-muted/30 p-3 text-sm">
@@ -432,7 +486,7 @@ function TransactionList({
         const iconClass =
           tx.type === 'ticket_purchase' ? 'bg-blue-100' :
           tx.type === 'wallet_deposit' ? 'bg-green-100' :
-          tx.type === 'booking_payment' || tx.type === 'artist_booking' ? 'bg-purple-100' :
+          tx.type === 'booking_payment' || tx.type === 'artist_booking' ? 'bg-neutral-100' :
           tx.type === 'vendor_service' ? 'bg-orange-100' :
           tx.type === 'payout' ? 'bg-amber-100' :
           'bg-muted'
@@ -443,7 +497,7 @@ function TransactionList({
               <div className={`p-2 rounded-lg ${iconClass}`}>
                 {tx.type === 'ticket_purchase' && <Ticket className="h-4 w-4 text-blue-600" />}
                 {tx.type === 'wallet_deposit' && <Wallet className="h-4 w-4 text-green-600" />}
-                {(tx.type === 'booking_payment' || tx.type === 'artist_booking') && <Music className="h-4 w-4 text-purple-600" />}
+                {(tx.type === 'booking_payment' || tx.type === 'artist_booking') && <Music className="h-4 w-4 text-primary" />}
                 {tx.type === 'vendor_service' && <Wrench className="h-4 w-4 text-orange-600" />}
                 {tx.type === 'payout' && <ArrowUpRight className="h-4 w-4 text-amber-600" />}
                 {!['ticket_purchase', 'wallet_deposit', 'booking_payment', 'artist_booking', 'vendor_service', 'payout'].includes(tx.type) && (

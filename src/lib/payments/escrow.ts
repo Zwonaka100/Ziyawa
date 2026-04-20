@@ -22,6 +22,7 @@ interface HeldTransaction {
   recipient_type: string | null
   event_id: string | null
   booking_id: string | null
+  provider_booking_id: string | null
   created_at: string
   held_at: string | null
 }
@@ -227,15 +228,17 @@ export async function releaseEligibleHeldFunds(options?: {
   transactionId?: string
   eventId?: string
   bookingId?: string
+  providerBookingId?: string
 }): Promise<ReleaseResult> {
   let query = supabaseAdmin
     .from('transactions')
-    .select('id, reference, type, state, amount, net_amount, payer_id, recipient_id, recipient_type, event_id, booking_id, created_at, held_at')
+    .select('id, reference, type, state, amount, net_amount, payer_id, recipient_id, recipient_type, event_id, booking_id, provider_booking_id, created_at, held_at')
     .eq('state', 'held')
 
   if (options?.transactionId) query = query.eq('id', options.transactionId)
   if (options?.eventId) query = query.eq('event_id', options.eventId)
   if (options?.bookingId) query = query.eq('booking_id', options.bookingId)
+  if (options?.providerBookingId) query = query.eq('provider_booking_id', options.providerBookingId)
 
   const { data: transactions, error } = await query
 
@@ -290,21 +293,34 @@ export async function releaseEligibleHeldFunds(options?: {
         continue
       }
 
-      if (['booking_payment', 'artist_booking', 'vendor_service'].includes(transaction.type)) {
-        if (!transaction.booking_id) {
+      // All booking payment types: artist and vendor/crew
+      const BOOKING_PAYMENT_TYPES = [
+        'booking_payment',  // legacy type used by existing webhook
+        'artist_booking',
+        'vendor_service',
+      ]
+      if (BOOKING_PAYMENT_TYPES.includes(transaction.type)) {
+        const isVendor = Boolean(transaction.provider_booking_id) ||
+          transaction.type === 'vendor_service' ||
+          transaction.type === 'vendor_service_payment'
+        const relevantBookingId = isVendor
+          ? (transaction.provider_booking_id ?? transaction.booking_id)
+          : transaction.booking_id
+
+        if (!relevantBookingId) {
           result.skipped += 1
           continue
         }
 
-        const tableName = transaction.type === 'vendor_service' ? 'provider_bookings' : 'bookings'
-        const selectFields = transaction.type === 'vendor_service'
+        const tableName = isVendor ? 'provider_bookings' : 'bookings'
+        const selectFields = isVendor
           ? 'id, state, completed_at, organizer_completed_at, provider_completed_at, payout_hold_until'
           : 'id, state, completed_at, organizer_completed_at, artist_completed_at, payout_hold_until'
 
         const { data: booking, error: bookingError } = await supabaseAdmin
           .from(tableName)
           .select(selectFields)
-          .eq('id', transaction.booking_id)
+          .eq('id', relevantBookingId)
           .single()
 
         if (bookingError || !booking) {

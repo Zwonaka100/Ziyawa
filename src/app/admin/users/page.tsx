@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -34,11 +35,9 @@ import {
   Eye, 
   Edit, 
   Ban, 
-  Trash2,
   AlertTriangle,
   CheckCircle,
   XCircle,
-  Shield,
   Mail,
   ChevronLeft,
   ChevronRight
@@ -65,7 +64,7 @@ interface User {
 const ITEMS_PER_PAGE = 20
 
 export default function AdminUsersPage() {
-  const router = useRouter()
+  useRouter()
   const searchParams = useSearchParams()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
@@ -75,11 +74,7 @@ export default function AdminUsersPage() {
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
 
-  useEffect(() => {
-    void fetchUsers()
-  }, [page, roleFilter, statusFilter])
-
-  async function fetchUsers() {
+  const fetchUsers = useCallback(async () => {
     setLoading(true)
     const supabase = createClient()
 
@@ -127,7 +122,11 @@ export default function AdminUsersPage() {
     }
 
     setLoading(false)
-  }
+  }, [page, roleFilter, statusFilter, searchQuery])
+
+  useEffect(() => {
+    void fetchUsers() // eslint-disable-line react-hooks/set-state-in-effect
+  }, [fetchUsers])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -261,7 +260,7 @@ export default function AdminUsersPage() {
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-neutral-200 flex items-center justify-center">
                           {user.avatar_url ? (
-                            <img src={user.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                            <Image src={user.avatar_url} alt="" width={40} height={40} className="w-full h-full rounded-full object-cover" />
                           ) : (
                             <span className="text-sm font-medium">
                               {user.full_name?.charAt(0) || user.email?.charAt(0) || '?'}

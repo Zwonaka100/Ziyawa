@@ -195,7 +195,7 @@ export function WalletWithdrawDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ArrowDownToLine className="h-5 w-5 text-purple-600" />
+            <ArrowDownToLine className="h-5 w-5 text-primary" />
             Withdraw Funds
           </DialogTitle>
           <DialogDescription>
@@ -209,11 +209,11 @@ export function WalletWithdrawDialog({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Available Balance</p>
-                <p className="text-2xl font-bold text-purple-600">
+                <p className="text-2xl font-bold text-primary">
                   {formatCurrency(currentBalance)}
                 </p>
               </div>
-              <Wallet className="h-10 w-10 text-purple-200" />
+              <Wallet className="h-10 w-10 text-neutral-200" />
             </div>
           </div>
 
@@ -226,7 +226,7 @@ export function WalletWithdrawDialog({
                 variant="ghost" 
                 size="sm"
                 onClick={handleWithdrawAll}
-                className="text-purple-600 h-auto py-0"
+                className="text-primary h-auto py-0"
               >
                 Withdraw All
               </Button>

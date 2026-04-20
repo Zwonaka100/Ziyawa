@@ -184,6 +184,36 @@ export async function sendTicketPurchasedEmail(
   });
 }
 
+export async function sendTicketAssignedEmail(
+  to: string,
+  data: {
+    recipientName: string;
+    eventName: string;
+    eventDate: string;
+    eventLocation: string;
+    ticketType: string;
+    ticketCode: string;
+    senderName?: string;
+    claimToken?: string | null;
+  }
+): Promise<SendEmailResult> {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const actionUrl = data.claimToken
+    ? `${baseUrl}/tickets/claim?token=${encodeURIComponent(data.claimToken)}`
+    : `${baseUrl}/dashboard/tickets`;
+
+  return sendEmail({
+    to,
+    subject: `Your ticket for ${data.eventName} is ready 🎫`,
+    html: EmailTemplates.ticketAssignedEmail({
+      ...data,
+      actionUrl,
+      actionLabel: data.claimToken ? 'Claim My Ticket' : 'Open My Ticket',
+    }),
+    tags: [{ name: 'category', value: 'ticket-delivery' }],
+  });
+}
+
 /**
  * Send event reminder
  */

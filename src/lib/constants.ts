@@ -60,7 +60,7 @@ export const EVENT_STATES = {
   },
   completed: { 
     label: 'Completed', 
-    color: 'bg-purple-100 text-purple-800',
+    color: 'bg-emerald-100 text-emerald-800',
     description: 'Event happened! Payouts will be released.',
     nextStates: [],
   },
@@ -104,7 +104,7 @@ export const BOOKING_STATES = {
   },
   completed: { 
     label: 'Completed', 
-    color: 'bg-purple-100 text-purple-800',
+    color: 'bg-emerald-100 text-emerald-800',
     description: 'Performance complete. Payout released.',
     nextStates: [],
   },
@@ -153,7 +153,7 @@ export const TRANSACTION_STATES = {
   },
   settled: { 
     label: 'Settled', 
-    color: 'bg-purple-100 text-purple-800',
+    color: 'bg-emerald-100 text-emerald-800',
     description: 'Money in recipient bank.',
   },
   refunded: { 

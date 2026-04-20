@@ -6,7 +6,35 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
+import { getEventAccessForUser } from '@/lib/event-team';
+
+const supabaseAdmin = createAdminClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+function resolveScannedInput(value: string | null | undefined) {
+  const raw = String(value || '').trim();
+
+  if (!raw) {
+    return { normalizedCode: null, parsedTicketId: null };
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as { code?: string; ticket?: string };
+    return {
+      normalizedCode: parsed.code ? String(parsed.code).trim().toUpperCase() : raw.toUpperCase(),
+      parsedTicketId: parsed.ticket ? String(parsed.ticket).trim() : null,
+    };
+  } catch {
+    return {
+      normalizedCode: raw.toUpperCase(),
+      parsedTicketId: null,
+    };
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,7 +51,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { ticketCode, eventId, ticketId } = body;
+    const { ticketCode, eventId, ticketId, selfCheckIn = false } = body;
 
     // Validate input - need either ticketCode or ticketId
     if (!ticketCode && !ticketId) {
@@ -33,7 +61,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const normalizedCode = ticketCode ? String(ticketCode).toUpperCase() : null;
+    const { normalizedCode, parsedTicketId } = resolveScannedInput(ticketCode);
 
     let entryId = '';
     let entryCode = '';
@@ -42,19 +70,19 @@ export async function POST(request: NextRequest) {
     let entryCheckedIn = false;
     let entryCheckedInAt: string | null = null;
     let entryEventId = '';
-    let organizerId = '';
     let eventDateValue = '';
+    let entryUserId: string | null = null;
     let sourceTable: 'tickets' | 'event_access_passes' = 'tickets';
 
     // Try normal ticket first
-    let ticketQuery = supabase
+    let ticketQuery = supabaseAdmin
       .from('tickets')
       .select(`
         id,
         ticket_code,
         ticket_type,
-        checked_in,
-        checked_in_at,
+        is_used,
+        used_at,
         event_id,
         user_id,
         events (
@@ -68,8 +96,8 @@ export async function POST(request: NextRequest) {
         )
       `);
 
-    if (ticketId) {
-      ticketQuery = ticketQuery.eq('id', ticketId);
+    if (ticketId || parsedTicketId) {
+      ticketQuery = ticketQuery.eq('id', ticketId || parsedTicketId);
     } else if (normalizedCode) {
       ticketQuery = ticketQuery.eq('ticket_code', normalizedCode);
     }
@@ -86,14 +114,14 @@ export async function POST(request: NextRequest) {
       entryCode = ticket.ticket_code;
       entryType = ticket.ticket_type;
       entryHolder = profile?.full_name || 'Guest';
-      entryCheckedIn = ticket.checked_in;
-      entryCheckedInAt = ticket.checked_in_at;
+      entryCheckedIn = ticket.is_used;
+      entryCheckedInAt = ticket.used_at;
       entryEventId = ticket.event_id;
-      organizerId = event?.organizer_id || '';
       eventDateValue = event?.event_date || '';
+      entryUserId = ticket.user_id || null;
       sourceTable = 'tickets';
     } else {
-      let passQuery = supabase
+      let passQuery = supabaseAdmin
         .from('event_access_passes')
         .select(`
           id,
@@ -111,8 +139,8 @@ export async function POST(request: NextRequest) {
           )
         `);
 
-      if (ticketId) {
-        passQuery = passQuery.eq('id', ticketId);
+      if (ticketId || parsedTicketId) {
+        passQuery = passQuery.eq('id', ticketId || parsedTicketId);
       } else if (normalizedCode) {
         passQuery = passQuery.eq('code', normalizedCode);
       }
@@ -140,7 +168,6 @@ export async function POST(request: NextRequest) {
       entryCheckedIn = pass.checked_in;
       entryCheckedInAt = pass.checked_in_at;
       entryEventId = pass.event_id;
-      organizerId = event?.organizer_id || '';
       eventDateValue = event?.event_date || '';
       sourceTable = 'event_access_passes';
     }
@@ -157,9 +184,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (organizerId !== user.id) {
+    const access = await getEventAccessForUser(supabaseAdmin, entryEventId, user.id);
+    const isOrganizer = access.isOwner;
+    const isTeamMember = access.permissions.canCheckIn;
+    const isTicketOwner = sourceTable === 'tickets' && entryUserId === user.id;
+
+    if (!isOrganizer && !isTeamMember && !isTicketOwner) {
       return NextResponse.json(
         { error: 'Not authorized to check in entries for this event' },
+        { status: 403 }
+      );
+    }
+
+    if (selfCheckIn && !isTicketOwner) {
+      return NextResponse.json(
+        { error: 'Only the ticket holder can self check-in' },
         { status: 403 }
       );
     }
@@ -187,6 +226,14 @@ export async function POST(request: NextRequest) {
     
     const daysDiff = Math.floor((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
+    if (selfCheckIn && daysDiff !== 0) {
+      return NextResponse.json({
+        success: false,
+        error: 'Not available yet',
+        message: 'Self check-in is available on the event day only.',
+      }, { status: 400 });
+    }
+
     if (daysDiff > 1) {
       return NextResponse.json({
         success: false,
@@ -206,13 +253,21 @@ export async function POST(request: NextRequest) {
     // Perform check-in
     const checkedInAt = new Date().toISOString();
     
-    const { error: updateError } = await supabase
+    const updatePayload = sourceTable === 'tickets'
+      ? {
+          is_used: true,
+          used_at: checkedInAt,
+          checked_in_by: user.id,
+        }
+      : {
+          checked_in: true,
+          checked_in_at: checkedInAt,
+          checked_in_by: user.id,
+        };
+
+    const { error: updateError } = await supabaseAdmin
       .from(sourceTable)
-      .update({
-        checked_in: true,
-        checked_in_at: checkedInAt,
-        checked_in_by: user.id,
-      })
+      .update(updatePayload)
       .eq('id', entryId);
 
     if (updateError) {
@@ -224,31 +279,31 @@ export async function POST(request: NextRequest) {
     }
 
     // Get updated attendance count
-    const { count: checkedInCount } = await supabase
+    const { count: checkedInCount } = await supabaseAdmin
       .from('tickets')
       .select('*', { count: 'exact', head: true })
       .eq('event_id', entryEventId)
-      .eq('checked_in', true);
+      .eq('is_used', true);
 
-    const { count: totalCount } = await supabase
+    const { count: totalCount } = await supabaseAdmin
       .from('tickets')
       .select('*', { count: 'exact', head: true })
       .eq('event_id', entryEventId);
 
-    const { count: guestCheckedInCount, error: guestCheckedInError } = await supabase
+    const { count: guestCheckedInCount, error: guestCheckedInError } = await supabaseAdmin
       .from('event_access_passes')
       .select('*', { count: 'exact', head: true })
       .eq('event_id', entryEventId)
       .eq('checked_in', true);
 
-    const { count: guestTotalCount, error: guestTotalError } = await supabase
+    const { count: guestTotalCount, error: guestTotalError } = await supabaseAdmin
       .from('event_access_passes')
       .select('*', { count: 'exact', head: true })
       .eq('event_id', entryEventId);
     
     return NextResponse.json({
       success: true,
-      message: 'Check-in successful!',
+      message: selfCheckIn ? 'You are checked in. The organizer can now find you on the list.' : 'Check-in successful!',
       ticket: {
         id: entryId,
         code: entryCode,

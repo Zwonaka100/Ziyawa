@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { 
@@ -11,10 +11,9 @@ import {
   CheckCheck, 
   Check,
   MoreVertical,
-  Search,
   ArrowLeft
 } from 'lucide-react';
-import { Conversation, Message, Profile } from '@/types/database';
+import { Conversation, Message } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

@@ -16,14 +16,11 @@ import {
   Star, 
   Briefcase,
   Loader2,
-  Phone,
-  Mail,
   Globe,
   Clock,
   CheckCircle,
   Calendar,
   Image as ImageIcon,
-  Video,
   FolderKanban,
   MessageSquare
 } from 'lucide-react'
@@ -33,7 +30,6 @@ import { SocialLinksRow } from '@/components/shared'
 import { MediaGallery } from '@/components/shared/media-gallery'
 import { TrackRecordCard } from '@/components/shared/trust-badges'
 import { ReviewsList } from '@/components/shared/reviews'
-import { toast } from 'sonner'
 import { 
   type Provider, 
   type ProviderService, 
@@ -82,6 +78,8 @@ interface ProviderWithProfile extends Provider {
   profile?: {
     full_name: string | null
     email: string
+    is_verified: boolean
+    verified_entity_type: string | null
   }
 }
 
@@ -111,51 +109,12 @@ export default function ProviderProfilePage() {
   const [reviews, setReviews] = useState<ReviewWithReviewer[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('services')
-  const [startingChat, setStartingChat] = useState(false)
-
-  // Start conversation handler
-  const handleStartConversation = async () => {
-    if (!profile) {
-      toast.error('Please sign in to send messages');
-      router.push('/auth/signin');
-      return;
-    }
-
-    if (!provider?.profile_id) {
-      toast.error('Cannot message this provider');
-      return;
-    }
-
-    setStartingChat(true);
-    try {
-      const response = await fetch('/api/conversations/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recipientId: provider.profile_id,
-          contextType: 'general',
-        }),
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to start conversation');
-      }
-
-      router.push(`/messages?chat=${data.conversationId}`);
-    } catch (error) {
-      console.error('Error starting conversation:', error);
-      toast.error('Failed to start conversation');
-    } finally {
-      setStartingChat(false);
-    }
-  };
-
+  const [activeSecondaryTab, setActiveSecondaryTab] = useState('gallery')
   useEffect(() => {
     if (providerId) {
       fetchProvider()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [providerId])
 
   const fetchProvider = async () => {
@@ -168,7 +127,7 @@ export default function ProviderProfilePage() {
         .from('providers')
         .select(`
           *,
-          profile:profiles(full_name, email)
+          profile:profiles(full_name, email, is_verified, verified_entity_type)
         `)
         .eq('id', providerId)
         .single()
@@ -180,6 +139,7 @@ export default function ProviderProfilePage() {
       }
 
       setProvider(providerData)
+      setActiveTab(providerData.work_mode === 'looking_for_work' ? 'work' : 'services')
 
       // Fetch services
       const { data: servicesData } = await supabase
@@ -259,7 +219,9 @@ export default function ProviderProfilePage() {
   }
 
   const isOwnProfile = profile?.id === provider.profile_id
-  const canBook = profile?.is_organizer && !isOwnProfile
+  const offersWork = provider.work_mode === 'looking_for_work' || provider.work_mode === 'both'
+  const offersServices = provider.work_mode === 'offering_services' || provider.work_mode === 'both' || services.length > 0
+  const workRoles = Array.isArray(provider.work_roles) ? provider.work_roles.filter(Boolean) : []
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -284,12 +246,22 @@ export default function ProviderProfilePage() {
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                   <h1 className="text-2xl font-bold mb-1">{provider.business_name}</h1>
-                  <Badge 
-                    variant="outline" 
-                    className={CATEGORY_COLORS[provider.primary_category]}
-                  >
-                    {SERVICE_CATEGORY_LABELS[provider.primary_category]}
-                  </Badge>
+                  {provider.profile?.is_verified && (
+                    <Badge className="mb-1 bg-amber-500 text-white">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      {provider.profile.verified_entity_type === 'business' ? 'Verified Business' : 'Verified'}
+                    </Badge>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    {offersWork && <Badge variant="secondary">Event Staff</Badge>}
+                    {offersServices && (
+                      <Badge variant="outline">
+                        {provider.primary_category !== 'event_staff'
+                          ? SERVICE_CATEGORY_LABELS[provider.primary_category]
+                          : 'Service Provider'}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 
                 {provider.is_available ? (
@@ -347,54 +319,200 @@ export default function ProviderProfilePage() {
             </>
           )}
 
-          {/* Contact Info */}
-          <Separator className="my-6" />
-          
-          <div className="flex flex-wrap gap-4">
-            {provider.business_phone && (
-              <a 
-                href={`tel:${provider.business_phone}`}
-                className="flex items-center gap-2 text-sm hover:text-primary"
-              >
-                <Phone className="h-4 w-4" />
-                {provider.business_phone}
-              </a>
-            )}
-            
-            {provider.business_email && (
-              <a 
-                href={`mailto:${provider.business_email}`}
-                className="flex items-center gap-2 text-sm hover:text-primary"
-              >
-                <Mail className="h-4 w-4" />
-                {provider.business_email}
-              </a>
-            )}
-            
-            {provider.website && (
-              <a 
-                href={provider.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-sm hover:text-primary"
-              >
-                <Globe className="h-4 w-4" />
-                Website
-              </a>
-            )}
-          </div>
+          {/* Contact Info — only website, no phone/email to keep comms on-platform */}
+          {provider.website && (
+            <>
+              <Separator className="my-6" />
+              <div className="flex flex-wrap gap-4">
+                <a 
+                  href={provider.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-sm hover:text-primary"
+                >
+                  <Globe className="h-4 w-4" />
+                  Website
+                </a>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
       {/* Main Content with Tabs */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Main Content */}
-        <div className="lg:col-span-2">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <div className="lg:col-span-2 space-y-6">
+
+          {/* ── PRIMARY: Work Profile / Services ── */}
+          {(offersWork || offersServices) && (
+            <div>
+              {/* Primary mode toggle — only shown when both are offered */}
+              {offersWork && offersServices && (
+                <div className="flex rounded-lg border bg-muted/20 p-1 mb-4 gap-1">
+                  <button
+                    onClick={() => setActiveTab('work')}
+                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                      activeTab === 'work'
+                        ? 'bg-white shadow-sm text-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Event Staff Profile
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('services')}
+                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                      activeTab === 'services'
+                        ? 'bg-white shadow-sm text-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Services ({services.length})
+                  </button>
+                </div>
+              )}
+
+              {/* Work Profile — shown when mode is work, or when both and work tab is active */}
+              {offersWork && (!offersServices || activeTab === 'work') && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Event Staff Profile</CardTitle>
+                    <CardDescription>
+                      Hire {provider.business_name} for event-day work, operations, check-in, support, and crew roles.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Starting rate</p>
+                        <p className="font-semibold">
+                          {provider.base_rate ? `${formatCurrency(provider.base_rate)} ${PRICE_TYPE_LABELS[(provider.rate_type || 'daily') as keyof typeof PRICE_TYPE_LABELS].toLowerCase()}` : 'Discuss rate directly'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Notice</p>
+                        <p className="font-semibold">{provider.advance_notice_days} day(s)</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2">Staff roles</p>
+                      {workRoles.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {workRoles.map((role) => (
+                            <Badge key={role} variant="secondary">{role}</Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">This crew member is open to event work. Confirm the final role and rate when hiring.</p>
+                      )}
+                    </div>
+
+                    {provider.availability_notes && (
+                      <div className="rounded-lg bg-muted/40 p-3 text-sm text-muted-foreground">
+                        {provider.availability_notes}
+                      </div>
+                    )}
+
+                    {!isOwnProfile && (
+                      <div className="pt-2 border-t space-y-2">
+                        {profile ? (
+                          <Link href={`/dashboard/organizer/book-crew/${provider.id}?mode=work`}>
+                            <Button className="w-full">
+                              <Calendar className="h-4 w-4 mr-2" />
+                              Hire for Event Work
+                            </Button>
+                          </Link>
+                        ) : (
+                          <Link href="/auth/signin">
+                            <Button className="w-full">Sign In to Hire</Button>
+                          </Link>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Services — shown when mode is services, or when both and services tab is active */}
+              {offersServices && (!offersWork || activeTab === 'services') && (
+                <div>
+                  {services.length === 0 ? (
+                    <Card>
+                      <CardContent className="py-8 text-center text-muted-foreground">
+                        No services listed yet
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {services.map((service) => (
+                        <Card key={service.id} className="hover:border-primary/50 transition-colors overflow-hidden">
+                          {/* Service Image */}
+                          {service.image_url && (
+                            <div className="aspect-video w-full relative bg-neutral-100">
+                              <Image
+                                src={service.image_url}
+                                alt={service.service_name}
+                                fill
+                                className="object-cover"
+                              />
+                            </div>
+                          )}
+                          <CardHeader className="pb-2">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <CardTitle className="text-lg">{service.service_name}</CardTitle>
+                                <Badge 
+                                  variant="outline" 
+                                  className={`mt-1 text-xs ${CATEGORY_COLORS[service.category]}`}
+                                >
+                                  {SERVICE_CATEGORY_LABELS[service.category]}
+                                </Badge>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold text-lg">
+                                  {formatCurrency(service.base_price)}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {PRICE_TYPE_LABELS[service.price_type]}
+                                </p>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          {service.description && (
+                            <CardContent className="pb-3">
+                              <p className="text-sm text-muted-foreground">{service.description}</p>
+                            </CardContent>
+                          )}
+                          {!isOwnProfile && (
+                            <CardContent className="pt-0">
+                              {profile ? (
+                                <Link href={`/dashboard/organizer/book-crew/${provider.id}?mode=services`}>
+                                  <Button size="sm" className="w-full">
+                                    <Calendar className="h-3 w-3 mr-2" />
+                                    Book this Service
+                                  </Button>
+                                </Link>
+                              ) : (
+                                <Link href="/auth/signin">
+                                  <Button size="sm" variant="outline" className="w-full">Sign In to Book</Button>
+                                </Link>
+                              )}
+                            </CardContent>
+                          )}
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── SECONDARY: Gallery / Portfolio / Reviews ── */}
+          <Tabs value={activeSecondaryTab} onValueChange={setActiveSecondaryTab} className="w-full">
             <TabsList className="w-full justify-start bg-white border border-neutral-200 p-1 mb-4">
-              <TabsTrigger value="services">
-                Services ({services.length})
-              </TabsTrigger>
               <TabsTrigger value="gallery" className="flex items-center gap-1">
                 <ImageIcon className="h-4 w-4" />
                 Gallery ({media.length})
@@ -408,61 +526,6 @@ export default function ProviderProfilePage() {
                 Reviews ({reviews.length})
               </TabsTrigger>
             </TabsList>
-
-            {/* Services Tab */}
-            <TabsContent value="services">
-              {services.length === 0 ? (
-                <Card>
-                  <CardContent className="py-8 text-center text-muted-foreground">
-                    No services listed yet
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="grid md:grid-cols-2 gap-4">
-                  {services.map((service) => (
-                    <Card key={service.id} className="hover:border-primary/50 transition-colors overflow-hidden">
-                      {/* Service Image */}
-                      {service.image_url && (
-                        <div className="aspect-video w-full relative bg-neutral-100">
-                          <Image
-                            src={service.image_url}
-                            alt={service.service_name}
-                            fill
-                            className="object-cover"
-                          />
-                        </div>
-                      )}
-                      <CardHeader className="pb-2">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <CardTitle className="text-lg">{service.service_name}</CardTitle>
-                            <Badge 
-                              variant="outline" 
-                              className={`mt-1 text-xs ${CATEGORY_COLORS[service.category]}`}
-                            >
-                              {SERVICE_CATEGORY_LABELS[service.category]}
-                            </Badge>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold text-lg">
-                              {formatCurrency(service.base_price)}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {PRICE_TYPE_LABELS[service.price_type]}
-                            </p>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      {service.description && (
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground">{service.description}</p>
-                        </CardContent>
-                      )}
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </TabsContent>
 
             {/* Gallery Tab */}
             <TabsContent value="gallery">
@@ -577,74 +640,50 @@ export default function ProviderProfilePage() {
             isVerified={!!provider.verified_at}
           />
 
-          {/* Book CTA */}
-          {canBook && services.length > 0 && (
+          {/* Hire / Book CTA — visible to any non-owner user */}
+          {!isOwnProfile && (offersWork || offersServices) && (
             <Card className="border-neutral-200">
               <CardContent className="py-6">
                 <div className="text-center space-y-3">
-                  <h3 className="font-semibold mb-2">Need this crew?</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Send a booking request to {provider.business_name}
-                  </p>
-                  <Link href={`/dashboard/organizer/book-crew/${provider.id}`}>
-                    <Button className="w-full">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      Book This Provider
-                    </Button>
-                  </Link>
-                  <Button 
-                    variant="outline" 
-                    className="w-full"
-                    onClick={handleStartConversation}
-                    disabled={startingChat}
-                  >
-                    {startingChat ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                    )}
-                    {startingChat ? 'Opening...' : 'Send Message'}
-                  </Button>
+                  <h3 className="font-semibold mb-2">Work with {provider.business_name}</h3>
+                  {profile ? (
+                    <>
+                      {offersWork && offersServices && (
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Choose whether you want to book services or hire for event work.
+                        </p>
+                      )}
+                      {offersWork && (
+                        <Link href={`/dashboard/organizer/book-crew/${provider.id}?mode=work`}>
+                          <Button className="w-full" variant={offersServices ? 'outline' : 'default'}>
+                            <Calendar className="h-4 w-4 mr-2" />
+                            Hire for Event Work
+                          </Button>
+                        </Link>
+                      )}
+                      {offersServices && (
+                        <Link href={`/dashboard/organizer/book-crew/${provider.id}?mode=services`}>
+                          <Button className="w-full">
+                            <Calendar className="h-4 w-4 mr-2" />
+                            Book Services
+                          </Button>
+                        </Link>
+                      )}
+                      <p className="text-xs text-muted-foreground text-center pt-1">
+                        Chat becomes available after you send a booking request.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-muted-foreground text-sm mb-4">
+                        Sign in to hire or book {provider.business_name}
+                      </p>
+                      <Link href="/auth/signin">
+                        <Button className="w-full">Sign In to Book</Button>
+                      </Link>
+                    </>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Message only (for organizers who see no services) */}
-          {canBook && services.length === 0 && (
-            <Card className="border-neutral-200">
-              <CardContent className="py-6">
-                <div className="text-center space-y-3">
-                  <h3 className="font-semibold mb-2">Contact {provider.business_name}</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Ask about their services
-                  </p>
-                  <Button 
-                    className="w-full"
-                    onClick={handleStartConversation}
-                    disabled={startingChat}
-                  >
-                    {startingChat ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                    )}
-                    {startingChat ? 'Opening...' : 'Send Message'}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {!profile && (
-            <Card className="border-neutral-200">
-              <CardContent className="py-6 text-center">
-                <p className="text-muted-foreground mb-4 text-sm">
-                  Sign in as an organiser to book this provider
-                </p>
-                <Link href="/auth/signin">
-                  <Button variant="outline" className="w-full">Sign In</Button>
-                </Link>
               </CardContent>
             </Card>
           )}

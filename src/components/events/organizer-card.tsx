@@ -49,7 +49,7 @@ export function OrganizerCard({
           {/* Avatar */}
           <Avatar className={variant === 'full' ? 'h-16 w-16' : 'h-12 w-12'}>
             <AvatarImage src={organizer.avatar_url || undefined} />
-            <AvatarFallback className="bg-purple-100 text-purple-600 font-semibold">
+            <AvatarFallback className="bg-neutral-100 text-neutral-600 font-semibold">
               {displayName.charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
@@ -126,7 +126,7 @@ export function OrganizerCard({
               </div>
             )}
             {stats.totalEvents >= 5 && (
-              <div className="flex items-center gap-1 text-purple-600">
+              <div className="flex items-center gap-1 text-neutral-600">
                 <TrendingUp className="h-4 w-4" />
                 <span>Experienced Host</span>
               </div>

@@ -1,0 +1,327 @@
+﻿
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\admin\communications\conversations\conversations-client.tsx
+   6:39  warning  'X' is defined but never used          @typescript-eslint/no-unused-vars
+  12:10  warning  'Separator' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\admin\disputes\page.tsx
+  15:29  warning  'CardHeader' is defined but never used  @typescript-eslint/no-unused-vars
+  15:41  warning  'CardTitle' is defined but never used   @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\admin\users\[id]\edit\page.tsx
+  294:23  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\admin\users\[id]\user-actions.tsx
+  27:3   warning  'Shield' is defined but never used        @typescript-eslint/no-unused-vars
+  28:3   warning  'Trash2' is defined but never used        @typescript-eslint/no-unused-vars
+  82:44  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\admin\users\page.tsx
+    6:29  warning  'CardHeader' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+    6:41  warning  'CardTitle' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   @typescript-eslint/no-unused-vars
+   37:3   warning  'Trash2' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      @typescript-eslint/no-unused-vars
+   41:3   warning  'Shield' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      @typescript-eslint/no-unused-vars
+   68:9   warning  'router' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+   79:10  warning  Error: Cannot access variable before it is declared
+
+`fetchUsers` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\admin\users\page.tsx:79:10
+  77 |
+  78 |   useEffect(() => {
+> 79 |     void fetchUsers()
+     |          ^^^^^^^^^^ `fetchUsers` accessed before it is declared
+  80 |   }, [page, roleFilter, statusFilter])
+  81 |
+  82 |   async function fetchUsers() {
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\admin\users\page.tsx:82:3
+   80 |   }, [page, roleFilter, statusFilter])
+   81 |
+>  82 |   async function fetchUsers() {
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  83 |     setLoading(true)
+      | ^^^^^^^^^^^^^^^^^^^^
+>  84 |     const supabase = createClient()
+      ΓÇª
+      | ^^^^^^^^^^^^^^^^^^^^
+> 129 |     setLoading(false)
+      | ^^^^^^^^^^^^^^^^^^^^
+> 130 |   }
+      | ^^^^ `fetchUsers` is declared here
+  131 |
+  132 |   const handleSearch = (e: React.FormEvent) => {
+  133 |     e.preventDefault()  react-hooks/immutability
+   80:6   warning  React Hook useEffect has a missing dependency: 'fetchUsers'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           react-hooks/exhaustive-deps
+  264:29  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @next/next/no-img-element
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\admin\verifications\page.tsx
+  4:29  warning  'CardHeader' is defined but never used   @typescript-eslint/no-unused-vars
+  4:41  warning  'CardTitle' is defined but never used    @typescript-eslint/no-unused-vars
+  8:34  warning  'AvatarImage' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\api\events\[id]\attendees\route.ts
+  66:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\api\tickets\checkin\route.ts
+  173:7  warning  'organizerId' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\api\ziwaphi\search\route.ts
+  18:11  warning  'category' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\crew\[id]\page.tsx
+   19:3   warning  'Phone' is defined but never used                                                                                 @typescript-eslint/no-unused-vars
+   20:3   warning  'Mail' is defined but never used                                                                                  @typescript-eslint/no-unused-vars
+   26:3   warning  'Video' is defined but never used                                                                                 @typescript-eslint/no-unused-vars
+   36:10  warning  'toast' is defined but never used                                                                                 @typescript-eslint/no-unused-vars
+  121:6   warning  React Hook useEffect has a missing dependency: 'fetchProvider'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  225:9   warning  'canBook' is assigned a value but never used                                                                      @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\crew\page.tsx
+   5:29  warning  'CardDescription' is defined but never used                                                                        @typescript-eslint/no-unused-vars
+  72:6   warning  React Hook useEffect has a missing dependency: 'fetchProviders'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\dashboard\artist\discography\discography-manager.tsx
+   11:3   warning  'ExternalLink' is defined but never used                         @typescript-eslint/no-unused-vars
+  415:61  warning  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\dashboard\artist\media\media-manager.tsx
+  25:3  warning  'Play' is defined but never used             @typescript-eslint/no-unused-vars
+  51:3  warning  'extractTikTokId' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\dashboard\artist\page.tsx
+  4:29  warning  'CardDescription' is defined but never used  @typescript-eslint/no-unused-vars
+  4:46  warning  'CardHeader' is defined but never used       @typescript-eslint/no-unused-vars
+  4:58  warning  'CardTitle' is defined but never used        @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\dashboard\artist\setup\page.tsx
+  57:6  warning  React Hook useEffect has a missing dependency: 'checkExistingArtist'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\dashboard\artist\social\social-manager.tsx
+  390:50  warning  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  390:58  warning  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\dashboard\notifications\page.tsx
+   6:29  warning  'CardHeader' is defined but never used      @typescript-eslint/no-unused-vars
+   6:41  warning  'CardTitle' is defined but never used       @typescript-eslint/no-unused-vars
+  63:10  warning  'total' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\dashboard\organizer\book-crew\[id]\page.tsx
+   24:3  warning  'Clock' is defined but never used                                                                             @typescript-eslint/no-unused-vars
+  100:6  warning  React Hook useEffect has a missing dependency: 'fetchData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\dashboard\organizer\crew\page.tsx
+   6:29  warning  'CardDescription' is defined but never used                                                                       @typescript-eslint/no-unused-vars
+   6:46  warning  'CardHeader' is defined but never used                                                                            @typescript-eslint/no-unused-vars
+   6:58  warning  'CardTitle' is defined but never used                                                                             @typescript-eslint/no-unused-vars
+  18:3   warning  'ArrowRight' is defined but never used                                                                            @typescript-eslint/no-unused-vars
+  67:6   warning  React Hook useEffect has a missing dependency: 'fetchBookings'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\dashboard\organizer\events\[id]\checkin\page.tsx
+   17:10  warning  'Separator' is defined but never used                                                                                                                                                            @typescript-eslint/no-unused-vars
+  166:6   warning  React Hook useEffect has missing dependencies: 'loadGuestList' and 'refreshAttendance'. Either include them or remove the dependency array                                                       react-hooks/exhaustive-deps
+  213:9   warning  The 'handleCheckin' function makes the dependencies of useCallback Hook (at line 396) change on every render. To fix this, wrap the definition of 'handleCheckin' in its own useCallback() Hook  react-hooks/exhaustive-deps
+  269:14  warning  'error' is defined but never used                                                                                                                                                                @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\dashboard\organizer\events\[id]\edit\page.tsx
+  66:6  warning  React Hook useEffect has a missing dependency: 'fetchEvent'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\dashboard\organizer\events\[id]\manage\page.tsx
+   27:3  warning  'ExternalLink' is defined but never used                                                                          @typescript-eslint/no-unused-vars
+  185:6  warning  React Hook useEffect has a missing dependency: 'loadAttendees'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  286:9  warning  'visibleEmailableCount' is assigned a value but never used                                                        @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\dashboard\organizer\page.tsx
+   4:29  warning  'CardDescription' is defined but never used      @typescript-eslint/no-unused-vars
+   4:46  warning  'CardHeader' is defined but never used           @typescript-eslint/no-unused-vars
+   4:58  warning  'CardTitle' is defined but never used            @typescript-eslint/no-unused-vars
+   8:33  warning  'DollarSign' is defined but never used           @typescript-eslint/no-unused-vars
+  90:9   warning  'pastEvents' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\dashboard\provider\page.tsx
+  104:6  warning  React Hook useEffect has a missing dependency: 'fetchProviderData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\dashboard\provider\portfolio\portfolio-manager.tsx
+  20:3  warning  'ExternalLink' is defined but never used  @typescript-eslint/no-unused-vars
+  21:3  warning  'Star' is defined but never used          @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\dashboard\provider\services\page.tsx
+  27:3  warning  'Upload' is defined but never used                                                                            @typescript-eslint/no-unused-vars
+  76:6  warning  React Hook useEffect has a missing dependency: 'fetchData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\dashboard\provider\setup\page.tsx
+  73:6  warning  React Hook useEffect has a missing dependency: 'checkExistingProvider'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\dashboard\settings\notifications\page.tsx
+   4:10  warning  'Bell' is defined but never used                                                                                     @typescript-eslint/no-unused-vars
+  45:6   warning  React Hook useEffect has a missing dependency: 'fetchPreferences'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\dashboard\settings\page.tsx
+  120:10  warning  'unenrollCode' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  854:3   warning  'docKey' is defined but never used                 @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\dashboard\tickets\page.tsx
+  39:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\dashboard\tickets\ticket-with-qr.tsx
+   62:16  warning  'err' is defined but never used                                  @typescript-eslint/no-unused-vars
+  136:14  warning  `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\for\crew\page.tsx
+  10:58   warning  'ShieldCheck' is defined but never used      @typescript-eslint/no-unused-vars
+  10:142  warning  'BadgeDollarSign' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\organizers\[id]\organizer-profile.tsx
+  16:10  warning  'Button' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\page.tsx
+  4:27  warning  'Users' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\support\[id]\page.tsx
+   19:10  warning  'Separator' is defined but never used                                                                           @typescript-eslint/no-unused-vars
+   27:3   warning  'MessageSquare' is defined but never used                                                                       @typescript-eslint/no-unused-vars
+   61:75  warning  Unexpected any. Specify a different type                                                                        @typescript-eslint/no-explicit-any
+  112:6   warning  React Hook useEffect has a missing dependency: 'fetchTicket'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\support\page.tsx
+   78:75  warning  Unexpected any. Specify a different type                                                                         @typescript-eslint/no-explicit-any
+   88:17  warning  'profile' is assigned a value but never used                                                                     @typescript-eslint/no-unused-vars
+  116:6   warning  React Hook useEffect has a missing dependency: 'fetchTickets'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  176:15  warning  'data' is assigned a value but never used                                                                        @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\wallet\page.tsx
+  80:12  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\app\wallet\page.tsx:80:12
+  78 |   useEffect(() => {
+  79 |     if (user) {
+> 80 |       void fetchTransactions()
+     |            ^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  81 |     }
+  82 |   }, [user])
+  83 |  react-hooks/set-state-in-effect
+  82:6   warning  React Hook useEffect has a missing dependency: 'fetchTransactions'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      react-hooks/exhaustive-deps
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\artists\artist-profile-enhanced.tsx
+  12:3   warning  'DollarSign' is defined but never used              @typescript-eslint/no-unused-vars
+  13:3   warning  'Star' is defined but never used                    @typescript-eslint/no-unused-vars
+  18:3   warning  'Play' is defined but never used                    @typescript-eslint/no-unused-vars
+  19:3   warning  'Loader2' is defined but never used                 @typescript-eslint/no-unused-vars
+  27:10  warning  'toast' is defined but never used                   @typescript-eslint/no-unused-vars
+  88:9   warning  'router' is assigned a value but never used         @typescript-eslint/no-unused-vars
+  97:9   warning  'featuredMedia' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\artists\artists-grid.tsx
+  10:15  warning  'Artist' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\auth\auth-form.tsx
+  21:28  warning  'onSuccess' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\dashboard\organizer-reviews-dashboard.tsx
+    7:29  warning  'CardHeader' is defined but never used       @typescript-eslint/no-unused-vars
+    7:41  warning  'CardTitle' is defined but never used        @typescript-eslint/no-unused-vars
+    7:52  warning  'CardDescription' is defined but never used  @typescript-eslint/no-unused-vars
+  103:15  warning  'data' is assigned a value but never used    @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\events\event-details.tsx
+  12:50  warning  'Music' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\events\event-staff-manager.tsx
+  127:6  warning  React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\events\event-team-access-card.tsx
+  59:6  warning  React Hook useEffect has a missing dependency: 'loadTeam'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\events\events-grid.tsx
+  8:15  warning  'Event' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\home\typewriter-hero.tsx
+  62:10  warning  'showCursor' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\layout\navbar.tsx
+  20:3  warning  'DropdownMenuLabel' is defined but never used  @typescript-eslint/no-unused-vars
+  33:3  warning  'Wrench' is defined but never used             @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\media\media-uploader.tsx
+  129:6   warning  React Hook useCallback has a missing dependency: 'validateFile'. Either include it or remove the dependency array                                                                                                                                                                        react-hooks/exhaustive-deps
+  229:19  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\media\social-links.tsx
+  21:3  warning  'ExternalLink' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\media\video-embed.tsx
+  54:13  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\notifications\notification-center.tsx
+  4:35  warning  'Trash2' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\payments\payment-dialog.tsx
+  41:9  warning  'router' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\providers\auth-provider.tsx
+  114:6  warning  React Hook useEffect has missing dependencies: 'fetchProfile' and 'supabase.auth'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\providers\crew-work-panel.tsx
+  6:22  warning  'Briefcase' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\search\search-filters.tsx
+   3:20  warning  'useEffect' is defined but never used  @typescript-eslint/no-unused-vars
+  26:3   warning  'Filter' is defined but never used     @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\shared\cookie-consent.tsx
+  15:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\shared\cookie-consent.tsx:15:7
+  13 |     const consent = localStorage.getItem(COOKIE_CONSENT_KEY)
+  14 |     if (!consent) {
+> 15 |       setVisible(true)
+     |       ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  16 |     }
+  17 |   }, [])
+  18 |  react-hooks/set-state-in-effect
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\shared\messaging.tsx
+   3:28  warning  'useEffect' is defined but never used  @typescript-eslint/no-unused-vars
+  14:3   warning  'Search' is defined but never used     @typescript-eslint/no-unused-vars
+  17:33  warning  'Profile' is defined but never used    @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\shared\portfolio.tsx
+   4:8   warning  'Link' is defined but never used                     @typescript-eslint/no-unused-vars
+   5:60  warning  'ExternalLink' is defined but never used             @typescript-eslint/no-unused-vars
+   6:62  warning  'MediaType' is defined but never used                @typescript-eslint/no-unused-vars
+  26:9   warning  'formatCurrency' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\shared\reviews.tsx
+  5:26  warning  'Flag' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\shared\trust-badges.tsx
+  24:3  warning  'rating' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\components\ziwaphi\ziwaphi-chat.tsx
+    9:10  warning  'Skeleton' is defined but never used                                                                                                                                                                                                                                                     @typescript-eslint/no-unused-vars
+   17:3   warning  'Ticket' is defined but never used                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+  446:15  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\hooks\use-toast.ts
+  16:7  warning  'actionTypes' is assigned a value but only used as a type  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\lib\helpers.ts
+  5:10  warning  'PLATFORM_CONFIG' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Users\Zwonaka Mabege\Desktop\Zande Technologies\Ziyawa\ziyawa\src\lib\notifications.ts
+  316:12  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+  338:12  warning  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+Γ£û 137 problems (0 errors, 137 warnings)
+

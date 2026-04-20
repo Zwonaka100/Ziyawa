@@ -13,7 +13,6 @@ import {
   Clock,
   Shield
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SocialLinksRow } from '@/components/shared';
 import { TrustBadge, TrackRecordCard } from '@/components/shared/trust-badges';
@@ -36,6 +35,8 @@ interface OrganizerProfileProps {
     total_organizer_reviews: number;
     years_organizing: number;
     verified_at: string | null;
+    is_verified?: boolean;
+    verified_entity_type?: string | null;
     created_at: string;
   };
   socialLinks: OrganizerSocialLink[];
@@ -131,6 +132,12 @@ export function OrganizerProfile({
                     totalBookings={profile.total_events_hosted}
                     rating={profile.organizer_rating}
                   />
+                )}
+                {profile.is_verified && (
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold bg-amber-500 text-white px-2 py-0.5 rounded-full">
+                    <CheckCircle className="h-3 w-3" />
+                    {profile.verified_entity_type === 'business' ? 'Verified Business' : 'Verified'}
+                  </span>
                 )}
               </div>
               {profile.location && (

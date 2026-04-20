@@ -4,7 +4,10 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useAuth } from '@/components/providers/auth-provider'
+import { ZiyawaLogo } from '@/components/brand/ziyawa-logo'
+import { NotificationCenter } from '@/components/notifications'
 import { useUnreadMessages } from '@/hooks/use-unread-messages'
+import { useEventWork } from '@/hooks/use-event-work'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -14,7 +17,6 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
 import { 
   Music, 
@@ -27,12 +29,12 @@ import {
   Ticket,
   Mic2,
   Users,
-  Wrench,
   MessageSquare,
   Search,
   Shield,
   ArrowLeftRight,
-  HelpCircle
+  HelpCircle,
+  BriefcaseBusiness
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/helpers'
 
@@ -42,7 +44,7 @@ function getDisplayRole(profile: { is_admin?: boolean; is_organizer?: boolean; i
   const roles = []
   if (profile.is_organizer) roles.push('Organiser')
   if (profile.is_artist) roles.push('Artist')
-  if (profile.is_provider) roles.push('Provider')
+  if (profile.is_provider) roles.push('Crew')
   return roles.length > 0 ? roles.join(' • ') : 'Groovist'
 }
 
@@ -53,6 +55,8 @@ export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const { unreadCount } = useUnreadMessages(user?.id)
+  const { hasEventWork, activeCount } = useEventWork()
+  const canUseProMessages = Boolean(profile?.is_admin || profile?.is_organizer || profile?.is_artist || profile?.is_provider)
 
   const navLinks = [
     { href: '/ziwaphi', label: 'Ziwaphi?', icon: Calendar },
@@ -76,6 +80,7 @@ export function Navbar() {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
+            <ZiyawaLogo size={32} className="text-neutral-900" />
             <span className="text-2xl font-bold text-primary">Ziyawa</span>
           </Link>
 
@@ -107,15 +112,17 @@ export function Navbar() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 autoComplete="off"
-                className="pl-9 pr-4 h-9 w-full bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-purple-500"
+                className="pl-9 pr-4 h-9 w-full bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary"
               />
             </div>
           </form>
 
           {/* User Menu / Auth Buttons */}
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden md:flex items-center space-x-2">
             {user && profile ? (
-              <DropdownMenu>
+              <>
+                <NotificationCenter />
+                <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center space-x-2">
                     <Avatar className="h-8 w-8">
@@ -147,21 +154,6 @@ export function Navbar() {
                     </>
                   )}
                   
-                  {/* Messages */}
-                  <DropdownMenuItem asChild>
-                    <Link href="/messages" className="flex items-center justify-between w-full">
-                      <span className="flex items-center">
-                        <MessageSquare className="mr-2 h-4 w-4" />
-                        Messages
-                      </span>
-                      {unreadCount > 0 && (
-                        <span className="bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full min-w-[20px] text-center">
-                          {unreadCount > 99 ? '99+' : unreadCount}
-                        </span>
-                      )}
-                    </Link>
-                  </DropdownMenuItem>
-                  
                   {/* Always show My Tickets */}
                   <DropdownMenuItem asChild>
                     <Link href="/dashboard/tickets" className="flex items-center">
@@ -190,12 +182,16 @@ export function Navbar() {
                     </DropdownMenuItem>
                   )}
 
-                  {/* Show Provider features if unlocked */}
-                  {profile.is_provider && (
+                  {(profile.is_provider || hasEventWork) && (
                     <DropdownMenuItem asChild>
                       <Link href="/dashboard/provider" className="flex items-center">
-                        <Wrench className="mr-2 h-4 w-4" />
-                        Provider Dashboard
+                        <BriefcaseBusiness className="mr-2 h-4 w-4" />
+                        Crew Dashboard
+                        {activeCount > 0 && (
+                          <span className="ml-2 bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                            {activeCount}
+                          </span>
+                        )}
                       </Link>
                     </DropdownMenuItem>
                   )}
@@ -217,12 +213,23 @@ export function Navbar() {
                       </Link>
                     </DropdownMenuItem>
                   )}
+                  {canUseProMessages && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/messages" className="flex w-full items-center">
+                        <MessageSquare className="mr-2 h-4 w-4" />
+                        <span className="flex-1">Messages</span>
+                        {unreadCount > 0 && (
+                          <span className="bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                            {unreadCount > 99 ? '99+' : unreadCount}
+                          </span>
+                        )}
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem asChild>
-                    <Link href="/wallet" className="flex items-center justify-between w-full">
-                      <span className="flex items-center">
-                        <Wallet className="mr-2 h-4 w-4" />
-                        Wallet
-                      </span>
+                    <Link href="/wallet" className="flex w-full items-center">
+                      <Wallet className="mr-2 h-4 w-4" />
+                      <span className="flex-1">Wallet</span>
                       <span className="text-xs text-muted-foreground">
                         {formatCurrency(profile.wallet_balance)}
                       </span>
@@ -241,6 +248,7 @@ export function Navbar() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              </>
             ) : (
               <div className="flex items-center space-x-2">
                 <Link href="/auth/signin">
@@ -326,17 +334,6 @@ export function Navbar() {
                           My Tickets
                         </Button>
                       </Link>
-                      <Link href="/messages" onClick={() => setMobileMenuOpen(false)}>
-                        <Button variant="outline" className="w-full justify-start relative">
-                          <MessageSquare className="mr-2 h-4 w-4" />
-                          Messages
-                          {unreadCount > 0 && (
-                            <span className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary text-primary-foreground text-xs rounded-full h-5 min-w-5 flex items-center justify-center px-1">
-                              {unreadCount > 99 ? '99+' : unreadCount}
-                            </span>
-                          )}
-                        </Button>
-                      </Link>
                       {profile.is_organizer && (
                         <Link href="/dashboard/organizer" onClick={() => setMobileMenuOpen(false)}>
                           <Button variant="outline" className="w-full justify-start">
@@ -353,11 +350,16 @@ export function Navbar() {
                           </Button>
                         </Link>
                       )}
-                      {profile.is_provider && (
+                      {(profile.is_provider || hasEventWork) && (
                         <Link href="/dashboard/provider" onClick={() => setMobileMenuOpen(false)}>
-                          <Button variant="outline" className="w-full justify-start">
-                            <Wrench className="mr-2 h-4 w-4" />
-                            Provider Dashboard
+                          <Button variant="outline" className="w-full justify-start relative">
+                            <BriefcaseBusiness className="mr-2 h-4 w-4" />
+                            Crew Dashboard
+                            {activeCount > 0 && (
+                              <span className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary text-primary-foreground text-xs rounded-full h-5 min-w-5 flex items-center justify-center px-1">
+                                {activeCount}
+                              </span>
+                            )}
                           </Button>
                         </Link>
                       )}
@@ -374,6 +376,25 @@ export function Navbar() {
                           <Button variant="outline" className="w-full justify-start">
                             <User className="mr-2 h-4 w-4" />
                             Profile
+                          </Button>
+                        </Link>
+                      )}
+                      <Link href="/dashboard/notifications" onClick={() => setMobileMenuOpen(false)}>
+                        <Button variant="outline" className="w-full justify-start">
+                          <Shield className="mr-2 h-4 w-4" />
+                          Notifications
+                        </Button>
+                      </Link>
+                      {canUseProMessages && (
+                        <Link href="/messages" onClick={() => setMobileMenuOpen(false)}>
+                          <Button variant="outline" className="w-full justify-start relative">
+                            <MessageSquare className="mr-2 h-4 w-4" />
+                            Messages
+                            {unreadCount > 0 && (
+                              <span className="absolute right-2 top-1/2 -translate-y-1/2 bg-primary text-primary-foreground text-xs rounded-full h-5 min-w-5 flex items-center justify-center px-1">
+                                {unreadCount > 99 ? '99+' : unreadCount}
+                              </span>
+                            )}
                           </Button>
                         </Link>
                       )}

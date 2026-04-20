@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -69,6 +69,7 @@ export default function CrewPage() {
 
   useEffect(() => {
     fetchProviders()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategory, selectedProvince])
 
   const fetchProviders = async () => {
@@ -97,7 +98,21 @@ export default function CrewPage() {
         // If view doesn't exist yet (migration not run), show empty
         setProviders([])
       } else {
-        setProviders(data || [])
+        const baseProviders = data || []
+        if (baseProviders.length === 0) {
+          setProviders([])
+        } else {
+          const { data: providerModes } = await supabase
+            .from('providers')
+            .select('id, work_mode')
+            .in('id', baseProviders.map((provider) => provider.id))
+
+          const modesById = new Map((providerModes || []).map((provider) => [provider.id, provider.work_mode]))
+          setProviders(baseProviders.map((provider) => ({
+            ...provider,
+            work_mode: modesById.get(provider.id) || provider.work_mode || null,
+          })))
+        }
       }
     } catch (error) {
       console.error('Error:', error)
@@ -121,7 +136,7 @@ export default function CrewPage() {
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold mb-2">Find Your Crew</h1>
         <p className="text-muted-foreground text-lg">
-          Discover service providers to make your event unforgettable
+          Discover event staff and service providers for every part of your event
         </p>
       </div>
 
@@ -133,7 +148,7 @@ export default function CrewPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search providers..."
+              placeholder="Search staff or services..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -197,7 +212,7 @@ export default function CrewPage() {
       ) : (
         <>
           <p className="text-sm text-muted-foreground mb-4">
-            {filteredProviders.length} provider{filteredProviders.length !== 1 ? 's' : ''} found
+            {filteredProviders.length} crew profile{filteredProviders.length !== 1 ? 's' : ''} found
           </p>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -214,12 +229,23 @@ export default function CrewPage() {
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <CardTitle className="text-lg truncate">{provider.business_name}</CardTitle>
-                        <Badge 
-                          variant="outline" 
-                          className={`mt-1 ${CATEGORY_COLORS[provider.primary_category]}`}
-                        >
-                          {SERVICE_CATEGORY_LABELS[provider.primary_category]}
-                        </Badge>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {(provider.work_mode === 'looking_for_work' || provider.work_mode === 'both') && (
+                            <Badge variant="secondary">Event Staff</Badge>
+                          )}
+                          {(provider.work_mode === 'offering_services' || provider.work_mode === 'both' || provider.service_count > 0) && (
+                            <Badge variant="outline" className={provider.primary_category !== 'event_staff' ? CATEGORY_COLORS[provider.primary_category] : ''}>
+                              {provider.primary_category !== 'event_staff'
+                                ? SERVICE_CATEGORY_LABELS[provider.primary_category]
+                                : 'Service Provider'}
+                            </Badge>
+                          )}
+                          {!provider.work_mode && (
+                            <Badge variant="outline" className={CATEGORY_COLORS[provider.primary_category]}>
+                              {SERVICE_CATEGORY_LABELS[provider.primary_category]}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </CardHeader>
@@ -245,7 +271,9 @@ export default function CrewPage() {
                       
                       <span className="flex items-center gap-1">
                         <Briefcase className="h-4 w-4" />
-                        {provider.service_count} service{provider.service_count !== 1 ? 's' : ''}
+                        {provider.service_count > 0
+                          ? `${provider.service_count} service${provider.service_count !== 1 ? 's' : ''}`
+                          : 'Event work available'}
                       </span>
                     </div>
 

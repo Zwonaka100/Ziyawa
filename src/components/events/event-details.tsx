@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
-import { Calendar, MapPin, Clock, Users, Ticket, Music, ArrowLeft, Play, ImageIcon, Star, CheckCircle, Flag } from 'lucide-react'
+import { Calendar, MapPin, Clock, Users, Ticket, ArrowLeft, Play, ImageIcon, Star, CheckCircle, Flag } from 'lucide-react'
 import { formatCurrency, formatDate, formatTime, getDaysUntilEvent, isEventPast } from '@/lib/helpers'
 import { PROVINCES } from '@/lib/constants'
 import { useAuth } from '@/components/providers/auth-provider'
@@ -92,11 +92,11 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
           {/* Cover Image */}
           <div className="relative h-64 md:h-80 bg-gradient-to-br from-primary/20 to-primary/5 rounded-lg overflow-hidden">
             {event.cover_image ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <Image
                 src={event.cover_image}
                 alt={event.title}
-                className="w-full h-full object-cover"
+                fill
+                className="object-cover"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
@@ -136,7 +136,14 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
               
               <div className="flex items-center gap-3 text-muted-foreground">
                 <MapPin className="h-5 w-5" />
-                <span>{event.venue}</span>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.venue)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-primary hover:underline transition-colors"
+                >
+                  {event.venue}
+                </a>
               </div>
               
               <div className="flex items-center gap-3 text-muted-foreground">
@@ -164,20 +171,22 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
               <h2 className="text-xl font-semibold mb-4">Lineup</h2>
               <div className="grid sm:grid-cols-2 gap-4">
                 {bookings.map((booking) => (
-                  <Card key={booking.id}>
-                    <CardContent className="p-4 flex items-center gap-4">
-                      <Avatar className="h-12 w-12">
-                        <AvatarImage src={booking.artists.profile_image || undefined} />
-                        <AvatarFallback>
-                          {booking.artists.stage_name.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium">{booking.artists.stage_name}</p>
-                        <p className="text-sm text-muted-foreground">{booking.artists.genre}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <Link key={booking.id} href={`/artists/${booking.artists.id}`}>
+                    <Card className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-4 flex items-center gap-4">
+                        <Avatar className="h-12 w-12">
+                          <AvatarImage src={booking.artists.profile_image || undefined} />
+                          <AvatarFallback>
+                            {booking.artists.stage_name.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium">{booking.artists.stage_name}</p>
+                          <p className="text-sm text-muted-foreground">{booking.artists.genre}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
                 ))}
               </div>
             </div>
@@ -193,7 +202,7 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
                     {/* Avatar */}
                     <Avatar className="h-14 w-14">
                       <AvatarImage src={event.profiles.avatar_url || undefined} />
-                      <AvatarFallback className="bg-purple-100 text-purple-600 font-semibold text-lg">
+                      <AvatarFallback className="bg-neutral-100 text-neutral-600 font-semibold text-lg">
                         {(event.profiles.company_name || event.profiles.full_name || 'O').charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
@@ -228,7 +237,7 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
                         </div>
                       )}
 
-                      <p className="text-sm text-purple-600 mt-2 flex items-center gap-1">
+                      <p className="text-sm text-primary mt-2 flex items-center gap-1">
                         View organizer profile
                         <ArrowLeft className="h-3 w-3 rotate-180" />
                       </p>
@@ -245,7 +254,7 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
                         </Badge>
                       )}
                       {organizerStats.totalEvents >= 5 && (
-                        <Badge variant="secondary" className="bg-purple-50 text-purple-700">
+                        <Badge variant="secondary" className="bg-neutral-100 text-neutral-700">
                           Experienced Host
                         </Badge>
                       )}
@@ -405,6 +414,9 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
                     className="w-20 rounded-md border border-input bg-background px-2 py-1 text-right"
                   />
                 </label>
+                <p className="text-xs text-muted-foreground">
+                  Buying for another groovist? You can assign each ticket holder at checkout.
+                </p>
               </div>
 
               <Separator />

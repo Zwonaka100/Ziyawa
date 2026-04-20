@@ -15,7 +15,6 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate');
     const city = searchParams.get('city');
     const province = searchParams.get('province');
-    const category = searchParams.get('category');
     const isFree = searchParams.get('free') === 'true';
     const maxPrice = searchParams.get('maxPrice');
     const searchText = searchParams.get('q');

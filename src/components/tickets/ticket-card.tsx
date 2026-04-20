@@ -84,7 +84,7 @@ export function TicketCard({ ticket, showQR = true, compact = false }: TicketCar
             <div className="flex-shrink-0">
               <div className={cn(
                 "bg-white p-2 rounded-lg border-2",
-                isCheckedIn ? "border-green-500" : "border-purple-200"
+                isCheckedIn ? "border-green-500" : "border-neutral-200"
               )}>
                 <QRCodeSVG 
                   value={qrData}
@@ -173,8 +173,8 @@ export function TicketListItem({ ticket }: { ticket: TicketCardProps['ticket'] }
       isCheckedIn && "bg-green-50 border-green-200"
     )}>
       <div className="flex-shrink-0">
-        <div className="h-12 w-12 rounded-lg bg-purple-100 flex items-center justify-center">
-          <TicketIcon className="h-6 w-6 text-purple-600" />
+          <div className="h-12 w-12 rounded-lg bg-neutral-100 flex items-center justify-center">
+          <TicketIcon className="h-6 w-6 text-neutral-600" />
         </div>
       </div>
       

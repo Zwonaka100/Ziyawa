@@ -70,8 +70,8 @@ const TYPE_CONFIG: Record<string, { label: string; icon: LucideIcon; color: stri
   wallet_deposit: { label: 'Wallet Deposit', icon: Wallet, color: 'bg-blue-100 text-blue-700' },
   payout: { label: 'Payout', icon: ArrowUpRight, color: 'bg-orange-100 text-orange-700' },
   refund: { label: 'Refund', icon: RefreshCcw, color: 'bg-red-100 text-red-700' },
-  booking_payment: { label: 'Booking Payment', icon: CreditCard, color: 'bg-purple-100 text-purple-700' },
-  artist_booking: { label: 'Artist Booking', icon: CreditCard, color: 'bg-purple-100 text-purple-700' },
+  booking_payment: { label: 'Booking Payment', icon: CreditCard, color: 'bg-neutral-100 text-neutral-700' },
+  artist_booking: { label: 'Artist Booking', icon: CreditCard, color: 'bg-neutral-100 text-neutral-700' },
   vendor_service: { label: 'Vendor Service', icon: CreditCard, color: 'bg-pink-100 text-pink-700' },
   platform_fee: { label: 'Platform Fee', icon: ArrowDownRight, color: 'bg-neutral-100 text-neutral-700' },
 }
@@ -79,7 +79,7 @@ const TYPE_CONFIG: Record<string, { label: string; icon: LucideIcon; color: stri
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   initiated: { label: 'Initiated', color: 'bg-yellow-100 text-yellow-700' },
   authorized: { label: 'Authorized', color: 'bg-blue-100 text-blue-700' },
-  held: { label: 'Held', color: 'bg-purple-100 text-purple-700' },
+  held: { label: 'Held', color: 'bg-neutral-100 text-neutral-700' },
   released: { label: 'Released', color: 'bg-green-100 text-green-700' },
   settled: { label: 'Settled', color: 'bg-emerald-100 text-emerald-700' },
   failed: { label: 'Failed', color: 'bg-red-100 text-red-700' },
@@ -187,7 +187,7 @@ export default function AdminTransactionsPage() {
     }
 
     if (tx.state === 'held') {
-      return { label: 'In Escrow', color: 'bg-purple-100 text-purple-700' }
+      return { label: 'In Escrow', color: 'bg-neutral-100 text-neutral-700' }
     }
 
     if (tx.state === 'released') {
@@ -248,7 +248,7 @@ export default function AdminTransactionsPage() {
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Held in Escrow</p>
-            <p className="text-2xl font-bold text-purple-600">{formatCurrency(stats.heldVolume / 100)}</p>
+            <p className="text-2xl font-bold text-primary">{formatCurrency(stats.heldVolume / 100)}</p>
           </CardContent>
         </Card>
         <Card>

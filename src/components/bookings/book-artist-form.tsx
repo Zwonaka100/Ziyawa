@@ -56,7 +56,7 @@ export function BookArtistForm({ event, artists, bookedArtistIds }: BookArtistFo
     try {
       const supabase = createClient()
 
-      const { error } = await supabase
+      const { data: newBooking, error } = await supabase
         .from('bookings')
         .insert({
           event_id: event.id,
@@ -66,10 +66,32 @@ export function BookArtistForm({ event, artists, bookedArtistIds }: BookArtistFo
           organizer_notes: notes || null,
           status: 'pending',
         })
+        .select('id')
+        .single()
 
       if (error) throw error
 
       toast.success('Booking request sent! The artist will be notified.')
+
+      // Auto-open conversation linked to this booking
+      try {
+        const convoRes = await fetch('/api/conversations/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipientId: selectedArtist!.profiles.id,
+            contextType: 'booking',
+            contextId: newBooking.id,
+          }),
+        })
+        const convoData = await convoRes.json()
+        if (convoData.conversationId) {
+          router.push(`/messages?chat=${convoData.conversationId}`)
+          return
+        }
+      } catch {
+        // fallback to dashboard if chat fails
+      }
       router.push('/dashboard/organizer')
       
     } catch (error) {
@@ -170,6 +192,9 @@ export function BookArtistForm({ event, artists, bookedArtistIds }: BookArtistFo
                 onChange={(e) => setOfferedAmount(e.target.value)}
                 required
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                You can send a lower or higher offer. The artist can accept it or use messages to negotiate.
+              </p>
               {selectedArtist && parseFloat(offeredAmount) < selectedArtist.base_price && offeredAmount && (
                 <p className="text-sm text-yellow-600 mt-1">
                   Your offer is below the artist&apos;s base price of {formatCurrency(selectedArtist.base_price)}
@@ -190,7 +215,7 @@ export function BookArtistForm({ event, artists, bookedArtistIds }: BookArtistFo
             </div>
 
             {/* Submit */}
-            <div className="flex gap-4">
+            <div className="flex gap-4 flex-wrap">
               <Button 
                 type="submit" 
                 disabled={loading || !selectedArtistId} 

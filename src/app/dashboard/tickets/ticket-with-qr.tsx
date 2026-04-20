@@ -5,7 +5,8 @@
  * Shows QR code in a dialog for scanning
  */
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { QRCodeSVG } from 'qrcode.react'
 import {
   Dialog,
@@ -15,17 +16,32 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { QrCode, Download, Share2 } from 'lucide-react'
+import { QrCode, Download, Share2, CheckCircle, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface TicketWithQRProps {
   ticketCode: string
   eventId: string
   ticketId: string
+  eventDate: string
+  isCheckedIn?: boolean
 }
 
-export function TicketWithQR({ ticketCode, eventId, ticketId }: TicketWithQRProps) {
+export function TicketWithQR({ ticketCode, eventId, ticketId, eventDate, isCheckedIn = false }: TicketWithQRProps) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
+  const [checkingIn, setCheckingIn] = useState(false)
+  const [checkedIn, setCheckedIn] = useState(isCheckedIn)
+
+  const canSelfCheckIn = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const target = new Date(eventDate)
+    target.setHours(0, 0, 0, 0)
+
+    return target.getTime() === today.getTime()
+  }, [eventDate])
 
   // QR code data for scanning
   const qrData = JSON.stringify({
@@ -43,13 +59,42 @@ export function TicketWithQR({ ticketCode, eventId, ticketId }: TicketWithQRProp
           text: `Ticket Code: ${ticketCode}`,
           url: window.location.href,
         })
-      } catch (err) {
+      } catch {
         // User cancelled or share failed
       }
     } else {
       // Fallback: copy to clipboard
       await navigator.clipboard.writeText(ticketCode)
       toast.success('Ticket code copied!')
+    }
+  }
+
+  const handleSelfCheckIn = async () => {
+    try {
+      setCheckingIn(true)
+      const response = await fetch('/api/tickets/checkin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticketCode,
+          ticketId,
+          eventId,
+          selfCheckIn: true,
+        }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.message || data.error || 'Unable to check you in')
+      }
+
+      setCheckedIn(true)
+      toast.success(data.message || 'You are checked in')
+      router.refresh()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Check-in failed')
+    } finally {
+      setCheckingIn(false)
     }
   }
 
@@ -79,12 +124,26 @@ export function TicketWithQR({ ticketCode, eventId, ticketId }: TicketWithQRProp
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <QrCode className="h-4 w-4 mr-2" />
-          Show QR
-        </Button>
-      </DialogTrigger>
+      <div className="flex flex-wrap items-center gap-2">
+        {checkedIn ? (
+          <Button size="sm" className="bg-green-500 hover:bg-green-500" disabled>
+            <CheckCircle className="h-4 w-4 mr-2" />
+            Checked In
+          </Button>
+        ) : canSelfCheckIn ? (
+          <Button size="sm" onClick={handleSelfCheckIn} disabled={checkingIn}>
+            {checkingIn ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+            I&apos;m Here
+          </Button>
+        ) : null}
+
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm">
+            <QrCode className="h-4 w-4 mr-2" />
+            Show QR
+          </Button>
+        </DialogTrigger>
+      </div>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Your Ticket QR Code</DialogTitle>
@@ -118,6 +177,19 @@ export function TicketWithQR({ ticketCode, eventId, ticketId }: TicketWithQRProp
           <p className="text-sm text-muted-foreground text-center mt-4">
             Show this QR code at the event entrance for quick check-in
           </p>
+
+          {!checkedIn && canSelfCheckIn && (
+            <Button className="mt-4" onClick={handleSelfCheckIn} disabled={checkingIn}>
+              {checkingIn ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+              Check in now
+            </Button>
+          )}
+
+          {!checkedIn && !canSelfCheckIn && (
+            <p className="mt-4 text-xs text-muted-foreground text-center">
+              Self check-in opens on the event day.
+            </p>
+          )}
 
           {/* Actions */}
           <div className="flex gap-3 mt-6">

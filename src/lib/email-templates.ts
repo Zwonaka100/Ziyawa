@@ -375,6 +375,58 @@ export function ticketPurchasedEmail(data: {
   return emailWrapper(content);
 }
 
+export function ticketAssignedEmail(data: {
+  recipientName: string;
+  eventName: string;
+  eventDate: string;
+  eventLocation: string;
+  ticketType: string;
+  ticketCode: string;
+  senderName?: string;
+  actionUrl: string;
+  actionLabel?: string;
+}): string {
+  const content = `
+    <h1>You’ve received a ticket 🎫</h1>
+    <p>Hi ${data.recipientName},</p>
+    <p>${data.senderName ? `<strong>${data.senderName}</strong> got you a ticket for <strong>${data.eventName}</strong>.` : `A ticket for <strong>${data.eventName}</strong> is ready for you.`}</p>
+
+    <div class="highlight-box">
+      <div class="detail-row">
+        <span class="detail-label">Event</span>
+        <span class="detail-value">${data.eventName}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Date</span>
+        <span class="detail-value">${data.eventDate}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Location</span>
+        <span class="detail-value">${data.eventLocation}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Ticket Type</span>
+        <span class="detail-value">${data.ticketType}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Ticket Code</span>
+        <span class="detail-value">${data.ticketCode}</span>
+      </div>
+    </div>
+
+    <p style="text-align: center;">
+      <a href="${data.actionUrl}" class="button">
+        ${data.actionLabel || 'Open My Ticket'}
+      </a>
+    </p>
+
+    <p style="font-size: 14px; color: #6b7280;">
+      If you do not have a Ziyawa account yet, sign up with this same email address to claim the ticket into your dashboard.
+    </p>
+  `;
+  return emailWrapper(content);
+}
+
 // Event reminder email
 export function eventReminderEmail(data: {
   recipientName: string;
@@ -422,6 +474,84 @@ export function eventReminderEmail(data: {
     </p>
     
     <p>Have an amazing time! 🎉</p>
+  `;
+  return emailWrapper(content);
+}
+
+export function eventUpdateEmail(data: {
+  recipientName: string;
+  eventName: string;
+  eventDate: string;
+  eventTime: string;
+  eventLocation: string;
+  message: string;
+  eventUrl: string;
+}): string {
+  const content = `
+    <h1>Important Event Update 📣</h1>
+    <p>Hi ${data.recipientName},</p>
+    <p>Here is an update for <strong>${data.eventName}</strong>.</p>
+
+    <div class="highlight-box">
+      <div class="detail-row">
+        <span class="detail-label">Event</span>
+        <span class="detail-value">${data.eventName}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Date</span>
+        <span class="detail-value">${data.eventDate}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Time</span>
+        <span class="detail-value">${data.eventTime}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Venue</span>
+        <span class="detail-value">${data.eventLocation}</span>
+      </div>
+    </div>
+
+    <div style="background-color: #f3f4f6; border-radius: 8px; padding: 16px; margin: 20px 0; color: #374151;">
+      ${data.message}
+    </div>
+
+    <p style="text-align: center;">
+      <a href="${data.eventUrl}" class="button">
+        Open Event on Ziyawa
+      </a>
+    </p>
+  `;
+  return emailWrapper(content);
+}
+
+export function eventFollowUpEmail(data: {
+  recipientName: string;
+  eventName: string;
+  eventDate: string;
+  message: string;
+  reviewUrl: string;
+  discoverUrl: string;
+}): string {
+  const content = `
+    <h1>Thanks for attending! ✨</h1>
+    <p>Hi ${data.recipientName},</p>
+    <p>Thank you for joining <strong>${data.eventName}</strong> on ${data.eventDate}.</p>
+
+    <div style="background-color: #f3f4f6; border-radius: 8px; padding: 16px; margin: 20px 0; color: #374151;">
+      ${data.message}
+    </div>
+
+    <p style="text-align: center;">
+      <a href="${data.reviewUrl}" class="button">
+        Leave a Review
+      </a>
+    </p>
+
+    <p style="text-align: center; margin-top: 10px;">
+      <a href="${data.discoverUrl}" style="color: #7c3aed; text-decoration: none; font-weight: 600;">
+        Discover more events on Ziyawa
+      </a>
+    </p>
   `;
   return emailWrapper(content);
 }

@@ -8,6 +8,7 @@
  */
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { Play, ExternalLink, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -51,10 +52,11 @@ export function VideoEmbed({ url, title, className }: VideoEmbedProps) {
             className="absolute inset-0 cursor-pointer group"
             onClick={() => setIsPlaying(true)}
           >
-            <img
+            <Image
               src={getYouTubeThumbnail(youtubeId, 'hq')}
               alt={title || 'Video thumbnail'}
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
             />
             <div className="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition-colors" />
             <div className="absolute inset-0 flex items-center justify-center">

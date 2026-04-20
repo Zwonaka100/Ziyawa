@@ -184,7 +184,7 @@ export function SearchResults({ className }: SearchResultsProps) {
                   variant={isActive ? "default" : "ghost"}
                   size="sm"
                   onClick={() => handlePageChange(page)}
-                  className={isActive ? "bg-purple-600 hover:bg-purple-700" : ""}
+                  className={isActive ? "bg-neutral-900 hover:bg-neutral-800" : ""}
                 >
                   {page}
                 </Button>
@@ -226,7 +226,7 @@ function EventCard({ event }: { event: Event }) {
               className="object-cover group-hover:scale-105 transition-transform duration-300"
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+            <div className="w-full h-full bg-gradient-to-br from-neutral-300 to-neutral-400 flex items-center justify-center">
               <Calendar className="h-12 w-12 text-white/50" />
             </div>
           )}
@@ -252,7 +252,7 @@ function EventCard({ event }: { event: Event }) {
 
         <CardContent className="p-4 space-y-3">
           {/* Title */}
-          <h3 className="font-semibold text-lg line-clamp-2 group-hover:text-purple-600 transition-colors">
+          <h3 className="font-semibold text-lg line-clamp-2 group-hover:text-primary transition-colors">
             {event.title}
           </h3>
 

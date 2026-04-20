@@ -2,7 +2,7 @@
  * Utility functions for Ziyawa
  */
 
-import { PLATFORM_CONFIG, PLATFORM_FEES } from './constants'
+import { PLATFORM_FEES } from './constants'
 
 /**
  * Format currency in South African Rand
