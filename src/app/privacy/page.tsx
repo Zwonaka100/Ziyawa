@@ -18,9 +18,9 @@ export default function PrivacyPage() {
           <h2 className="text-lg font-semibold mb-3">1. Introduction</h2>
           <p>
             This Privacy Policy explains how <strong>Zande Technologies (Pty) Ltd</strong>
-            (Registration No. K2025834311), operating the Ziyawa platform (&quot;Platform&quot;),
-            collects, uses, stores, and protects your personal information in accordance with
-            the <strong>Protection of Personal Information Act 4 of 2013 (POPIA)</strong>.
+            (Registration No. K2025834311), in partnership with <strong>Rath Group (Pty) Ltd</strong>,
+            operating the Ziyawa platform (&quot;Platform&quot;), collects, uses, stores, and protects
+            your personal information in accordance with the <strong>Protection of Personal Information Act 4 of 2013 (POPIA)</strong>.
           </p>
           <p className="mt-2">
             Zande Technologies is registered with the Information Regulator of South Africa

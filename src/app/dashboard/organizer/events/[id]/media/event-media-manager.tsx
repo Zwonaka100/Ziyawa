@@ -475,8 +475,11 @@ export function EventMediaManager({
                         {uploading ? (
                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black mx-auto" />
                         ) : newMedia.url ? (
-                          <div className="relative w-32 h-32 mx-auto">
-                            <Image src={newMedia.url} alt="Preview" fill className="object-cover rounded-lg" />
+                          <div className="space-y-2">
+                            <div className="relative w-32 h-32 mx-auto">
+                              <Image src={newMedia.url} alt="Preview" fill className="object-cover rounded-lg" />
+                            </div>
+                            <p className="text-xs text-green-600 font-medium">Image uploaded successfully</p>
                           </div>
                         ) : (
                           <>
@@ -486,26 +489,26 @@ export function EventMediaManager({
                         )}
                       </label>
                     </div>
-                    <p className="text-xs text-neutral-500">Or paste an image URL below</p>
                   </div>
                 )}
 
-                {/* URL Input */}
-                <div className="space-y-2">
-                  <Label>
-                    {newMedia.media_type === 'image' ? 'Image URL' : 
-                     newMedia.media_type === 'youtube_video' ? 'YouTube URL' : 'TikTok URL'}
-                  </Label>
-                  <Input
-                    placeholder={
-                      newMedia.media_type === 'youtube_video' 
-                        ? 'https://www.youtube.com/watch?v=...' 
-                        : 'https://...'
-                    }
-                    value={newMedia.url}
-                    onChange={(e) => setNewMedia(prev => ({ ...prev, url: e.target.value }))}
-                  />
-                </div>
+                {/* URL Input — only for video platforms */}
+                {newMedia.media_type !== 'image' && (
+                  <div className="space-y-2">
+                    <Label>
+                      {newMedia.media_type === 'youtube_video' ? 'YouTube URL' : 'TikTok URL'}
+                    </Label>
+                    <Input
+                      placeholder={
+                        newMedia.media_type === 'youtube_video'
+                          ? 'https://www.youtube.com/watch?v=...'
+                          : 'https://www.tiktok.com/@user/video/...'
+                      }
+                      value={newMedia.url}
+                      onChange={(e) => setNewMedia(prev => ({ ...prev, url: e.target.value }))}
+                    />
+                  </div>
+                )}
 
                 {/* Title */}
                 <div className="space-y-2">

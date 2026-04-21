@@ -19,7 +19,7 @@ export default function RefundsPage() {
           <p>
             This Refund Policy outlines the terms under which refunds, cancellations, and
             disputes are handled on the Ziyawa platform, operated by <strong>Zande Technologies
-            (Pty) Ltd</strong> (Registration No. K2025834311).
+            (Pty) Ltd</strong> (Registration No. K2025834311) in partnership with <strong>Rath Group (Pty) Ltd</strong>.
           </p>
           <p className="mt-2">
             All transactions on the Platform are conducted in South African Rand (ZAR). This

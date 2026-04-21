@@ -19,8 +19,8 @@ export default function TermsPage() {
           <p>
             These Terms of Service (&quot;Terms&quot;) govern your access to and use of the Ziyawa platform
             (&quot;Platform&quot;), operated by <strong>Zande Technologies (Pty) Ltd</strong> (Registration
-            No. K2025834311), a company registered in the Republic of South Africa (&quot;we&quot;,
-            &quot;us&quot;, or &quot;Ziyawa&quot;).
+            No. K2025834311), a company registered in the Republic of South Africa, in partnership
+            with <strong>Rath Group (Pty) Ltd</strong> (&quot;we&quot;, &quot;us&quot;, or &quot;Ziyawa&quot;).
           </p>
           <p className="mt-2">
             By creating an account or using the Platform, you agree to be bound by these Terms,

@@ -269,6 +269,15 @@ export default function AboutPage() {
           <Separator />
 
           <div>
+            <h2 className="text-2xl font-bold mb-4">Our Partners</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              Zande Technologies is proud to be in partnership with <span className="font-medium text-foreground">Rath Group (Pty) Ltd</span>, working together to grow and strengthen South Africa&apos;s entertainment and events industry.
+            </p>
+          </div>
+
+          <Separator />
+
+          <div>
             <h2 className="text-2xl font-bold mb-4">Get in Touch</h2>
             <div className="space-y-3 text-muted-foreground">
               <div className="flex items-center gap-3">

@@ -21,7 +21,7 @@ const faqs = [
       },
       {
         q: 'Who runs Ziyawa?',
-        a: 'Ziyawa is built and operated by Zande Technologies (Pty) Ltd, a registered South African company.',
+        a: 'Ziyawa is built and operated by Zande Technologies (Pty) Ltd, a registered South African company, in partnership with Rath Group (Pty) Ltd.',
       },
     ],
   },
