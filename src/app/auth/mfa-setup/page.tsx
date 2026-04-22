@@ -22,6 +22,14 @@ export default function MfaSetupPage() {
   const handleStart = async () => {
     setEnrolling(true)
     try {
+      // Clean up any stale unverified factors before enrolling.
+      // Without this, a previously abandoned setup attempt blocks new enrollment.
+      const { data: existing } = await supabase.auth.mfa.listFactors()
+      const stale = existing?.totp?.filter((f) => f.status === 'unverified') ?? []
+      for (const f of stale) {
+        await supabase.auth.mfa.unenroll({ factorId: f.id })
+      }
+
       const { data, error } = await supabase.auth.mfa.enroll({
         factorType: 'totp',
         friendlyName: 'Admin authenticator',
@@ -31,7 +39,7 @@ export default function MfaSetupPage() {
       setQrCode(data.totp.qr_code)
       setSecret(data.totp.secret)
     } catch {
-      toast.error('Failed to start 2FA setup')
+      toast.error('Something went wrong. Please try again or contact support.')
     } finally {
       setEnrolling(false)
     }
@@ -53,7 +61,7 @@ export default function MfaSetupPage() {
       // Hard navigation ensures the updated aal2 session cookie is sent with the next request
       window.location.replace('/admin')
     } catch {
-      toast.error('Invalid code. Please try again.')
+      toast.error('That code didn\'t work. Wait for the next 6-digit code and try again.')
     } finally {
       setVerifying(false)
     }
@@ -75,7 +83,7 @@ export default function MfaSetupPage() {
           {!qrCode ? (
             <Button className="w-full" onClick={handleStart} disabled={enrolling}>
               {enrolling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
-              Set up 2FA now
+              {enrolling ? 'Preparing setup…' : 'Set up 2FA now'}
             </Button>
           ) : (
             <div className="space-y-4">
@@ -96,7 +104,11 @@ export default function MfaSetupPage() {
                   className="font-mono text-center text-lg tracking-widest"
                   maxLength={6}
                   autoComplete="one-time-code"
+                  inputMode="numeric"
                 />
+                <p className="text-xs text-muted-foreground">
+                  If the code is rejected, wait for a new code to appear in the app and try again. Make sure your phone&apos;s date &amp; time is set to <span className="font-medium">automatic</span> in Settings.
+                </p>
               </div>
               <Button
                 className="w-full"

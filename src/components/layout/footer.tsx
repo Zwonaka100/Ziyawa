@@ -139,7 +139,7 @@ export function Footer() {
         </div>
 
         {/* Legal Links */}
-        <div className="mt-8 pt-8 border-t flex flex-wrap gap-6 text-sm text-muted-foreground">
+        <div className="mt-8 pt-8 border-t flex flex-wrap gap-6 text-sm text-muted-foreground md:justify-center">
           <Link href="/terms" className="hover:text-primary">Terms of Service</Link>
           <Link href="/privacy" className="hover:text-primary">Privacy Policy</Link>
           <Link href="/refunds" className="hover:text-primary">Refund Policy</Link>
