@@ -25,7 +25,7 @@ export default function MfaSetupPage() {
       // Clean up any stale unverified factors before enrolling.
       // Without this, a previously abandoned setup attempt blocks new enrollment.
       const { data: existing } = await supabase.auth.mfa.listFactors()
-      const stale = existing?.totp?.filter((f) => f.status === 'unverified') ?? []
+      const stale = existing?.totp?.filter((f) => (f.status as string) === 'unverified') ?? []
       for (const f of stale) {
         await supabase.auth.mfa.unenroll({ factorId: f.id })
       }
