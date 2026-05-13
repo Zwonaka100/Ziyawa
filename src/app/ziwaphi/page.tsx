@@ -13,7 +13,7 @@ export default function ZiwaphiPage() {
       {/* Header */}
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold mb-2">
-          Ziwaphi? <span className="text-muted-foreground text-2xl">(Where is it going down?)</span>
+          Ziwaphi?
         </h1>
         <p className="text-muted-foreground max-w-xl mx-auto">
           Ask me anything about events in South Africa or use the filters below. 
