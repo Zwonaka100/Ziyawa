@@ -210,8 +210,8 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="container max-w-4xl py-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="container mx-auto max-w-4xl px-4 py-8">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold">Notifications</h1>
           <p className="text-muted-foreground mt-1">
