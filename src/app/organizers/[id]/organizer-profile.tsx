@@ -33,7 +33,7 @@ interface OrganizerProfileProps {
     payment_completion_rate: number;
     organizer_rating: number;
     total_organizer_reviews: number;
-    years_organizing: number;
+    years_in_business: number | null;
     verified_at: string | null;
     is_verified?: boolean;
     verified_entity_type?: string | null;
@@ -345,7 +345,7 @@ export function OrganizerProfile({
               <ul className="space-y-3 text-sm">
                 <li className="flex items-center gap-2 text-neutral-600">
                   <Clock className="h-4 w-4 text-neutral-400" />
-                  Organizing for {profile.years_organizing || 1}+ year{(profile.years_organizing || 1) > 1 ? 's' : ''}
+                  Organizing for {profile.years_in_business || 1}+ year{(profile.years_in_business || 1) > 1 ? 's' : ''}
                 </li>
                 <li className="flex items-center gap-2 text-neutral-600">
                   <Shield className="h-4 w-4 text-neutral-400" />

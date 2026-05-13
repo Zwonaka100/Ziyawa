@@ -27,7 +27,7 @@ export default async function OrganizerPage({ params }: OrganizerPageProps) {
       payment_completion_rate,
       organizer_rating,
       total_organizer_reviews,
-      years_organizing,
+      years_in_business,
       verified_at,
       is_verified,
       verified_entity_type,
