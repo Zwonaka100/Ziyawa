@@ -7,6 +7,7 @@ import { Footer } from "@/components/layout/footer";
 import { Toaster } from "@/components/ui/sonner";
 import { ZiwaphiFloatingButton } from "@/components/ziwaphi";
 import { CookieConsent } from "@/components/shared/cookie-consent";
+import { SITE_URL } from "@/lib/constants";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -18,7 +19,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ziyawa.co.za'
+const siteUrl = SITE_URL
 
 export const metadata: Metadata = {
   title: {

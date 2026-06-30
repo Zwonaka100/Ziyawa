@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { initializePayment, generatePaymentReference } from '@/lib/paystack';
-import { calculateDepositFee } from '@/lib/constants';
+import { SITE_URL, calculateDepositFee } from '@/lib/constants';
 
 export async function POST(request: NextRequest) {
   try {
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Initialize Paystack payment
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const appUrl = SITE_URL;
     
     const paystackResponse = await initializePayment({
       email: profile.email,

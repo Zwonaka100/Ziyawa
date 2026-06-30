@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { SITE_URL } from '@/lib/constants'
 import { sendEmail } from '@/lib/email'
 import { eventFollowUpEmail, eventReminderEmail } from '@/lib/email-templates'
 import { createBulkNotifications, type CreateNotificationParams } from '@/lib/notifications'
@@ -130,8 +131,8 @@ export async function GET(request: NextRequest) {
         continue
       }
 
-      const eventUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://ziyawa.vercel.app'}/events/${event.id}`
-      const discoverUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://ziyawa.vercel.app'}/events`
+      const eventUrl = `${SITE_URL}/events/${event.id}`
+      const discoverUrl = `${SITE_URL}/events`
       const formattedEventDate = new Date(event.event_date).toLocaleDateString('en-ZA', {
         weekday: 'short',
         day: 'numeric',

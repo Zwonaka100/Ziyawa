@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email'
+import { SITE_URL } from '@/lib/constants'
 import { getEventAccessForUser } from '@/lib/event-team'
 import { eventUpdateEmail, eventFollowUpEmail, eventReminderEmail } from '@/lib/email-templates'
 import { createBulkNotifications, type CreateNotificationParams } from '@/lib/notifications'
@@ -278,7 +279,7 @@ export async function POST(
       return NextResponse.json({ error: 'No attendees with email addresses match this filter' }, { status: 400 })
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ziyawa.vercel.app'
+    const appUrl = SITE_URL
     const eventUrl = `${appUrl}/events/${eventId}`
     const formattedEventDate = authorized.event.event_date
       ? new Date(authorized.event.event_date).toLocaleDateString('en-ZA', {

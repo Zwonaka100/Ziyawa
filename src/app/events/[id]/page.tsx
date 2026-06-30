@@ -3,8 +3,9 @@ import { createClient } from '@/lib/supabase/server'
 import { EventDetails } from '@/components/events/event-details'
 import { EventReviewsSection } from '@/components/events/event-reviews-section'
 import { Metadata } from 'next'
+import { SITE_URL } from '@/lib/constants'
 
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ziyawa.co.za'
+const siteUrl = SITE_URL
 
 interface EventPageProps {
   params: Promise<{

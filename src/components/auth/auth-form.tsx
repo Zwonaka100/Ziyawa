@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Checkbox } from '@/components/ui/checkbox'
+import { SITE_URL } from '@/lib/constants'
 import { Mail, Lock } from 'lucide-react'
 
 type AuthMode = 'signin' | 'signup' | 'forgot-password'
@@ -38,7 +39,7 @@ export function AuthForm({ onSuccess: _onSuccess, defaultMode = 'signin' }: Auth
   const getRedirectUrl = () => {
     const baseUrl = typeof window !== 'undefined' 
       ? window.location.origin 
-      : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      : SITE_URL
     return `${baseUrl}/auth/callback`
   }
 

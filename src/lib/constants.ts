@@ -3,6 +3,10 @@
  * Based on Phase 0 Foundational Design
  */
 
+export const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || (process.env.NODE_ENV === 'production'
+  ? 'https://ziyawa.com'
+  : 'http://localhost:3000')
+
 // South African provinces with display names
 export const PROVINCES = {
   gauteng: 'Gauteng',

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email'
+import { SITE_URL } from '@/lib/constants'
 import { EVENT_TEAM_ROLE_LABELS } from '@/lib/event-team'
 
 const supabaseAdmin = createAdminClient(
@@ -412,7 +413,7 @@ export async function POST(
       }
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const appUrl = SITE_URL
     const invitePath = `/dashboard/event-work/accept?token=${encodeURIComponent(inviteToken)}`
     const inviteUrl = `${appUrl}${invitePath}`
     const roleLabel = EVENT_TEAM_ROLE_LABELS[role as keyof typeof EVENT_TEAM_ROLE_LABELS]

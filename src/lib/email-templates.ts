@@ -3,6 +3,8 @@
  * Reusable email templates for Ziyawa notifications
  */
 
+import { SITE_URL } from './constants'
+
 // Base email wrapper
 export function emailWrapper(content: string): string {
   return `
@@ -121,7 +123,7 @@ export function emailWrapper(content: string): string {
   <div class="container">
     <div class="email-wrapper">
       <div class="header">
-        <a href="${process.env.NEXT_PUBLIC_APP_URL || 'https://ziyawa.vercel.app'}" class="logo">
+        <a href="${SITE_URL}" class="logo">
           Ziyawa
         </a>
       </div>
@@ -139,7 +141,7 @@ export function emailWrapper(content: string): string {
         <p style="margin-top: 15px; font-size: 11px;">
           You're receiving this email because you have an account on Ziyawa.
           <br>
-          <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/settings/notifications">Manage notification preferences</a>
+          <a href="${SITE_URL}/dashboard/settings/notifications">Manage notification preferences</a>
         </p>
       </div>
     </div>
@@ -162,7 +164,7 @@ export function welcomeEmail(userName: string): string {
       <li><strong>Host Events</strong> - Create and manage your own events</li>
     </ul>
     <p style="text-align: center;">
-      <a href="${process.env.NEXT_PUBLIC_APP_URL}/explore" class="button">
+      <a href="${SITE_URL}/explore" class="button">
         Start Exploring
       </a>
     </p>
@@ -309,7 +311,7 @@ export function paymentReceivedEmail(data: {
     <p>Thank you for your payment. Your booking is now secured!</p>
     
     <p style="text-align: center;">
-      <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/bookings" class="button">
+      <a href="${SITE_URL}/dashboard/bookings" class="button">
         View My Bookings
       </a>
     </p>
@@ -615,7 +617,7 @@ export function payoutProcessedEmail(data: {
     <p>The funds should appear in your account within 1-3 business days, depending on your bank.</p>
     
     <p style="text-align: center;">
-      <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/earnings" class="button">
+      <a href="${SITE_URL}/dashboard/earnings" class="button">
         View Earnings Dashboard
       </a>
     </p>

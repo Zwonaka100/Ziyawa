@@ -2,8 +2,9 @@ import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ArtistProfileEnhanced } from '@/components/artists/artist-profile-enhanced'
 import { Metadata } from 'next'
+import { SITE_URL } from '@/lib/constants'
 
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ziyawa.co.za'
+const siteUrl = SITE_URL
 
 interface ArtistPageProps {
   params: Promise<{

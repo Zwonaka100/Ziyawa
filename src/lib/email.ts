@@ -6,6 +6,7 @@
  */
 
 import * as EmailTemplates from './email-templates';
+import { SITE_URL } from './constants';
 
 // Email configuration
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
@@ -104,7 +105,7 @@ export async function sendBookingRequestEmail(
     bookingId: string;
   }
 ): Promise<SendEmailResult> {
-  const bookingUrl = `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/bookings/${data.bookingId}`;
+  const bookingUrl = `${SITE_URL}/dashboard/bookings/${data.bookingId}`;
   
   return sendEmail({
     to,
@@ -129,7 +130,7 @@ export async function sendBookingConfirmedEmail(
     bookingId: string;
   }
 ): Promise<SendEmailResult> {
-  const bookingUrl = `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/bookings/${data.bookingId}`;
+  const bookingUrl = `${SITE_URL}/dashboard/bookings/${data.bookingId}`;
   
   return sendEmail({
     to,
@@ -174,7 +175,7 @@ export async function sendTicketPurchasedEmail(
     totalAmount: string;
   }
 ): Promise<SendEmailResult> {
-  const ticketUrl = `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/tickets`;
+  const ticketUrl = `${SITE_URL}/dashboard/tickets`;
   
   return sendEmail({
     to,
@@ -197,7 +198,7 @@ export async function sendTicketAssignedEmail(
     claimToken?: string | null;
   }
 ): Promise<SendEmailResult> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const baseUrl = SITE_URL;
   const actionUrl = data.claimToken
     ? `${baseUrl}/tickets/claim?token=${encodeURIComponent(data.claimToken)}`
     : `${baseUrl}/dashboard/tickets`;
@@ -228,7 +229,7 @@ export async function sendEventReminderEmail(
     eventId: string;
   }
 ): Promise<SendEmailResult> {
-  const eventUrl = `${process.env.NEXT_PUBLIC_APP_URL}/events/${data.eventId}`;
+  const eventUrl = `${SITE_URL}/events/${data.eventId}`;
   
   return sendEmail({
     to,
@@ -250,7 +251,7 @@ export async function sendReviewRequestEmail(
     bookingId: string;
   }
 ): Promise<SendEmailResult> {
-  const reviewUrl = `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/bookings/${data.bookingId}/review`;
+  const reviewUrl = `${SITE_URL}/dashboard/bookings/${data.bookingId}/review`;
   
   return sendEmail({
     to,

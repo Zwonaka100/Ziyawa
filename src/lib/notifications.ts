@@ -5,6 +5,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from './email';
+import { SITE_URL } from './constants';
 
 // Service client for server-side operations
 const supabaseAdmin = createClient(
@@ -371,7 +372,7 @@ async function sendNotificationEmail(
   const shouldSend = shouldSendEmail(type, prefs);
   if (!shouldSend) return false;
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const appUrl = SITE_URL;
   const emailResult = await sendEmail({
     to: profile.email,
     subject: title,

@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { initializePayment, generatePaymentReference } from '@/lib/paystack'
-import { calculateArtistCommission, calculateVendorCommission } from '@/lib/constants'
+import { SITE_URL, calculateArtistCommission, calculateVendorCommission } from '@/lib/constants'
 
 export async function POST(request: NextRequest) {
   try {
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Failed to create transaction record' }, { status: 500 })
       }
 
-      const callbackUrl = `${process.env.NEXT_PUBLIC_APP_URL}/payments/callback`
+      const callbackUrl = `${SITE_URL}/payments/callback`
 
       const paystack = await initializePayment({
         email: profile.email,
@@ -218,7 +218,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create transaction record' }, { status: 500 })
     }
 
-    const callbackUrl = `${process.env.NEXT_PUBLIC_APP_URL}/payments/callback`
+    const callbackUrl = `${SITE_URL}/payments/callback`
 
     const paystack = await initializePayment({
       email: profile.email,
