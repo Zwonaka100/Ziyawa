@@ -25,6 +25,8 @@ export default async function HomePage() {
         full_name
       )
     `)
+    .eq('is_published', true)
+    .in('state', ['published', 'locked'])
     .gte('event_date', new Date().toISOString().split('T')[0])
     .order('event_date', { ascending: true })
     .limit(6)
