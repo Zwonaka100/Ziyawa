@@ -9,6 +9,7 @@ const supabase = createClient(
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
+    const today = new Date().toISOString().split('T')[0];
     
     // Extract query parameters
     const startDate = searchParams.get('startDate');
@@ -18,6 +19,8 @@ export async function GET(request: NextRequest) {
     const isFree = searchParams.get('free') === 'true';
     const maxPrice = searchParams.get('maxPrice');
     const searchText = searchParams.get('q');
+    const startDateOnly = startDate ? startDate.split('T')[0] : today;
+    const effectiveStartDate = startDateOnly > today ? startDateOnly : today;
     
     // Build the query - using correct column names from Event interface
     let query = supabase
@@ -36,18 +39,13 @@ export async function GET(request: NextRequest) {
         capacity,
         tickets_sold
       `)
-      .eq('state', 'published')
+      .eq('is_published', true)
+      .in('state', ['published', 'locked'])
       .order('event_date', { ascending: true })
       .limit(10);
     
-    // Date filter - convert ISO string to date only
-    if (startDate) {
-      const startDateOnly = startDate.split('T')[0];
-      query = query.gte('event_date', startDateOnly);
-    } else {
-      // Default to upcoming events
-      query = query.gte('event_date', new Date().toISOString().split('T')[0]);
-    }
+    // Always default to upcoming events, even when an older startDate is supplied
+    query = query.gte('event_date', effectiveStartDate);
     
     if (endDate) {
       const endDateOnly = endDate.split('T')[0];

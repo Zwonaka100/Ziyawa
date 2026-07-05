@@ -6,6 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
     const { searchParams } = new URL(request.url);
+    const today = new Date().toISOString().split('T')[0];
 
     // Extract search parameters
     const query = searchParams.get('q') || '';
@@ -19,6 +20,7 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get('sortBy') || 'date'; // date, price-low, price-high, popular
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '12');
+    const effectiveDateFrom = dateFrom && dateFrom > today ? dateFrom : today;
 
     const offset = (page - 1) * limit;
 
@@ -36,7 +38,10 @@ export async function GET(request: NextRequest) {
           average_rating,
           total_reviews
         )
-      `, { count: 'exact' });
+      `, { count: 'exact' })
+      .eq('is_published', true)
+      .in('state', ['published', 'locked'])
+      .gte('event_date', effectiveDateFrom);
 
     // Text search - search in title, description, venue
     if (query) {
@@ -44,16 +49,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Location filter
-    if (location) {
+    if (location && location !== 'all') {
       dbQuery = dbQuery.eq('location', location);
     }
 
     // Date filters
-    if (dateFrom) {
-      dbQuery = dbQuery.gte('event_date', dateFrom);
-    }
-    // Note: No default date filter - show all events (past and future)
-
     if (dateTo) {
       dbQuery = dbQuery.lte('event_date', dateTo);
     }
@@ -102,16 +102,15 @@ export async function GET(request: NextRequest) {
       let fallbackQuery = supabase
         .from('events')
         .select('*', { count: 'exact' })
-        .eq('is_published', true);
+        .eq('is_published', true)
+        .in('state', ['published', 'locked'])
+        .gte('event_date', effectiveDateFrom);
 
       if (query) {
         fallbackQuery = fallbackQuery.or(`title.ilike.%${query}%,description.ilike.%${query}%,venue.ilike.%${query}%`);
       }
-      if (location) {
+      if (location && location !== 'all') {
         fallbackQuery = fallbackQuery.eq('location', location);
-      }
-      if (dateFrom) {
-        fallbackQuery = fallbackQuery.gte('event_date', dateFrom);
       }
       if (dateTo) {
         fallbackQuery = fallbackQuery.lte('event_date', dateTo);
@@ -129,17 +128,23 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    // Get unique locations for filter options (all events)
+    // Get unique locations for filter options (discoverable events only)
     const { data: locations } = await supabase
       .from('events')
-      .select('location');
+      .select('location')
+      .eq('is_published', true)
+      .in('state', ['published', 'locked'])
+      .gte('event_date', today);
 
     const uniqueLocations = [...new Set(locations?.map(e => e.location) || [])];
 
-    // Get price range for filter (all events)
+    // Get price range for filter (discoverable events only)
     const { data: priceRange } = await supabase
       .from('events')
       .select('ticket_price')
+      .eq('is_published', true)
+      .in('state', ['published', 'locked'])
+      .gte('event_date', today)
       .order('ticket_price', { ascending: true });
 
     const prices = priceRange?.map(e => e.ticket_price) || [];
