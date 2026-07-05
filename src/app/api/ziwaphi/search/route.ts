@@ -40,7 +40,6 @@ export async function GET(request: NextRequest) {
         tickets_sold
       `)
       .eq('is_published', true)
-      .in('state', ['published', 'locked'])
       .order('event_date', { ascending: true })
       .limit(10);
     

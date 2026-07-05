@@ -40,7 +40,6 @@ export async function GET(request: NextRequest) {
         )
       `, { count: 'exact' })
       .eq('is_published', true)
-      .in('state', ['published', 'locked'])
       .gte('event_date', effectiveDateFrom);
 
     // Text search - search in title, description, venue
@@ -103,7 +102,6 @@ export async function GET(request: NextRequest) {
         .from('events')
         .select('*', { count: 'exact' })
         .eq('is_published', true)
-        .in('state', ['published', 'locked'])
         .gte('event_date', effectiveDateFrom);
 
       if (query) {
@@ -133,7 +131,6 @@ export async function GET(request: NextRequest) {
       .from('events')
       .select('location')
       .eq('is_published', true)
-      .in('state', ['published', 'locked'])
       .gte('event_date', today);
 
     const uniqueLocations = [...new Set(locations?.map(e => e.location) || [])];
@@ -143,7 +140,6 @@ export async function GET(request: NextRequest) {
       .from('events')
       .select('ticket_price')
       .eq('is_published', true)
-      .in('state', ['published', 'locked'])
       .gte('event_date', today)
       .order('ticket_price', { ascending: true });
 
