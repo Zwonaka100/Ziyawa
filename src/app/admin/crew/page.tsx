@@ -166,6 +166,7 @@ export default function AdminCrewPage() {
       <div>
         <h2 className="text-2xl font-bold">Crew Management</h2>
         <p className="text-muted-foreground">Manage crew and service provider discovery, visibility, and moderation.</p>
+        <p className="text-xs text-muted-foreground mt-1">Use quick buttons in each row to hide/show and pause/resume, then open the menu for remove profile.</p>
       </div>
 
       <Card>
@@ -257,13 +258,20 @@ export default function AdminCrewPage() {
                     </TableCell>
                     <TableCell>{format(new Date(row.created_at), 'MMM d, yyyy')}</TableCell>
                     <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button variant="outline" size="sm" onClick={() => handleTogglePublic(row)}>
+                          {row.is_public ? 'Hide' : 'Show'}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleToggleAvailability(row)}>
+                          {row.is_available ? 'Pause' : 'Resume'}
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
                           <DropdownMenuItem asChild>
                             <Link href={`/crew/${row.id}`}>
                               <Briefcase className="h-4 w-4 mr-2" />
@@ -290,8 +298,9 @@ export default function AdminCrewPage() {
                             <Trash2 className="h-4 w-4 mr-2" />
                             Remove crew profile
                           </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

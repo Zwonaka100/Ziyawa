@@ -158,6 +158,7 @@ export default function AdminArtistsPage() {
       <div>
         <h2 className="text-2xl font-bold">Artist Management</h2>
         <p className="text-muted-foreground">Manage artist discovery visibility, availability, and profile moderation.</p>
+        <p className="text-xs text-muted-foreground mt-1">Use quick buttons in each row to hide/show and pause/resume, then open the menu for remove profile.</p>
       </div>
 
       <Card>
@@ -249,13 +250,20 @@ export default function AdminArtistsPage() {
                     </TableCell>
                     <TableCell>{format(new Date(artist.created_at), 'MMM d, yyyy')}</TableCell>
                     <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button variant="outline" size="sm" onClick={() => handleTogglePublic(artist)}>
+                          {artist.is_public ? 'Hide' : 'Show'}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleToggleAvailability(artist)}>
+                          {artist.is_available ? 'Pause' : 'Resume'}
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
                           <DropdownMenuItem asChild>
                             <Link href={`/artists/${artist.id}`}>
                               <Mic2 className="h-4 w-4 mr-2" />
@@ -282,8 +290,9 @@ export default function AdminArtistsPage() {
                             <Trash2 className="h-4 w-4 mr-2" />
                             Remove artist profile
                           </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

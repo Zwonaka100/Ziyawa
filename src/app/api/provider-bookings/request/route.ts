@@ -163,16 +163,20 @@ export async function POST(request: NextRequest) {
         conversationId = createdConvo?.id || null
       }
 
-      await createNotification({
-        userId: provider.profile_id,
-        type: 'booking_request',
-        title: 'New Service Booking Request',
-        message: `${organizerProfile.full_name || 'An organizer'} requested "${service.service_name}" for "${event.title}".`,
-        link: '/dashboard/provider',
-        eventId: event.id,
-        bookingId: newBooking.id,
-        sendEmail: false,
-      })
+      try {
+        await createNotification({
+          userId: provider.profile_id,
+          type: 'booking_request',
+          title: 'New Service Booking Request',
+          message: `${organizerProfile.full_name || 'An organizer'} requested "${service.service_name}" for "${event.title}".`,
+          link: '/dashboard/provider',
+          eventId: event.id,
+          bookingId: newBooking.id,
+          sendEmail: false,
+        })
+      } catch (notificationError) {
+        console.warn('Provider booking request notification skipped:', notificationError)
+      }
 
       const { data: providerProfile } = await supabase
         .from('profiles')
@@ -180,24 +184,28 @@ export async function POST(request: NextRequest) {
         .eq('id', provider.profile_id)
         .maybeSingle()
 
-      if (providerProfile?.email) {
-        await sendProviderBookingRequestEmail(providerProfile.email, {
-          recipientName: providerProfile.full_name || provider.business_name || 'there',
-          organizerName: organizerProfile.full_name || 'Organizer',
-          eventName: event.title,
-          eventDate: new Date(event.event_date).toLocaleDateString('en-ZA', {
-            weekday: 'short',
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-          }),
-          eventLocation: event.venue || 'Venue to be confirmed',
-          serviceName: service.service_name,
-          amount: `R${offeredAmount.toFixed(2)}`,
-          quantity,
-          notes: notes || undefined,
-          actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/dashboard/provider`,
-        })
+      try {
+        if (providerProfile?.email) {
+          await sendProviderBookingRequestEmail(providerProfile.email, {
+            recipientName: providerProfile.full_name || provider.business_name || 'there',
+            organizerName: organizerProfile.full_name || 'Organizer',
+            eventName: event.title,
+            eventDate: new Date(event.event_date).toLocaleDateString('en-ZA', {
+              weekday: 'short',
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            }),
+            eventLocation: event.venue || 'Venue to be confirmed',
+            serviceName: service.service_name,
+            amount: `R${offeredAmount.toFixed(2)}`,
+            quantity,
+            notes: notes || undefined,
+            actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/dashboard/provider`,
+          })
+        }
+      } catch (emailError) {
+        console.warn('Provider booking request email skipped:', emailError)
       }
     }
 

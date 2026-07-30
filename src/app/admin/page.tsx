@@ -220,6 +220,16 @@ export default async function AdminDashboardPage() {
                 Manage Users
               </button>
             </Link>
+            <Link href="/admin/artists">
+              <button className="px-4 py-2 bg-pink-600 text-white rounded-lg text-sm font-medium hover:bg-pink-700">
+                Manage Artists
+              </button>
+            </Link>
+            <Link href="/admin/crew">
+              <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">
+                Manage Crew
+              </button>
+            </Link>
             <Link href="/admin/events">
               <button className="px-4 py-2 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-800">
                 Manage Events

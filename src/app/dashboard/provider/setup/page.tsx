@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Loader2, Users, ArrowRight, ArrowLeft } from 'lucide-react'
+import { Loader2, Users, ArrowRight, ArrowLeft, AlertTriangle, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/components/providers/auth-provider'
 import {
@@ -45,6 +45,7 @@ export default function ProviderSetupPage() {
   const [loading, setLoading] = useState(false)
   const [checkingExisting, setCheckingExisting] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
+  const [removing, setRemoving] = useState(false)
   
   // Form state
   const [businessName, setBusinessName] = useState('')
@@ -189,6 +190,64 @@ export default function ProviderSetupPage() {
       toast.error('Failed to save crew profile')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleRemoveProfile = async () => {
+    if (!profile) return
+
+    const confirmed = window.confirm(
+      'Remove your crew profile? This removes your public listing. You can set up a new crew profile later.'
+    )
+    if (!confirmed) return
+
+    setRemoving(true)
+    try {
+      const supabase = createClient()
+
+      const { data: existingProvider, error: providerLookupError } = await supabase
+        .from('providers')
+        .select('id')
+        .eq('profile_id', profile.id)
+        .single()
+
+      if (providerLookupError || !existingProvider) {
+        throw providerLookupError || new Error('Crew profile not found')
+      }
+
+      const { count, error: activeBookingsError } = await supabase
+        .from('provider_bookings')
+        .select('id', { count: 'exact', head: true })
+        .eq('provider_id', existingProvider.id)
+        .in('state', ['pending', 'accepted', 'confirmed', 'disputed'])
+
+      if (activeBookingsError) throw activeBookingsError
+
+      if ((count || 0) > 0) {
+        toast.error('You have active bookings. Pause or complete them before removing your crew profile.')
+        return
+      }
+
+      const { error: deleteError } = await supabase
+        .from('providers')
+        .delete()
+        .eq('id', existingProvider.id)
+
+      if (deleteError) throw deleteError
+
+      await supabase
+        .from('profiles')
+        .update({ is_provider: false, role: 'user' })
+        .eq('id', profile.id)
+
+      await refreshProfile()
+      toast.success('Crew profile removed')
+      router.push('/dashboard/settings')
+    } catch (error) {
+      console.error('Error removing crew profile:', error)
+      toast.error('Failed to remove crew profile')
+    } finally {
+      setRemoving(false)
     }
   }
 
@@ -511,6 +570,31 @@ export default function ProviderSetupPage() {
           </form>
         </CardContent>
       </Card>
+
+      {isEditing && (
+        <Card className="mt-6 border-red-200 bg-red-50/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-700">
+              <AlertTriangle className="h-5 w-5" />
+              Remove Crew Profile
+            </CardTitle>
+            <CardDescription>
+              This removes your crew listing from Ziyawa. You cannot remove it while you still have active bookings.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleRemoveProfile}
+              disabled={removing}
+            >
+              {removing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Remove Crew Profile
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

@@ -5,6 +5,40 @@ import { sendBookingResponseEmail } from '@/lib/email'
 
 type ProviderBookingAction = 'accept' | 'decline' | 'counter'
 
+async function updateProviderBookingWithSchemaFallback(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  bookingId: string,
+  updates: Record<string, unknown>
+) {
+  const { error } = await supabase
+    .from('provider_bookings')
+    .update(updates)
+    .eq('id', bookingId)
+
+  if (!error) return null
+
+  const message = String(error.message || '').toLowerCase()
+  const missingTimestampColumn =
+    message.includes('accepted_at') ||
+    message.includes('declined_at') ||
+    (message.includes('column') && (message.includes('accepted') || message.includes('declined')))
+
+  if (!missingTimestampColumn) {
+    return error
+  }
+
+  const fallbackUpdates = { ...updates }
+  delete fallbackUpdates.accepted_at
+  delete fallbackUpdates.declined_at
+
+  const { error: fallbackError } = await supabase
+    .from('provider_bookings')
+    .update(fallbackUpdates)
+    .eq('id', bookingId)
+
+  return fallbackError || null
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -81,10 +115,7 @@ export async function POST(
       updates.provider_notes = notes || `Counter-offer: R${counterAmount.toFixed(2)}`
     }
 
-    const { error: updateError } = await supabase
-      .from('provider_bookings')
-      .update(updates)
-      .eq('id', booking.id)
+    const updateError = await updateProviderBookingWithSchemaFallback(supabase, booking.id, updates)
 
     if (updateError) {
       return NextResponse.json({ error: 'Failed to update provider booking' }, { status: 500 })
@@ -102,52 +133,60 @@ export async function POST(
       .eq('id', booking.organizer_id)
       .maybeSingle()
 
-    if (action === 'accept') {
-      await createNotification({
-        userId: booking.organizer_id,
-        type: 'booking_accepted',
-        title: 'Service booking accepted! 🎉',
-        message: `${provider.business_name} accepted your service booking for "${event?.title || 'your event'}". You can now complete payment.`,
-        link: `/dashboard/organizer/events/${booking.event_id}/bookings`,
-        bookingId: booking.id,
-        eventId: booking.event_id,
-        sendEmail: false,
-      })
-    } else if (action === 'decline') {
-      await createNotification({
-        userId: booking.organizer_id,
-        type: 'booking_declined',
-        title: 'Service booking declined',
-        message: `${provider.business_name} declined your service booking request for "${event?.title || 'your event'}".`,
-        link: `/dashboard/organizer/events/${booking.event_id}/bookings`,
-        bookingId: booking.id,
-        eventId: booking.event_id,
-        sendEmail: false,
-      })
-    } else {
-      await createNotification({
-        userId: booking.organizer_id,
-        type: 'message_received',
-        title: 'Service counter-offer received',
-        message: `${provider.business_name} proposed a new amount for "${event?.title || 'your event'}": R${counterAmount.toFixed(2)}.`,
-        link: `/dashboard/organizer/events/${booking.event_id}/bookings`,
-        bookingId: booking.id,
-        eventId: booking.event_id,
-        metadata: { counterAmount },
-        sendEmail: false,
-      })
+    try {
+      if (action === 'accept') {
+        await createNotification({
+          userId: booking.organizer_id,
+          type: 'booking_accepted',
+          title: 'Service booking accepted! 🎉',
+          message: `${provider.business_name} accepted your service booking for "${event?.title || 'your event'}". You can now complete payment.`,
+          link: `/dashboard/organizer/events/${booking.event_id}/bookings`,
+          bookingId: booking.id,
+          eventId: booking.event_id,
+          sendEmail: false,
+        })
+      } else if (action === 'decline') {
+        await createNotification({
+          userId: booking.organizer_id,
+          type: 'booking_declined',
+          title: 'Service booking declined',
+          message: `${provider.business_name} declined your service booking request for "${event?.title || 'your event'}".`,
+          link: `/dashboard/organizer/events/${booking.event_id}/bookings`,
+          bookingId: booking.id,
+          eventId: booking.event_id,
+          sendEmail: false,
+        })
+      } else {
+        await createNotification({
+          userId: booking.organizer_id,
+          type: 'message_received',
+          title: 'Service counter-offer received',
+          message: `${provider.business_name} proposed a new amount for "${event?.title || 'your event'}": R${counterAmount.toFixed(2)}.`,
+          link: `/dashboard/organizer/events/${booking.event_id}/bookings`,
+          bookingId: booking.id,
+          eventId: booking.event_id,
+          metadata: { counterAmount },
+          sendEmail: false,
+        })
+      }
+    } catch (notificationError) {
+      console.warn('Provider booking response notification skipped:', notificationError)
     }
 
-    if (organizerProfile?.email) {
-      await sendBookingResponseEmail(organizerProfile.email, {
-        recipientName: organizerProfile.full_name || 'there',
-        responderName: provider.business_name,
-        eventName: event?.title || 'your event',
-        responseType: action === 'counter' ? 'countered' : action === 'accept' ? 'accepted' : 'declined',
-        amount: action === 'counter' ? `R${counterAmount.toFixed(2)}` : undefined,
-        note: notes || undefined,
-        actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/dashboard/organizer/events/${booking.event_id}/bookings`,
-      })
+    try {
+      if (organizerProfile?.email) {
+        await sendBookingResponseEmail(organizerProfile.email, {
+          recipientName: organizerProfile.full_name || 'there',
+          responderName: provider.business_name,
+          eventName: event?.title || 'your event',
+          responseType: action === 'counter' ? 'countered' : action === 'accept' ? 'accepted' : 'declined',
+          amount: action === 'counter' ? `R${counterAmount.toFixed(2)}` : undefined,
+          note: notes || undefined,
+          actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/dashboard/organizer/events/${booking.event_id}/bookings`,
+        })
+      }
+    } catch (emailError) {
+      console.warn('Provider booking response email skipped:', emailError)
     }
 
     return NextResponse.json({

@@ -160,28 +160,36 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      await createNotification({
-        userId: artistProfileId,
-        type: 'booking_request',
-        title: 'New Booking Request',
-        message: `${organizerProfile.full_name || 'An organizer'} requested to book you for "${event.title}".`,
-        link: '/dashboard/artist',
-        bookingId: newBooking.id,
-        eventId: event.id,
-        sendEmail: false,
-      })
-
-      if (artistProfile?.email) {
-        await sendBookingRequestEmail(artistProfile.email, {
-          recipientName: artistProfile.full_name || artist.stage_name || 'Artist',
-          clientName: organizerProfile.full_name || 'Organizer',
-          eventName: event.title,
-          eventDate: formatDate(event.event_date),
-          eventLocation: event.venue || 'Venue to be confirmed',
-          amount: offeredAmount.toFixed(2),
-          message: notes || undefined,
+      try {
+        await createNotification({
+          userId: artistProfileId,
+          type: 'booking_request',
+          title: 'New Booking Request',
+          message: `${organizerProfile.full_name || 'An organizer'} requested to book you for "${event.title}".`,
+          link: '/dashboard/artist',
           bookingId: newBooking.id,
+          eventId: event.id,
+          sendEmail: false,
         })
+      } catch (notificationError) {
+        console.warn('Artist booking request notification skipped:', notificationError)
+      }
+
+      try {
+        if (artistProfile?.email) {
+          await sendBookingRequestEmail(artistProfile.email, {
+            recipientName: artistProfile.full_name || artist.stage_name || 'Artist',
+            clientName: organizerProfile.full_name || 'Organizer',
+            eventName: event.title,
+            eventDate: formatDate(event.event_date),
+            eventLocation: event.venue || 'Venue to be confirmed',
+            amount: offeredAmount.toFixed(2),
+            message: notes || undefined,
+            bookingId: newBooking.id,
+          })
+        }
+      } catch (emailError) {
+        console.warn('Artist booking request email skipped:', emailError)
       }
     }
 

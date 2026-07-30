@@ -406,6 +406,9 @@ export default function ProviderDashboardPage() {
             <Badge variant={provider.is_available ? 'default' : 'secondary'} className={provider.is_available ? 'bg-green-100 text-green-700 hover:bg-green-100' : ''}>
               {provider.is_available ? 'Available' : 'Paused'}
             </Badge>
+            <Badge variant={provider.is_public ? 'default' : 'secondary'} className={provider.is_public ? 'bg-blue-100 text-blue-700 hover:bg-blue-100' : ''}>
+              {provider.is_public ? 'Directory: Public' : 'Directory: Hidden'}
+            </Badge>
           </div>
           <p className="text-muted-foreground">
             {provider.business_name} • {provider.is_available ? `${provider.advance_notice_days || 0} days notice` : 'Not taking new bookings right now'}
@@ -425,6 +428,22 @@ export default function ProviderDashboardPage() {
           </Link>
         </div>
       </div>
+
+      <Card className="mb-6 border-orange-200 bg-orange-50/40">
+        <CardContent className="pt-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-semibold">Profile Controls</p>
+              <p className="text-sm text-muted-foreground">
+                Open Crew Setup to hide your profile from the public Crew directory, pause bookings, or remove your crew profile.
+              </p>
+            </div>
+            <Link href="/dashboard/provider/setup">
+              <Button className="bg-orange-500 hover:bg-orange-600">Open Profile Controls</Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">

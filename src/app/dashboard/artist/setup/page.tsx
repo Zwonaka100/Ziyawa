@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ArrowLeft, Loader2, Music } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Loader2, Music, Trash2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { PROVINCES, GENRES } from '@/lib/constants'
 import { toast } from 'sonner'
@@ -27,6 +27,7 @@ export default function ArtistSetupPage() {
   const [checkingExisting, setCheckingExisting] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [artistId, setArtistId] = useState<string | null>(null)
+  const [removing, setRemoving] = useState(false)
   
   const [formData, setFormData] = useState({
     stage_name: '',
@@ -180,6 +181,56 @@ export default function ArtistSetupPage() {
 
   const updateField = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleRemoveProfile = async () => {
+    if (!artistId || !profile) return
+
+    const confirmed = window.confirm(
+      'Remove your artist profile? This removes your public listing. You can create a new one later.'
+    )
+    if (!confirmed) return
+
+    setRemoving(true)
+    try {
+      const supabase = createClient()
+      const { count, error: activeBookingsError } = await supabase
+        .from('bookings')
+        .select('id', { count: 'exact', head: true })
+        .eq('artist_id', artistId)
+        .in('state', ['pending', 'accepted', 'confirmed', 'disputed'])
+
+      if (activeBookingsError) {
+        throw activeBookingsError
+      }
+
+      if ((count || 0) > 0) {
+        toast.error('You have active bookings. Pause or complete them before removing your profile.')
+        return
+      }
+
+      const { error: deleteError } = await supabase
+        .from('artists')
+        .delete()
+        .eq('id', artistId)
+        .eq('profile_id', profile.id)
+
+      if (deleteError) throw deleteError
+
+      await supabase
+        .from('profiles')
+        .update({ is_artist: false, role: 'user' })
+        .eq('id', profile.id)
+
+      await refreshProfile()
+      toast.success('Artist profile removed')
+      router.push('/dashboard/settings')
+    } catch (error) {
+      console.error('Error removing artist profile:', error)
+      toast.error('Failed to remove artist profile')
+    } finally {
+      setRemoving(false)
+    }
   }
 
   if (checkingExisting || !profile) {
@@ -407,6 +458,31 @@ export default function ArtistSetupPage() {
           </form>
         </CardContent>
       </Card>
+
+      {isEditing && (
+        <Card className="mt-6 border-red-200 bg-red-50/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-700">
+              <AlertTriangle className="h-5 w-5" />
+              Remove Artist Profile
+            </CardTitle>
+            <CardDescription>
+              This removes your artist listing from Ziyawa. You cannot remove it while you still have active bookings.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleRemoveProfile}
+              disabled={removing}
+            >
+              {removing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Remove Artist Profile
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

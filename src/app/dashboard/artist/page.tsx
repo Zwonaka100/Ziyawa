@@ -90,6 +90,9 @@ export default async function ArtistDashboardPage() {
           <Badge variant={artist.is_available ? 'default' : 'secondary'} className={artist.is_available ? 'bg-green-100 text-green-700 hover:bg-green-100' : ''}>
             {artist.is_available ? 'Available' : 'Paused'}
           </Badge>
+          <Badge variant={artist.is_public ? 'default' : 'secondary'} className={artist.is_public ? 'bg-blue-100 text-blue-700 hover:bg-blue-100' : ''}>
+            {artist.is_public ? 'Directory: Public' : 'Directory: Hidden'}
+          </Badge>
         </div>
         <p className="text-muted-foreground">
           Welcome back, {artist.stage_name}! {artist.is_available ? `Open for bookings • ${artist.advance_notice_days || 0} days notice` : 'Bookings are paused right now.'}
@@ -174,6 +177,22 @@ export default async function ArtistDashboardPage() {
           </Card>
         </Link>
       </div>
+
+      <Card className="mb-8 border-primary/20 bg-primary/5">
+        <CardContent className="pt-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-semibold">Profile Controls</p>
+              <p className="text-sm text-muted-foreground">
+                Use Edit Profile to hide your artist profile from public directory pages, pause bookings, or remove your artist profile.
+              </p>
+            </div>
+            <Link href="/dashboard/artist/setup">
+              <Button>Open Profile Controls</Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -356,10 +375,10 @@ export default async function ArtistDashboardPage() {
 
         {/* History Tab */}
         <TabsContent value="history" className="space-y-4">
-          {bookings && bookings.filter(b => ['completed', 'declined', 'cancelled'].includes(b.status)).length > 0 ? (
+          {bookings && bookings.filter(b => ['completed', 'declined', 'cancelled'].includes(b.state)).length > 0 ? (
             <div className="grid gap-4">
               {bookings
-                .filter(b => ['completed', 'declined', 'cancelled'].includes(b.status))
+                .filter(b => ['completed', 'declined', 'cancelled'].includes(b.state))
                 .map((booking) => (
                   <Card key={booking.id}>
                     <CardContent className="p-4">

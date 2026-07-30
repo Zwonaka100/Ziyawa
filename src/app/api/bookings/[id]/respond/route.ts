@@ -5,6 +5,40 @@ import { sendBookingResponseEmail } from '@/lib/email'
 
 type ArtistBookingAction = 'accept' | 'decline' | 'counter'
 
+async function updateBookingWithSchemaFallback(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  bookingId: string,
+  updates: Record<string, unknown>
+) {
+  const { error } = await supabase
+    .from('bookings')
+    .update(updates)
+    .eq('id', bookingId)
+
+  if (!error) return null
+
+  const message = String(error.message || '').toLowerCase()
+  const missingTimestampColumn =
+    message.includes('accepted_at') ||
+    message.includes('declined_at') ||
+    (message.includes('column') && (message.includes('accepted') || message.includes('declined')))
+
+  if (!missingTimestampColumn) {
+    return error
+  }
+
+  const fallbackUpdates = { ...updates }
+  delete fallbackUpdates.accepted_at
+  delete fallbackUpdates.declined_at
+
+  const { error: fallbackError } = await supabase
+    .from('bookings')
+    .update(fallbackUpdates)
+    .eq('id', bookingId)
+
+  return fallbackError || null
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -81,10 +115,7 @@ export async function POST(
       updates.artist_notes = notes || `Counter-offer: R${counterAmount.toFixed(2)}`
     }
 
-    const { error: updateError } = await supabase
-      .from('bookings')
-      .update(updates)
-      .eq('id', booking.id)
+    const updateError = await updateBookingWithSchemaFallback(supabase, booking.id, updates)
 
     if (updateError) {
       return NextResponse.json({ error: 'Failed to update booking' }, { status: 500 })
