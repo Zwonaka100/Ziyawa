@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       `)
       .eq('is_published', true)
       .order('event_date', { ascending: true })
-      .limit(10);
+      .limit(20);
     
     // Always default to upcoming events, even when an older startDate is supplied
     query = query.gte('event_date', effectiveStartDate);

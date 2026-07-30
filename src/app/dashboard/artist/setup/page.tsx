@@ -35,6 +35,7 @@ export default function ArtistSetupPage() {
     base_price: '',
     location: '',
     is_available: 'true',
+    is_public: 'true',
     advance_notice_days: '3',
     years_active: '',
     record_label: '',
@@ -78,6 +79,7 @@ export default function ArtistSetupPage() {
           base_price: data.base_price?.toString() || '',
           location: data.location || '',
           is_available: data.is_available === false ? 'false' : 'true',
+          is_public: data.is_public === false ? 'false' : 'true',
           advance_notice_days: data.advance_notice_days?.toString() || '3',
           years_active: data.years_active?.toString() || '',
           record_label: data.record_label || '',
@@ -118,6 +120,7 @@ export default function ArtistSetupPage() {
         base_price: parseFloat(formData.base_price) || 0,
         location: formData.location,
         is_available: formData.is_available !== 'false',
+        is_public: formData.is_public !== 'false',
         advance_notice_days: parseInt(formData.advance_notice_days) || 3,
         years_active: formData.years_active ? parseInt(formData.years_active) : null,
         record_label: formData.record_label.trim() || null,
@@ -306,6 +309,25 @@ export default function ArtistSetupPage() {
               </Select>
               <p className="text-sm text-muted-foreground mt-1">
                 Let organisers know if you are open for new requests right now.
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="is_public">Directory Visibility</Label>
+              <Select
+                value={formData.is_public}
+                onValueChange={(value) => updateField('is_public', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Show me on Artist Directory</SelectItem>
+                  <SelectItem value="false">Hide me from Artist Directory</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground mt-1">
+                This controls whether your profile appears on public front pages.
               </p>
             </div>
 

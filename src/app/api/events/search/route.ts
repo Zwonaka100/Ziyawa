@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     const isFree = searchParams.get('isFree') === 'true';
     const sortBy = searchParams.get('sortBy') || 'date'; // date, price-low, price-high, popular
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '12');
+    const limit = parseInt(searchParams.get('limit') || '20');
     const effectiveDateFrom = dateFrom && dateFrom > today ? dateFrom : today;
 
     const offset = (page - 1) * limit;

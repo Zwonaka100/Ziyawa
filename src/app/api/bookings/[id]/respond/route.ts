@@ -102,52 +102,60 @@ export async function POST(
       .eq('id', booking.organizer_id)
       .maybeSingle()
 
-    if (action === 'accept') {
-      await createNotification({
-        userId: booking.organizer_id,
-        type: 'booking_accepted',
-        title: 'Booking accepted! 🎉',
-        message: `${artist.stage_name} accepted your booking for "${event?.title || 'your event'}". You can now complete payment.`,
-        link: `/dashboard/organizer/events/${booking.event_id}/bookings`,
-        bookingId: booking.id,
-        eventId: booking.event_id,
-        sendEmail: false,
-      })
-    } else if (action === 'decline') {
-      await createNotification({
-        userId: booking.organizer_id,
-        type: 'booking_declined',
-        title: 'Booking declined',
-        message: `${artist.stage_name} declined your booking request for "${event?.title || 'your event'}".`,
-        link: `/dashboard/organizer/events/${booking.event_id}/bookings`,
-        bookingId: booking.id,
-        eventId: booking.event_id,
-        sendEmail: false,
-      })
-    } else {
-      await createNotification({
-        userId: booking.organizer_id,
-        type: 'message_received',
-        title: 'Counter-offer received',
-        message: `${artist.stage_name} proposed a new amount for "${event?.title || 'your event'}": R${counterAmount.toFixed(2)}.`,
-        link: `/dashboard/organizer/events/${booking.event_id}/bookings`,
-        bookingId: booking.id,
-        eventId: booking.event_id,
-        metadata: { counterAmount },
-        sendEmail: false,
-      })
+    try {
+      if (action === 'accept') {
+        await createNotification({
+          userId: booking.organizer_id,
+          type: 'booking_accepted',
+          title: 'Booking accepted! 🎉',
+          message: `${artist.stage_name} accepted your booking for "${event?.title || 'your event'}". You can now complete payment.`,
+          link: `/dashboard/organizer/events/${booking.event_id}/bookings`,
+          bookingId: booking.id,
+          eventId: booking.event_id,
+          sendEmail: false,
+        })
+      } else if (action === 'decline') {
+        await createNotification({
+          userId: booking.organizer_id,
+          type: 'booking_declined',
+          title: 'Booking declined',
+          message: `${artist.stage_name} declined your booking request for "${event?.title || 'your event'}".`,
+          link: `/dashboard/organizer/events/${booking.event_id}/bookings`,
+          bookingId: booking.id,
+          eventId: booking.event_id,
+          sendEmail: false,
+        })
+      } else {
+        await createNotification({
+          userId: booking.organizer_id,
+          type: 'message_received',
+          title: 'Counter-offer received',
+          message: `${artist.stage_name} proposed a new amount for "${event?.title || 'your event'}": R${counterAmount.toFixed(2)}.`,
+          link: `/dashboard/organizer/events/${booking.event_id}/bookings`,
+          bookingId: booking.id,
+          eventId: booking.event_id,
+          metadata: { counterAmount },
+          sendEmail: false,
+        })
+      }
+    } catch (notificationError) {
+      console.warn('Booking response notification skipped:', notificationError)
     }
 
-    if (organizerProfile?.email) {
-      await sendBookingResponseEmail(organizerProfile.email, {
-        recipientName: organizerProfile.full_name || 'there',
-        responderName: artist.stage_name,
-        eventName: event?.title || 'your event',
-        responseType: action === 'counter' ? 'countered' : action === 'accept' ? 'accepted' : 'declined',
-        amount: action === 'counter' ? `R${counterAmount.toFixed(2)}` : undefined,
-        note: notes || undefined,
-        actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/dashboard/organizer/events/${booking.event_id}/bookings`,
-      })
+    try {
+      if (organizerProfile?.email) {
+        await sendBookingResponseEmail(organizerProfile.email, {
+          recipientName: organizerProfile.full_name || 'there',
+          responderName: artist.stage_name,
+          eventName: event?.title || 'your event',
+          responseType: action === 'counter' ? 'countered' : action === 'accept' ? 'accepted' : 'declined',
+          amount: action === 'counter' ? `R${counterAmount.toFixed(2)}` : undefined,
+          note: notes || undefined,
+          actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/dashboard/organizer/events/${booking.event_id}/bookings`,
+        })
+      }
+    } catch (emailError) {
+      console.warn('Booking response email skipped:', emailError)
     }
 
     return NextResponse.json({

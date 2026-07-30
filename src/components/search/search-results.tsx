@@ -64,7 +64,7 @@ export function SearchResults({ className }: SearchResultsProps) {
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 12,
+    limit: 20,
     total: 0,
     totalPages: 0,
   });
@@ -74,6 +74,7 @@ export function SearchResults({ className }: SearchResultsProps) {
     try {
       const params = new URLSearchParams(searchParams.toString());
       if (!params.has('page')) params.set('page', '1');
+      if (!params.has('limit')) params.set('limit', '20');
       
       const response = await fetch(`/api/events/search?${params.toString()}`);
       const data = await response.json();

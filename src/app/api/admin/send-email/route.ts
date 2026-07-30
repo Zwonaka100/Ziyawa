@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email'
+import { emailWrapper } from '@/lib/email-templates'
 
 const SUPPORT_FROM_EMAIL = process.env.SUPPORT_FROM_EMAIL || 'Ziyawa Support <support@zande.io>'
 const SUPPORT_REPLY_TO = process.env.SUPPORT_EMAIL || 'support@zande.io'
@@ -50,19 +51,13 @@ export async function POST(request: NextRequest) {
       replyTo: SUPPORT_REPLY_TO,
       to,
       subject,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="padding: 20px; background-color: #f5f5f5;">
-            <h1 style="color: #333; margin: 0;">Ziyawa Support</h1>
-          </div>
-          <div style="padding: 20px;">
-            ${personalizedBody.replace(/\n/g, '<br>')}
-          </div>
-          <div style="padding: 20px; background-color: #f5f5f5; font-size: 12px; color: #666;">
-            <p>This email was sent from Ziyawa support. Replies will go to ${SUPPORT_REPLY_TO}.</p>
-          </div>
+      html: emailWrapper(`
+        <h1>${subject}</h1>
+        <div class="message-box">
+          ${personalizedBody.replace(/\n/g, '<br>')}
         </div>
-      `,
+        <p style="font-size: 14px; color: #6b7280;">This email was sent from Ziyawa support. Replies go to ${SUPPORT_REPLY_TO}.</p>
+      `),
       tags: [{ name: 'category', value: 'admin-support' }],
     })
 

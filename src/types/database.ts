@@ -199,6 +199,7 @@ export interface Artist {
   profile_image: string | null;
   base_price: number;
   is_available: boolean;
+  is_public: boolean;
   advance_notice_days: number;
   years_active: number | null;
   record_label: string | null;
@@ -364,6 +365,7 @@ export interface Provider {
   business_email: string | null;
   website: string | null;
   is_available: boolean;
+  is_public: boolean;
   advance_notice_days: number;
   years_in_business: number | null;
   team_size: number | null;
@@ -445,6 +447,7 @@ export interface PublicProvider {
   location: SaProvince;
   profile_image: string | null;
   is_available: boolean;
+  is_public?: boolean;
   total_bookings: number;
   completed_bookings: number;
   average_rating: number;

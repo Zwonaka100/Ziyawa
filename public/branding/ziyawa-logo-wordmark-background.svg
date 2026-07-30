@@ -1,0 +1,12 @@
+<svg width="360" height="96" viewBox="0 0 360 96" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Ziyawa logo with wordmark and white background">
+  <rect x="0" y="0" width="360" height="96" fill="#FFFFFF" />
+  <g transform="translate(16,16)">
+    <circle cx="32" cy="32" r="32" fill="#171717" />
+    <rect x="13" y="13" width="38" height="5.5" rx="2.5" fill="#FFFFFF" />
+    <rect x="13" y="45.5" width="38" height="5.5" rx="2.5" fill="#FFFFFF" />
+    <rect x="22" y="25" width="4" height="14" rx="2" fill="#FFFFFF" />
+    <rect x="30" y="22" width="4" height="20" rx="2" fill="#FFFFFF" />
+    <rect x="38" y="27" width="4" height="10" rx="2" fill="#FFFFFF" />
+  </g>
+  <text x="96" y="58" fill="#171717" font-family="Segoe UI, Arial, Helvetica, sans-serif" font-size="52" font-weight="700" letter-spacing="0">Ziyawa</text>
+</svg>

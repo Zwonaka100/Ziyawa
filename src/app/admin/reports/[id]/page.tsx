@@ -272,7 +272,7 @@ export default function AdminReportDetailPage() {
 
       // Take action on reported content
       if (actionType === 'action' && selectedAction) {
-        await takeContentAction(selectedAction)
+        await takeContentAction(selectedAction, adminNotes)
       }
 
       // Update report
@@ -297,8 +297,15 @@ export default function AdminReportDetailPage() {
       await supabase.from('admin_audit_logs').insert({
         admin_id: admin?.id,
         action: `report_${actionType}`,
-        entity_type: 'report',
-        entity_id: reportId,
+        action_type: actionType === 'resolve'
+          ? 'report_resolve'
+          : actionType === 'dismiss'
+            ? 'report_dismiss'
+            : actionType === 'escalate'
+              ? 'report_escalate'
+              : 'report_update',
+        target_type: 'report',
+        target_id: reportId,
         details: {
           reported_type: report.reported_type,
           reported_id: report.reported_id,
@@ -324,7 +331,7 @@ export default function AdminReportDetailPage() {
     }
   }
 
-  const takeContentAction = async (action: string) => {
+  const takeContentAction = async (action: string, moderationNote?: string) => {
     if (!report || !reportedContent) return
 
     const { data: { user: admin } } = await supabase.auth.getUser()
@@ -356,24 +363,37 @@ export default function AdminReportDetailPage() {
 
       case 'remove_content':
         if (report.reported_type === 'event') {
-          await supabase
-            .from('events')
-            .update({ is_published: false, state: 'removed' })
-            .eq('id', report.reported_id)
+          const response = await fetch(`/api/admin/events/${report.reported_id}/publish`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              publish: false,
+              reason: moderationNote || `Removed after report review: ${report.reason}`,
+            }),
+          })
+
+          const payload = await response.json().catch(() => ({})) as { error?: string }
+          if (!response.ok) {
+            throw new Error(payload.error || 'Failed to remove reported event')
+          }
         } else if (report.reported_type === 'review') {
-          await supabase
+          const { error } = await supabase
             .from('reviews')
             .update({ is_visible: false })
             .eq('id', report.reported_id)
+
+          if (error) throw error
         }
         break
 
       case 'delete_content':
         if (report.reported_type === 'review') {
-          await supabase
+          const { error } = await supabase
             .from('reviews')
             .delete()
             .eq('id', report.reported_id)
+
+          if (error) throw error
         }
         break
     }
@@ -382,8 +402,9 @@ export default function AdminReportDetailPage() {
     await supabase.from('admin_audit_logs').insert({
       admin_id: admin?.id,
       action: action,
-      entity_type: report.reported_type,
-      entity_id: report.reported_id,
+      action_type: action === 'remove_content' || action === 'delete_content' ? 'report_content_remove' : 'report_user_action',
+      target_type: report.reported_type,
+      target_id: report.reported_id,
       details: { reason: `Reported for: ${report.reason}` },
     })
   }
@@ -401,8 +422,9 @@ export default function AdminReportDetailPage() {
     await supabase.from('admin_audit_logs').insert({
       admin_id: admin?.id,
       action: 'report_review_started',
-      entity_type: 'report',
-      entity_id: reportId,
+        action_type: 'report_escalate',
+        target_type: 'report',
+        target_id: reportId,
     })
 
     toast.success('Report marked as under review')

@@ -55,6 +55,7 @@ export default function ProviderSetupPage() {
   const [businessEmail, setBusinessEmail] = useState('')
   const [website, setWebsite] = useState('')
   const [isAvailable, setIsAvailable] = useState(true)
+  const [isPublic, setIsPublic] = useState(true)
   const [advanceNoticeDays, setAdvanceNoticeDays] = useState(3)
   const [workMode, setWorkMode] = useState<CrewWorkMode>('offering_services')
   const [activeSection, setActiveSection] = useState<'work' | 'services'>('work')
@@ -94,6 +95,7 @@ export default function ProviderSetupPage() {
         setBusinessEmail(data.business_email || '')
         setWebsite(data.website || '')
         setIsAvailable(data.is_available !== false)
+        setIsPublic(data.is_public !== false)
         setAdvanceNoticeDays(data.advance_notice_days)
         setWorkMode(data.work_mode || 'offering_services')
         setActiveSection(data.work_mode === 'offering_services' ? 'services' : 'work')
@@ -137,6 +139,7 @@ export default function ProviderSetupPage() {
         business_email: businessEmail.trim() || null,
         website: website.trim() || null,
         is_available: isAvailable,
+        is_public: isPublic,
         advance_notice_days: advanceNoticeDays,
       }
 
@@ -328,6 +331,22 @@ export default function ProviderSetupPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="isPublic">Directory Visibility</Label>
+              <Select value={isPublic ? 'true' : 'false'} onValueChange={(value) => setIsPublic(value === 'true')}>
+                <SelectTrigger id="isPublic">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Show me on Crew Directory</SelectItem>
+                  <SelectItem value="false">Hide me from Crew Directory</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground mt-1">
+                Hide your profile from public front pages while keeping your account active.
+              </p>
             </div>
 
             <div className="grid md:grid-cols-2 gap-4">

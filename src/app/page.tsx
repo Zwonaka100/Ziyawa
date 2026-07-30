@@ -10,7 +10,7 @@ import Image from 'next/image'
 export default async function HomePage() {
   const supabase = await createClient()
 
-  // Fetch upcoming events only (limit 6)
+  // Fetch upcoming events only (limit 12)
   const { data: events } = await supabase
     .from('events')
     .select(`
@@ -28,7 +28,7 @@ export default async function HomePage() {
     .eq('is_published', true)
     .gte('event_date', new Date().toISOString().split('T')[0])
     .order('event_date', { ascending: true })
-    .limit(6)
+    .limit(12)
 
 
   return (

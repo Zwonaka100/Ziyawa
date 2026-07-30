@@ -68,6 +68,7 @@ async function ArtistsContent({
         avatar_url
       )
     `)
+    .eq('is_public', true)
     .eq('is_available', true)
     .order('stage_name', { ascending: true })
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email'
+import { emailWrapper } from '@/lib/email-templates'
 
 const INFO_FROM_EMAIL = process.env.INFO_FROM_EMAIL || 'Ziyawa <info@zande.io>'
 const INFO_REPLY_TO = process.env.INFO_EMAIL || process.env.SUPPORT_EMAIL || 'support@zande.io'
@@ -39,22 +40,17 @@ export async function POST(request: NextRequest) {
         replyTo: INFO_REPLY_TO,
         to: profile.email,
         subject: `[TEST] ${subject}`,
-        html: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-            <div style="padding: 10px; background-color: #fef3c7; border: 1px solid #f59e0b; margin-bottom: 20px;">
-              <strong>TEST EMAIL</strong> - This is how the email will look to recipients.
-            </div>
-            <div style="padding: 20px; background-color: #f5f5f5;">
-              <h1 style="color: #333; margin: 0;">Ziyawa</h1>
-            </div>
-            <div style="padding: 20px;">
-              ${body.replace(/\{\{name\}\}/g, 'Test User').replace(/\n/g, '<br>')}
-            </div>
-            <div style="padding: 20px; background-color: #f5f5f5; font-size: 12px; color: #666;">
-              <p>This test email was sent from Ziyawa communications. Replies go to ${INFO_REPLY_TO}.</p>
-            </div>
+        html: emailWrapper(`
+          <h1>Test email preview</h1>
+          <p>This is a test preview of your bulk communication before sending to recipients.</p>
+          <div class="note-box">
+            <p style="margin: 0;"><strong>TEST MODE:</strong> This was only sent to your admin inbox.</p>
           </div>
-        `,
+          <div class="message-box">
+            ${body.replace(/\{\{name\}\}/g, 'Test User').replace(/\n/g, '<br>')}
+          </div>
+          <p style="font-size: 14px; color: #6b7280;">Replies go to ${INFO_REPLY_TO}.</p>
+        `),
         tags: [{ name: 'category', value: 'admin-bulk-test' }],
       })
 
@@ -94,19 +90,13 @@ export async function POST(request: NextRequest) {
             replyTo: INFO_REPLY_TO,
             to: recipient.email,
             subject,
-            html: `
-              <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-                <div style="padding: 20px; background-color: #f5f5f5;">
-                  <h1 style="color: #333; margin: 0;">Ziyawa</h1>
-                </div>
-                <div style="padding: 20px;">
-                  ${personalizedBody.replace(/\n/g, '<br>')}
-                </div>
-                <div style="padding: 20px; background-color: #f5f5f5; font-size: 12px; color: #666;">
-                  <p>This email was sent from Ziyawa communications. Replies go to ${INFO_REPLY_TO}.</p>
-                </div>
+            html: emailWrapper(`
+              <h1>${subject}</h1>
+              <div class="message-box">
+                ${personalizedBody.replace(/\n/g, '<br>')}
               </div>
-            `,
+              <p style="font-size: 14px; color: #6b7280;">This email was sent from Ziyawa communications. Replies go to ${INFO_REPLY_TO}.</p>
+            `),
             tags: [{ name: 'category', value: 'admin-bulk' }],
           })
 

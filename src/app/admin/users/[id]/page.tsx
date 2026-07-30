@@ -65,12 +65,14 @@ export default async function AdminUserDetailPage({ params }: PageProps) {
     { data: warnings },
     { data: reports },
     { data: artistProfile },
+    { data: providerProfile },
   ] = await Promise.all([
     supabase.from('events').select('id, title, event_date, is_published').eq('organizer_id', id).order('created_at', { ascending: false }).limit(10),
     supabase.from('tickets').select('id, event_id, created_at, events(title)').eq('user_id', id).order('created_at', { ascending: false }).limit(10),
     supabase.from('user_warnings').select('*').eq('user_id', id).order('created_at', { ascending: false }),
     supabase.from('reports').select('*').eq('reported_id', id).order('created_at', { ascending: false }),
     supabase.from('artists').select('*').eq('profile_id', id).single(),
+    supabase.from('providers').select('*').eq('profile_id', id).single(),
   ])
 
   return (
@@ -166,6 +168,11 @@ export default async function AdminUserDetailPage({ params }: PageProps) {
                 {artistProfile && (
                   <span className="px-3 py-1 rounded-full text-sm bg-pink-100 text-pink-700">
                     Artist
+                  </span>
+                )}
+                {providerProfile && (
+                  <span className="px-3 py-1 rounded-full text-sm bg-indigo-100 text-indigo-700">
+                    Crew
                   </span>
                 )}
                 {user.is_verified && (

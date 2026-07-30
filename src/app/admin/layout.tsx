@@ -17,6 +17,8 @@ import {
   Settings,
   FileText,
   Shield,
+  Mic2,
+  Briefcase,
   Menu,
   X,
   LogOut,
@@ -30,6 +32,8 @@ import { cn } from '@/lib/utils'
 const navigation = [
   { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
   { name: 'Users', href: '/admin/users', icon: Users },
+  { name: 'Artists', href: '/admin/artists', icon: Mic2 },
+  { name: 'Crew', href: '/admin/crew', icon: Briefcase },
   { name: 'Events', href: '/admin/events', icon: Calendar },
   { name: 'Reports', href: '/admin/reports', icon: AlertTriangle },
   { name: 'Disputes', href: '/admin/disputes', icon: Scale },

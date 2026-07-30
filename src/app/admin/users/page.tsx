@@ -53,6 +53,8 @@ interface User {
   avatar_url: string | null
   role: string
   is_organizer: boolean
+  is_artist?: boolean
+  is_provider?: boolean
   is_admin: boolean
   admin_role: string | null
   is_suspended: boolean
@@ -86,10 +88,14 @@ export default function AdminUsersPage() {
     // Apply role filter
     if (roleFilter === 'organizer') {
       query = query.eq('is_organizer', true)
+    } else if (roleFilter === 'artist') {
+      query = query.eq('is_artist', true)
+    } else if (roleFilter === 'crew') {
+      query = query.eq('is_provider', true)
     } else if (roleFilter === 'admin') {
       query = query.eq('is_admin', true)
     } else if (roleFilter === 'user') {
-      query = query.eq('is_organizer', false).eq('is_admin', false)
+      query = query.eq('is_organizer', false).eq('is_admin', false).eq('is_artist', false).eq('is_provider', false)
     }
 
     // Apply status filter
@@ -208,6 +214,8 @@ export default function AdminUsersPage() {
                 <SelectItem value="all">All Roles</SelectItem>
                 <SelectItem value="user">Users</SelectItem>
                 <SelectItem value="organizer">Organizers</SelectItem>
+                <SelectItem value="artist">Artists</SelectItem>
+                <SelectItem value="crew">Crew</SelectItem>
                 <SelectItem value="admin">Admins</SelectItem>
               </SelectContent>
             </Select>
@@ -285,7 +293,17 @@ export default function AdminUsersPage() {
                             Organizer
                           </span>
                         )}
-                        {!user.is_admin && !user.is_organizer && (
+                        {user.is_artist && (
+                          <span className="px-2 py-0.5 rounded text-xs bg-pink-100 text-pink-700">
+                            Artist
+                          </span>
+                        )}
+                        {user.is_provider && (
+                          <span className="px-2 py-0.5 rounded text-xs bg-indigo-100 text-indigo-700">
+                            Crew
+                          </span>
+                        )}
+                        {!user.is_admin && !user.is_organizer && !user.is_artist && !user.is_provider && (
                           <span className="px-2 py-0.5 rounded text-xs bg-neutral-100 text-neutral-700">
                             User
                           </span>

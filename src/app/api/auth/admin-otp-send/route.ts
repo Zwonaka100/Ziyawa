@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { Resend } from 'resend'
 import { randomInt, createHash } from 'crypto'
+import { emailWrapper } from '@/lib/email-templates'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -50,17 +51,15 @@ export async function POST(_request: NextRequest) {
     from: getFromAddress(),
     to: user.email,
     subject: 'Ziyawa Admin — Your verification code',
-    html: `
-      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
-        <h2 style="margin-bottom:8px">Admin verification code</h2>
-        <p style="color:#555;margin-bottom:24px">Hi ${profile.full_name ?? 'Admin'},</p>
-        <p style="color:#555">Enter this code to access the Ziyawa admin panel:</p>
-        <div style="font-size:40px;font-weight:700;letter-spacing:12px;font-family:monospace;text-align:center;padding:24px;background:#f5f5f5;border-radius:8px;margin:24px 0">
-          ${code}
-        </div>
-        <p style="color:#888;font-size:13px">This code expires in <strong>10 minutes</strong>. If you didn't try to sign in, you can safely ignore this email.</p>
+    html: emailWrapper(`
+      <h1>Admin verification code</h1>
+      <p>Hi ${profile.full_name ?? 'Admin'},</p>
+      <p>Enter this code to access the Ziyawa admin panel:</p>
+      <div class="highlight-box" style="text-align: center;">
+        <p style="margin: 0; font-size: 40px; font-weight: 700; letter-spacing: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; color: #111111;">${code}</p>
       </div>
-    `,
+      <p style="font-size: 13px; color: #6b7280;">This code expires in <strong>10 minutes</strong>. If you did not try to sign in, you can safely ignore this email.</p>
+    `),
   })
 
   if (emailError) {

@@ -18,78 +18,87 @@ export function emailWrapper(content: string): string {
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       line-height: 1.6;
-      color: #1a1a1a;
+      color: #111111;
       margin: 0;
       padding: 0;
-      background-color: #f5f5f5;
+      background-color: #f3f4f6;
     }
     .container {
       max-width: 600px;
       margin: 0 auto;
-      padding: 20px;
+      padding: 18px;
     }
     .email-wrapper {
       background-color: #ffffff;
-      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
       overflow: hidden;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
     }
     .header {
-      background: linear-gradient(135deg, #18082e 0%, #4c1d95 50%, #7c3aed 100%);
-      padding: 28px 30px;
+      background-color: #ffffff;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 18px 24px;
       text-align: center;
     }
     .brand-lockup {
       display: inline-flex;
-      flex-direction: column;
+      flex-direction: row;
       align-items: center;
-      gap: 12px;
+      justify-content: center;
+      gap: 10px;
     }
     .brand-lockup img {
-      width: 148px;
+      width: 32px;
       max-width: 100%;
       height: auto;
       display: block;
     }
-    .logo {
-      font-size: 26px;
-      font-weight: 800;
-      color: #ffffff;
-      text-decoration: none;
-      letter-spacing: 0.02em;
+    .brand-copy {
+      text-align: left;
+      line-height: 1.15;
     }
-    .tagline {
-      color: rgba(255, 255, 255, 0.82);
-      font-size: 13px;
+    .logo {
+      display: inline-block;
+      font-size: 24px;
+      font-weight: 700;
+      color: #111111;
+      text-decoration: none;
+      letter-spacing: 0;
       margin: 0;
     }
+    .tagline {
+      margin: 2px 0 0;
+      font-size: 12px;
+      color: #6b7280;
+    }
     .content {
-      padding: 40px 30px;
+      padding: 32px 26px;
     }
     .footer {
       background-color: #f9fafb;
-      padding: 20px 30px;
+      border-top: 1px solid #e5e7eb;
+      padding: 18px 24px;
       text-align: center;
       font-size: 12px;
       color: #6b7280;
     }
     .button {
       display: inline-block;
-      padding: 14px 28px;
-      background: linear-gradient(135deg, #7c3aed 0%, #9333ea 100%);
+      padding: 12px 24px;
+      background-color: #111111;
       color: #ffffff !important;
       text-decoration: none;
-      border-radius: 8px;
+      border-radius: 7px;
       font-weight: 600;
       margin: 20px 0;
     }
     .button:hover {
-      opacity: 0.9;
+      background-color: #000000;
     }
     h1 {
       font-size: 24px;
       margin: 0 0 20px;
-      color: #1a1a1a;
+      color: #111111;
     }
     p {
       margin: 0 0 16px;
@@ -113,10 +122,39 @@ export function emailWrapper(content: string): string {
     .detail-label {
       color: #6b7280;
       font-size: 14px;
+      display: inline-block;
+      min-width: 90px;
+      white-space: nowrap;
+    }
+    .detail-label::after {
+      content: ':';
+      margin-left: 2px;
     }
     .detail-value {
       font-weight: 600;
-      color: #1a1a1a;
+      color: #111111;
+      margin-left: 8px;
+    }
+    .message-box {
+      background-color: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 20px 0;
+      color: #374151;
+    }
+    .note-box {
+      background-color: #f9fafb;
+      border-left: 4px solid #9ca3af;
+      border-radius: 4px;
+      padding: 15px;
+      margin: 20px 0;
+      color: #374151;
+    }
+    .text-link {
+      color: #111111;
+      text-decoration: underline;
+      font-weight: 600;
     }
     .social-links {
       margin-top: 15px;
@@ -145,8 +183,10 @@ export function emailWrapper(content: string): string {
           <a href="${SITE_URL}" aria-label="Ziyawa home">
             <img src="${SITE_URL}/ziyawa-logo.svg" alt="Ziyawa" />
           </a>
-          <a href="${SITE_URL}" class="logo">Ziyawa</a>
-          <p class="tagline">South Africa's event operating system</p>
+          <div class="brand-copy">
+            <a href="${SITE_URL}" class="logo" style="color: #111111 !important; text-decoration: none;">Ziyawa</a>
+            <p class="tagline">South Africa's event operating system</p>
+          </div>
         </div>
       </div>
       <div class="content">
@@ -233,7 +273,7 @@ export function bookingRequestEmail(data: {
     </div>
 
     ${data.message ? `
-      <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; border-radius: 4px;">
+      <div class="note-box">
         <p style="margin: 0; font-style: italic;">"${data.message}"</p>
       </div>
     ` : ''}
@@ -572,7 +612,7 @@ export function eventFollowUpEmail(data: {
     </p>
 
     <p style="text-align: center; margin-top: 10px;">
-      <a href="${data.discoverUrl}" style="color: #7c3aed; text-decoration: none; font-weight: 600;">
+      <a href="${data.discoverUrl}" class="text-link">
         Discover more events on Ziyawa
       </a>
     </p>
@@ -617,7 +657,7 @@ export function eventPublishedEmail(data: {
     </p>
 
     <p style="text-align: center; margin-top: 10px;">
-      <a href="${data.manageUrl}" style="color: #7c3aed; text-decoration: none; font-weight: 600;">
+      <a href="${data.manageUrl}" class="text-link">
         Manage this event
       </a>
     </p>
@@ -793,7 +833,7 @@ export function eventCancelledEmail(data: {
     <p>Hi ${data.recipientName},</p>
     <p>We need to let you know that <strong>${data.eventName}</strong>, scheduled for ${data.eventDate}, has been cancelled.</p>
 
-    ${data.reason ? `<div style="background-color: #fff7ed; border-left: 4px solid #f97316; padding: 15px; margin: 20px 0; border-radius: 4px;"><p style="margin:0;"><strong>Reason:</strong> ${data.reason}</p></div>` : ''}
+    ${data.reason ? `<div class="note-box"><p style="margin:0;"><strong>Reason:</strong> ${data.reason}</p></div>` : ''}
 
     <p>${nextStep}</p>
 
@@ -985,7 +1025,7 @@ export function attendeeContactOrganizerEmail(data: {
       </div>
     </div>
 
-    <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 20px 0; color: #374151;">
+    <div class="message-box">
       ${data.message.replace(/\n/g, '<br/>')}
     </div>
 

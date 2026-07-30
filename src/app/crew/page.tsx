@@ -80,6 +80,7 @@ export default function CrewPage() {
       let query = supabase
         .from('v_public_providers')
         .select('*')
+        .eq('is_public', true)
         .eq('is_available', true)
         .order('completed_bookings', { ascending: false })
 

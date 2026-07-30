@@ -7,11 +7,26 @@ import { createClient } from '@supabase/supabase-js';
 import { sendBrandedNotificationEmail } from './email';
 import { SITE_URL } from './constants';
 
-// Service client for server-side operations
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Service client for server-side operations. Create it lazily so the app can
+// still process booking responses in environments without the service-role key.
+type SupabaseAdminClient = ReturnType<typeof createClient<any>>;
+
+let supabaseAdmin: SupabaseAdminClient | null = null;
+
+function getSupabaseAdminClient() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return null;
+  }
+
+  if (!supabaseAdmin) {
+    supabaseAdmin = createClient<any>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+  }
+
+  return supabaseAdmin;
+}
 
 // =====================================================
 // TYPES
@@ -188,7 +203,12 @@ export async function createNotification(params: CreateNotificationParams): Prom
   const { userId, type, title, message, link, eventId, bookingId, transactionId, metadata, sendEmail } = params;
 
   try {
-    const { data, error } = await supabaseAdmin
+    const adminClient = getSupabaseAdminClient();
+    if (!adminClient) {
+      return null;
+    }
+
+    const { data, error } = await adminClient
       .from('notifications')
       .insert({
         user_id: userId,
@@ -242,7 +262,12 @@ export async function createBulkNotifications(
       metadata: n.metadata || {},
     }));
 
-    const { data, error } = await supabaseAdmin
+    const adminClient = getSupabaseAdminClient();
+    if (!adminClient) {
+      return 0;
+    }
+
+    const { data, error } = await adminClient
       .from('notifications')
       .insert(records)
       .select();
@@ -264,7 +289,12 @@ export async function createBulkNotifications(
  */
 export async function markNotificationRead(notificationId: string, userId: string): Promise<boolean> {
   try {
-    const { error } = await supabaseAdmin
+    const adminClient = getSupabaseAdminClient();
+    if (!adminClient) {
+      return false;
+    }
+
+    const { error } = await adminClient
       .from('notifications')
       .update({
         read: true,
@@ -285,7 +315,12 @@ export async function markNotificationRead(notificationId: string, userId: strin
  */
 export async function markAllNotificationsRead(userId: string): Promise<boolean> {
   try {
-    const { error } = await supabaseAdmin
+    const adminClient = getSupabaseAdminClient();
+    if (!adminClient) {
+      return false;
+    }
+
+    const { error } = await adminClient
       .from('notifications')
       .update({
         read: true,
@@ -306,7 +341,12 @@ export async function markAllNotificationsRead(userId: string): Promise<boolean>
  */
 export async function getUnreadCount(userId: string): Promise<number> {
   try {
-    const { count, error } = await supabaseAdmin
+    const adminClient = getSupabaseAdminClient();
+    if (!adminClient) {
+      return 0;
+    }
+
+    const { count, error } = await adminClient
       .from('notifications')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId)
@@ -327,7 +367,12 @@ export async function deleteOldNotifications(daysOld: number = 90): Promise<numb
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysOld);
 
-    const { data, error } = await supabaseAdmin
+    const adminClient = getSupabaseAdminClient();
+    if (!adminClient) {
+      return 0;
+    }
+
+    const { data, error } = await adminClient
       .from('notifications')
       .delete()
       .lt('created_at', cutoffDate.toISOString())
@@ -352,8 +397,13 @@ async function sendNotificationEmail(
   message: string,
   link?: string
 ): Promise<boolean> {
+  const adminClient = getSupabaseAdminClient();
+  if (!adminClient) {
+    return false;
+  }
+
   // Get user email
-  const { data: profile } = await supabaseAdmin
+  const { data: profile } = await adminClient
     .from('profiles')
     .select('email, full_name')
     .eq('id', userId)
@@ -362,7 +412,7 @@ async function sendNotificationEmail(
   if (!profile?.email) return false;
 
   // Check user preferences
-  const { data: prefs } = await supabaseAdmin
+  const { data: prefs } = await adminClient
     .from('notification_preferences')
     .select('*')
     .eq('user_id', userId)

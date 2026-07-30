@@ -6,7 +6,6 @@
  * 
  * Full event details with moderation actions:
  * - Approve/reject events
- * - Feature/unfeature
  * - Suspend event
  * - View organizer details
  * - View ticket sales
@@ -49,7 +48,6 @@ import {
   ExternalLink,
   CheckCircle,
   XCircle,
-  Star,
   Ban,
   Eye,
   Loader2,
@@ -94,10 +92,6 @@ interface EventDetail {
     avatar_url: string
     phone: string
   }
-  featured?: {
-    id: string
-    featured_at: string
-  }[]
 }
 
 interface BookingSummary {
@@ -169,7 +163,7 @@ export default function AdminEventDetailPage() {
 
   // Action dialog
   const [actionOpen, setActionOpen] = useState(false)
-  const [actionType, setActionType] = useState<'approve' | 'reject' | 'suspend' | 'feature' | 'unfeature' | 'delete'>('approve')
+  const [actionType, setActionType] = useState<'approve' | 'reject' | 'suspend' | 'delete'>('approve')
   const [actionNotes, setActionNotes] = useState('')
   const [processing, setProcessing] = useState(false)
 
@@ -186,8 +180,7 @@ export default function AdminEventDetailPage() {
       .from('events')
       .select(`
         *,
-        organizer:profiles!events_organizer_id_fkey(id, full_name, email, avatar_url, phone),
-        featured:featured_events(id, featured_at)
+        organizer:profiles!events_organizer_id_fkey(id, full_name, email, avatar_url, phone)
       `)
       .eq('id', eventId)
       .single()
@@ -299,39 +292,37 @@ export default function AdminEventDetailPage() {
 
       switch (actionType) {
         case 'approve':
-          updates = { state: 'approved', is_approved: true, is_published: true }
+          updates = { state: 'published', is_approved: true, is_published: true }
           break
         case 'reject':
-          updates = { state: 'rejected', is_approved: false, is_published: false }
+          updates = { state: 'draft', is_approved: false, is_published: false }
           break
         case 'suspend':
-          updates = { state: 'suspended', is_published: false }
+          updates = { state: 'locked', is_published: false }
           break
-        case 'feature':
-          await supabase.from('featured_events').insert({
-            event_id: eventId,
-            featured_by: admin?.id,
-          })
-          toast.success('Event featured successfully')
-          setActionOpen(false)
-          void fetchEvent()
-          setProcessing(false)
-          return
-        case 'unfeature':
-          await supabase.from('featured_events').delete().eq('event_id', eventId)
-          toast.success('Event removed from featured')
-          setActionOpen(false)
-          void fetchEvent()
-          setProcessing(false)
-          return
         case 'delete':
-          const { error: deleteError } = await supabase
-            .from('events')
-            .delete()
-            .eq('id', eventId)
-          if (deleteError) throw deleteError
-          toast.success('Event deleted')
-          router.push('/admin/events')
+          {
+            const response = await fetch(`/api/admin/events/${eventId}/publish`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ operation: 'delete', reason: actionNotes || 'Removed by admin moderation' }),
+            })
+
+            const payload = await response.json().catch(() => ({})) as { error?: string; deleted?: boolean; refundedTickets?: number }
+            if (!response.ok) {
+              throw new Error(payload.error || 'Failed to delete event')
+            }
+
+            if (payload.deleted) {
+              toast.success('Event deleted')
+            } else {
+              toast.success((payload.refundedTickets || 0) > 0
+                ? `Event cancelled and ${payload.refundedTickets} refund item(s) queued`
+                : 'Event removed from public listings')
+            }
+
+            router.push('/admin/events')
+          }
           return
       }
 
@@ -347,8 +338,9 @@ export default function AdminEventDetailPage() {
       await supabase.from('admin_audit_logs').insert({
         admin_id: admin?.id,
         action: `event_${actionType}`,
-        entity_type: 'event',
-        entity_id: eventId,
+        action_type: actionType === 'approve' ? 'event_approve' : actionType === 'reject' ? 'event_reject' : actionType === 'suspend' ? 'event_edit' : 'event_delete',
+        target_type: 'event',
+        target_id: eventId,
         details: {
           event_title: event.title,
           organizer_email: event.organizer?.email,
@@ -356,17 +348,17 @@ export default function AdminEventDetailPage() {
         },
       })
 
-      // Notify organizer (TODO: Send email)
+      // Notify organizer
       await supabase.from('notifications').insert({
         user_id: event.organizer_id,
-        type: `event_${actionType}`,
+        type: 'event_updated',
         title: actionType === 'approve' 
           ? 'Event Approved!' 
           : actionType === 'reject' 
             ? 'Event Rejected' 
             : 'Event Suspended',
         message: actionNotes || `Your event "${event.title}" has been ${actionType}ed by our moderation team.`,
-        link: `/dashboard/events/${eventId}`,
+        link: `/dashboard/organizer/events/${eventId}/manage`,
       })
 
       toast.success(`Event ${actionType}ed successfully`)
@@ -386,33 +378,31 @@ export default function AdminEventDetailPage() {
     setPublishLoading(true)
 
     try {
-      const nextState = publish ? 'published' : 'draft'
-      const { data, error } = await supabase
-        .from('events')
-        .update({ is_published: publish, state: nextState, updated_at: new Date().toISOString() })
-        .eq('id', eventId)
-        .select('id, state, is_published')
-        .single()
-
-      if (error) throw error
-
-      if (publish && (!data?.is_published || data?.state !== 'published')) {
-        throw new Error('Publish write did not persist correctly')
+      let reason = ''
+      if (!publish && Number(event.tickets_sold || 0) > 0) {
+        reason = window.prompt('This event has ticket sales. Unpublishing will cancel the event and queue refunds. Please provide a reason:')?.trim() || ''
+        if (!reason) {
+          throw new Error('Reason is required to unpublish an event with ticket sales')
+        }
       }
 
-      const { data: refreshedEvent, error: refreshError } = await supabase
-        .from('events')
-        .select('id, state, is_published')
-        .eq('id', eventId)
-        .single()
+      const response = await fetch(`/api/admin/events/${eventId}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ publish, reason, operation: publish ? 'publish' : 'unpublish' }),
+      })
 
-      if (refreshError) throw refreshError
-
-      if (publish && (!refreshedEvent?.is_published || refreshedEvent?.state !== 'published')) {
-        throw new Error('Publish state could not be verified')
+      const payload = await response.json().catch(() => ({})) as { error?: string; refundedTickets?: number }
+      if (!response.ok) {
+        throw new Error(payload.error || 'Failed to update event visibility')
       }
 
-      toast.success(publish ? 'Event published' : 'Event unpublished')
+      if (!publish && (payload.refundedTickets || 0) > 0) {
+        toast.success(`Event cancelled and ${payload.refundedTickets} refund item(s) queued`)
+      } else {
+        toast.success(publish ? 'Event published' : 'Event unpublished')
+      }
+
       void fetchEvent()
     } catch (error) {
       console.error('Publish error:', error)
@@ -448,20 +438,30 @@ export default function AdminEventDetailPage() {
   const handleCancelEvent = async () => {
     if (!event) return
 
-    const confirmed = window.confirm('Cancel this event? It will be hidden from the public listing and marked cancelled.')
+    const confirmed = window.confirm('Cancel this event? It will be hidden from the public listing, marked cancelled, and refunds will be queued where needed.')
     if (!confirmed) return
+
+    const reason = window.prompt('Please provide a cancellation reason:')?.trim() || ''
+    if (!reason) {
+      toast.error('Cancellation reason is required')
+      return
+    }
 
     setPublishLoading(true)
 
     try {
-      const { error } = await supabase
-        .from('events')
-        .update({ state: 'cancelled', is_published: false })
-        .eq('id', eventId)
+      const response = await fetch(`/api/admin/events/${eventId}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ publish: false, reason, operation: 'cancel' }),
+      })
 
-      if (error) throw error
+      const payload = await response.json().catch(() => ({})) as { error?: string; refundedTickets?: number }
+      if (!response.ok) {
+        throw new Error(payload.error || 'Failed to cancel event')
+      }
 
-      toast.success('Event cancelled')
+      toast.success((payload.refundedTickets || 0) > 0 ? `Event cancelled and ${payload.refundedTickets} refund item(s) queued` : 'Event cancelled')
       void fetchEvent()
     } catch (error) {
       console.error('Cancel error:', error)
@@ -516,7 +516,6 @@ export default function AdminEventDetailPage() {
     )
   }
 
-  const isFeatured = event.featured && event.featured.length > 0
   const lifecycleStatus = getEventLifecycleStatus(event)
   const revenue = bookings.reduce((sum, b) => sum + (b.total_amount || 0), 0)
 
@@ -535,12 +534,6 @@ export default function AdminEventDetailPage() {
             <div className="flex items-center gap-2">
               <h2 className="text-2xl font-bold">{event.title}</h2>
               <Badge className={lifecycleStatus.color}>{lifecycleStatus.label}</Badge>
-              {isFeatured && (
-                <Badge className="bg-yellow-100 text-yellow-700">
-                  <Star className="h-3 w-3 mr-1 fill-current" />
-                  Featured
-                </Badge>
-              )}
             </div>
             <p className="text-muted-foreground">Created {format(new Date(event.created_at), 'PPP')}</p>
           </div>
@@ -613,18 +606,6 @@ export default function AdminEventDetailPage() {
               <XCircle className="h-4 w-4 mr-2" />
               Cancel
             </Button>
-
-            {isFeatured ? (
-              <Button onClick={() => openAction('unfeature')} variant="outline">
-                <Star className="h-4 w-4 mr-2" />
-                Unfeature
-              </Button>
-            ) : (
-              <Button onClick={() => openAction('feature')} variant="outline">
-                <Star className="h-4 w-4 mr-2" />
-                Feature
-              </Button>
-            )}
 
             {event.state !== 'suspended' && (
               <Button onClick={() => openAction('suspend')} variant="outline" className="text-orange-600 border-orange-300 hover:bg-orange-50">
@@ -1017,16 +998,12 @@ export default function AdminEventDetailPage() {
               {actionType === 'approve' && 'Approve Event'}
               {actionType === 'reject' && 'Reject Event'}
               {actionType === 'suspend' && 'Suspend Event'}
-              {actionType === 'feature' && 'Feature Event'}
-              {actionType === 'unfeature' && 'Remove from Featured'}
               {actionType === 'delete' && 'Delete Event'}
             </DialogTitle>
             <DialogDescription>
               {actionType === 'approve' && 'Approve this event to allow it to be published on the platform.'}
               {actionType === 'reject' && 'Reject this event. The organizer will be notified with your feedback.'}
               {actionType === 'suspend' && 'Suspend this event. It will be hidden from the platform immediately.'}
-              {actionType === 'feature' && 'Feature this event on the homepage for more visibility.'}
-              {actionType === 'unfeature' && 'Remove this event from the featured section.'}
               {actionType === 'delete' && 'Permanently delete this event. This action cannot be undone.'}
             </DialogDescription>
           </DialogHeader>
@@ -1076,8 +1053,6 @@ export default function AdminEventDetailPage() {
                     {actionType === 'approve' && <CheckCircle className="h-4 w-4 mr-2" />}
                     {actionType === 'reject' && <XCircle className="h-4 w-4 mr-2" />}
                     {actionType === 'suspend' && <Ban className="h-4 w-4 mr-2" />}
-                    {actionType === 'feature' && <Star className="h-4 w-4 mr-2" />}
-                    {actionType === 'unfeature' && <Star className="h-4 w-4 mr-2" />}
                     {actionType === 'delete' && <Trash2 className="h-4 w-4 mr-2" />}
                     {actionType.charAt(0).toUpperCase() + actionType.slice(1)}
                   </>

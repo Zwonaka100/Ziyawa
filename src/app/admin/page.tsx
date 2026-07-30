@@ -6,7 +6,8 @@ import {
   AlertTriangle, 
   MessageSquare,
   UserPlus,
-  CalendarPlus
+  CalendarPlus,
+  Briefcase
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -22,6 +23,7 @@ export default async function AdminDashboardPage() {
     { count: totalUsers },
     { count: totalOrganizers },
     { count: totalArtists },
+    { count: totalCrewProfiles },
     { count: totalEvents },
     { count: publishedEvents },
     { count: pendingReports },
@@ -33,6 +35,7 @@ export default async function AdminDashboardPage() {
     supabase.from('profiles').select('*', { count: 'exact', head: true }),
     supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('is_organizer', true),
     supabase.from('artists').select('*', { count: 'exact', head: true }),
+    supabase.from('providers').select('*', { count: 'exact', head: true }),
     supabase.from('events').select('*', { count: 'exact', head: true }),
     supabase.from('events').select('*', { count: 'exact', head: true }).eq('is_published', true),
     supabase.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
@@ -45,7 +48,8 @@ export default async function AdminDashboardPage() {
   const stats = [
     { name: 'Total Users', value: totalUsers || 0, icon: Users, href: '/admin/users', color: 'text-blue-600' },
     { name: 'Organizers', value: totalOrganizers || 0, icon: Users, href: '/admin/users?role=organizer', color: 'text-purple-600' },
-    { name: 'Artists', value: totalArtists || 0, icon: Users, href: '/admin/users?role=artist', color: 'text-pink-600' },
+    { name: 'Artists', value: totalArtists || 0, icon: Users, href: '/admin/artists', color: 'text-pink-600' },
+    { name: 'Crew Profiles', value: totalCrewProfiles || 0, icon: Briefcase, href: '/admin/crew', color: 'text-indigo-600' },
     { name: 'Total Events', value: totalEvents || 0, icon: Calendar, href: '/admin/events', color: 'text-green-600' },
     { name: 'Published Events', value: publishedEvents || 0, icon: Calendar, href: '/admin/events?status=published', color: 'text-emerald-600' },
     { name: 'Pending Reports', value: pendingReports || 0, icon: AlertTriangle, href: '/admin/reports', color: 'text-orange-600' },

@@ -45,6 +45,23 @@ import {
 import { EventMedia, MediaType, MEDIA_TYPE_LABELS, extractYouTubeId, getYouTubeThumbnail } from '@/types/database';
 import { toast } from 'sonner';
 
+function isValidTikTokUrl(url: string): boolean {
+  return /tiktok\.com\//i.test(url);
+}
+
+function isValidInstagramVideoUrl(url: string): boolean {
+  return /instagram\.com\/(reel|reels|tv)\//i.test(url);
+}
+
+function isValidFacebookVideoUrl(url: string): boolean {
+  return /facebook\.com\/.+\/videos\//i.test(url) || /fb\.watch\//i.test(url);
+}
+
+function getVideoPlaceholderThumbnail(label: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720"><rect width="1280" height="720" fill="#111827"/><rect x="40" y="40" width="1200" height="640" rx="24" fill="#1f2937"/><circle cx="640" cy="360" r="88" fill="#374151"/><polygon points="610,310 610,410 700,360" fill="#ffffff"/><text x="640" y="530" font-family="Arial, Helvetica, sans-serif" font-size="40" fill="#e5e7eb" text-anchor="middle">${label}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
 interface EventMediaManagerProps {
   eventId: string;
   eventTitle: string;
@@ -170,9 +187,22 @@ export function EventMediaManager({
     }
 
     if (newMedia.media_type === 'tiktok_video') {
-      const isValidTikTokUrl = /tiktok\.com\//i.test(trimmedMediaUrl);
-      if (!isValidTikTokUrl) {
+      if (!isValidTikTokUrl(trimmedMediaUrl)) {
         toast.error('Please enter a valid TikTok URL');
+        return;
+      }
+    }
+
+    if (newMedia.media_type === 'instagram_reel') {
+      if (!isValidInstagramVideoUrl(trimmedMediaUrl)) {
+        toast.error('Please enter a valid Instagram Reel URL');
+        return;
+      }
+    }
+
+    if (newMedia.media_type === 'facebook_video') {
+      if (!isValidFacebookVideoUrl(trimmedMediaUrl)) {
+        toast.error('Please enter a valid Facebook video URL');
         return;
       }
     }
@@ -291,6 +321,9 @@ export function EventMediaManager({
   const getThumbnail = (item: EventMedia): string => {
     if (item.thumbnail_url) return item.thumbnail_url;
     if (item.embed_id) return getYouTubeThumbnail(item.embed_id);
+    if (item.media_type === 'tiktok_video') return getVideoPlaceholderThumbnail('TikTok Video');
+    if (item.media_type === 'instagram_reel') return getVideoPlaceholderThumbnail('Instagram Reel');
+    if (item.media_type === 'facebook_video') return getVideoPlaceholderThumbnail('Facebook Video');
     return item.url;
   };
 
@@ -451,6 +484,8 @@ export function EventMediaManager({
                       <SelectItem value="image">Image</SelectItem>
                       <SelectItem value="youtube_video">YouTube Video</SelectItem>
                       <SelectItem value="tiktok_video">TikTok Video</SelectItem>
+                      <SelectItem value="instagram_reel">Instagram Reel</SelectItem>
+                      <SelectItem value="facebook_video">Facebook Video</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -495,13 +530,23 @@ export function EventMediaManager({
                 {newMedia.media_type !== 'image' && (
                   <div className="space-y-2">
                     <Label>
-                      {newMedia.media_type === 'youtube_video' ? 'YouTube URL' : 'TikTok URL'}
+                      {newMedia.media_type === 'youtube_video'
+                        ? 'YouTube URL'
+                        : newMedia.media_type === 'tiktok_video'
+                          ? 'TikTok URL'
+                          : newMedia.media_type === 'instagram_reel'
+                            ? 'Instagram Reel URL'
+                            : 'Facebook Video URL'}
                     </Label>
                     <Input
                       placeholder={
                         newMedia.media_type === 'youtube_video'
                           ? 'https://www.youtube.com/watch?v=...'
-                          : 'https://www.tiktok.com/@user/video/...'
+                          : newMedia.media_type === 'tiktok_video'
+                            ? 'https://www.tiktok.com/@user/video/...'
+                            : newMedia.media_type === 'instagram_reel'
+                              ? 'https://www.instagram.com/reel/.../'
+                              : 'https://www.facebook.com/.../videos/...'
                       }
                       value={newMedia.url}
                       onChange={(e) => setNewMedia(prev => ({ ...prev, url: e.target.value }))}
@@ -641,7 +686,7 @@ export function EventMediaManager({
             <div className="text-center py-12 bg-neutral-50 rounded-xl">
               <Video className="h-12 w-12 text-neutral-300 mx-auto mb-3" />
               <p className="text-neutral-500">No promo videos yet</p>
-              <p className="text-sm text-neutral-400">Add YouTube or TikTok videos to promote your event</p>
+              <p className="text-sm text-neutral-400">Add YouTube, TikTok, Instagram, or Facebook videos to promote your event</p>
             </div>
           )}
         </div>

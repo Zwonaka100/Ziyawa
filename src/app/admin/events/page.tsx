@@ -33,7 +33,6 @@ import {
   MoreHorizontal,
   Eye,
   Trash2,
-  Star,
   CheckCircle,
   XCircle,
   ChevronLeft,
@@ -280,70 +279,70 @@ export default function AdminEventsPage() {
   }
 
   const handlePublish = async (eventId: string, publish: boolean) => {
-    const supabase = createClient()
     setPublishingEventId(eventId)
+    try {
+      const response = await fetch(`/api/admin/events/${eventId}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ publish }),
+      })
 
-    const { error } = await supabase
-      .from('events')
-      .update({ is_published: publish })
-      .eq('id', eventId)
+      const payload = await response.json().catch(() => ({})) as { error?: string; refundedTickets?: number }
 
-    if (error) {
-      toast.error('Failed to update event')
-    } else {
-      toast.success(publish ? 'Event published' : 'Event unpublished')
+      if (!response.ok) {
+        throw new Error(payload.error || 'Failed to update event visibility')
+      }
+
+      if (!publish && (payload.refundedTickets || 0) > 0) {
+        toast.success(`Event cancelled and ${payload.refundedTickets} refund item(s) queued`)
+      } else {
+        toast.success(publish ? 'Event published' : 'Event unpublished')
+      }
+
       setSelectedEventIds((prev) => prev.filter((id) => id !== eventId))
       void fetchEvents()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update event visibility')
+    } finally {
+      setPublishingEventId(null)
     }
-
-    setPublishingEventId(null)
   }
 
   const handleBulkPublish = async (publish: boolean) => {
     if (selectedEventIds.length === 0) return
-
-    const supabase = createClient()
-    setBulkActionLoading(true)
-
-    const { error } = await supabase
-      .from('events')
-      .update({ is_published: publish })
-      .in('id', selectedEventIds)
-
-    if (error) {
-      toast.error('Failed to update selected events')
-    } else {
-      toast.success(publish ? `Published ${selectedEventIds.length} event(s)` : `Unpublished ${selectedEventIds.length} event(s)`)
-      setSelectedEventIds([])
-      void fetchEvents()
-    }
-
-    setBulkActionLoading(false)
-  }
-
-  const handleBulkFeature = async () => {
-    if (selectedEventIds.length === 0) return
-
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
     setBulkActionLoading(true)
 
     try {
-      const inserts = selectedEventIds.map((eventId) => ({
-        event_id: eventId,
-        featured_by: user?.id,
-      }))
+      let successCount = 0
+      let refundCount = 0
 
-      const { error } = await supabase.from('featured_events').insert(inserts)
+      for (const eventId of selectedEventIds) {
+        const response = await fetch(`/api/admin/events/${eventId}/publish`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ publish }),
+        })
 
-      if (error) throw error
+        const payload = await response.json().catch(() => ({})) as { refundedTickets?: number }
+        if (response.ok) {
+          successCount += 1
+          refundCount += Number(payload.refundedTickets || 0)
+        }
+      }
 
-      toast.success(`Featured ${selectedEventIds.length} event(s)`)
+      if (successCount === 0) {
+        toast.error('Failed to update selected events')
+      } else if (!publish && refundCount > 0) {
+        toast.success(`Updated ${successCount} event(s). ${refundCount} refund item(s) queued.`)
+      } else {
+        toast.success(publish ? `Published ${successCount} event(s)` : `Unpublished ${successCount} event(s)`)
+      }
+
       setSelectedEventIds([])
       void fetchEvents()
     } catch (error) {
       console.error(error)
-      toast.error('Failed to feature selected events')
+      toast.error('Failed to update selected events')
     } finally {
       setBulkActionLoading(false)
     }
@@ -353,23 +352,42 @@ export default function AdminEventsPage() {
     if (selectedEventIds.length === 0) return
     if (!confirm(`Delete ${selectedEventIds.length} selected event(s)? This cannot be undone.`)) return
 
-    const supabase = createClient()
     setBulkActionLoading(true)
 
-    const { error } = await supabase
-      .from('events')
-      .delete()
-      .in('id', selectedEventIds)
+    try {
+      let successCount = 0
+      let cancelledCount = 0
 
-    if (error) {
-      toast.error('Failed to delete selected events')
-    } else {
-      toast.success(`Deleted ${selectedEventIds.length} event(s)`)
+      for (const eventId of selectedEventIds) {
+        const response = await fetch(`/api/admin/events/${eventId}/publish`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ operation: 'delete', reason: 'Removed by admin moderation' }),
+        })
+
+        const payload = await response.json().catch(() => ({})) as { deleted?: boolean }
+        if (response.ok) {
+          successCount += 1
+          if (!payload.deleted) cancelledCount += 1
+        }
+      }
+
+      if (successCount === 0) {
+        toast.error('Failed to delete selected events')
+      } else if (cancelledCount > 0) {
+        toast.success(`Removed ${successCount} event(s). ${cancelledCount} were cancelled due to existing records.`)
+      } else {
+        toast.success(`Deleted ${successCount} event(s)`)
+      }
+
       setSelectedEventIds([])
       void fetchEvents()
+    } catch (error) {
+      console.error(error)
+      toast.error('Failed to delete selected events')
+    } finally {
+      setBulkActionLoading(false)
     }
-
-    setBulkActionLoading(false)
   }
 
   const handleDelete = async (eventId: string) => {
@@ -377,40 +395,22 @@ export default function AdminEventsPage() {
       return
     }
 
-    const supabase = createClient()
-
-    const { error } = await supabase
-      .from('events')
-      .delete()
-      .eq('id', eventId)
-
-    if (error) {
-      toast.error('Failed to delete event')
-    } else {
-      toast.success('Event deleted')
-      void fetchEvents()
-    }
-  }
-
-  const handleFeature = async (eventId: string) => {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    const { error } = await supabase
-      .from('featured_events')
-      .insert({
-        event_id: eventId,
-        featured_by: user?.id,
+    try {
+      const response = await fetch(`/api/admin/events/${eventId}/publish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operation: 'delete', reason: 'Removed by admin moderation' }),
       })
 
-    if (error) {
-      if (error.code === '23505') {
-        toast.error('Event is already featured')
-      } else {
-        toast.error('Failed to feature event')
+      const payload = await response.json().catch(() => ({})) as { error?: string; deleted?: boolean }
+      if (!response.ok) {
+        throw new Error(payload.error || 'Failed to delete event')
       }
-    } else {
-      toast.success('Event featured on homepage')
+
+      toast.success(payload.deleted ? 'Event deleted' : 'Event removed from public listings')
+      void fetchEvents()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete event')
     }
   }
 
@@ -437,10 +437,6 @@ export default function AdminEventsPage() {
               <Button type="button" size="sm" variant="outline" onClick={() => void handleBulkPublish(false)} disabled={bulkActionLoading}>
                 {bulkActionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
                 Unpublish
-              </Button>
-              <Button type="button" size="sm" variant="outline" onClick={() => void handleBulkFeature()} disabled={bulkActionLoading}>
-                {bulkActionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Star className="mr-2 h-4 w-4" />}
-                Feature
               </Button>
               <Button type="button" size="sm" variant="destructive" onClick={() => void handleBulkDelete()} disabled={bulkActionLoading}>
                 {bulkActionLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
@@ -670,10 +666,6 @@ export default function AdminEventsPage() {
                                 Publish
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem disabled={bulkActionLoading} onClick={() => handleFeature(event.id)}>
-                              <Star className="h-4 w-4 mr-2" />
-                              Feature Event
-                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem disabled={bulkActionLoading} onClick={() => handleDelete(event.id)} className="text-red-600">
                               <Trash2 className="h-4 w-4 mr-2" />

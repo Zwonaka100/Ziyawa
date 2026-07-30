@@ -24,11 +24,11 @@ export async function POST(
     }
 
     const body = await request.json().catch(() => ({})) as { reason?: string }
-    const reason = String(body.reason || '').trim() || 'Cancelled by organizer'
+    const providedReason = String(body.reason || '').trim()
 
     const { data: event, error: eventError } = await supabaseAdmin
       .from('events')
-      .select('id, title, organizer_id, state')
+      .select('id, title, organizer_id, state, tickets_sold')
       .eq('id', eventId)
       .single()
 
@@ -39,6 +39,13 @@ export async function POST(
     if (event.organizer_id !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+
+    const soldTickets = Number(event.tickets_sold || 0)
+    if (soldTickets > 0 && !providedReason) {
+      return NextResponse.json({ error: 'Cancellation reason is required after ticket sales begin' }, { status: 400 })
+    }
+
+    const reason = providedReason || 'Cancelled by organizer'
 
     if (event.state === 'cancelled') {
       return NextResponse.json({ success: true, alreadyCancelled: true })
