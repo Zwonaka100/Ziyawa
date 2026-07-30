@@ -35,15 +35,33 @@ export function emailWrapper(content: string): string {
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
     }
     .header {
-      background: linear-gradient(135deg, #7c3aed 0%, #9333ea 100%);
-      padding: 30px;
+      background: linear-gradient(135deg, #18082e 0%, #4c1d95 50%, #7c3aed 100%);
+      padding: 28px 30px;
       text-align: center;
     }
+    .brand-lockup {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-lockup img {
+      width: 148px;
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
     .logo {
-      font-size: 28px;
-      font-weight: bold;
+      font-size: 26px;
+      font-weight: 800;
       color: #ffffff;
       text-decoration: none;
+      letter-spacing: 0.02em;
+    }
+    .tagline {
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 13px;
+      margin: 0;
     }
     .content {
       padding: 40px 30px;
@@ -123,9 +141,13 @@ export function emailWrapper(content: string): string {
   <div class="container">
     <div class="email-wrapper">
       <div class="header">
-        <a href="${SITE_URL}" class="logo">
-          Ziyawa
-        </a>
+        <div class="brand-lockup">
+          <a href="${SITE_URL}" aria-label="Ziyawa home">
+            <img src="${SITE_URL}/ziyawa-logo.svg" alt="Ziyawa" />
+          </a>
+          <a href="${SITE_URL}" class="logo">Ziyawa</a>
+          <p class="tagline">South Africa's event operating system</p>
+        </div>
       </div>
       <div class="content">
         ${content}
@@ -599,6 +621,375 @@ export function eventPublishedEmail(data: {
         Manage this event
       </a>
     </p>
+  `;
+
+  return emailWrapper(content);
+}
+
+export function providerBookingRequestEmail(data: {
+  recipientName: string;
+  organizerName: string;
+  eventName: string;
+  eventDate: string;
+  eventLocation: string;
+  serviceName: string;
+  amount: string;
+  quantity: number;
+  notes?: string;
+  actionUrl: string;
+}): string {
+  const content = `
+    <h1>New service booking request</h1>
+    <p>Hi ${data.recipientName},</p>
+    <p><strong>${data.organizerName}</strong> wants to book your service for <strong>${data.eventName}</strong>.</p>
+
+    <div class="highlight-box">
+      <div class="detail-row">
+        <span class="detail-label">Service</span>
+        <span class="detail-value">${data.serviceName}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Date</span>
+        <span class="detail-value">${data.eventDate}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Location</span>
+        <span class="detail-value">${data.eventLocation}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Quantity</span>
+        <span class="detail-value">${data.quantity}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Offer</span>
+        <span class="detail-value">${data.amount}</span>
+      </div>
+    </div>
+
+    ${data.notes ? `<div style="background-color: #f3f4f6; border-radius: 8px; padding: 16px; margin: 20px 0;"><strong>Notes from organiser:</strong><br/>${data.notes}</div>` : ''}
+
+    <p>Please review the request and respond on Ziyawa so the organiser can move forward.</p>
+
+    <p style="text-align: center;">
+      <a href="${data.actionUrl}" class="button">
+        Review Booking Request
+      </a>
+    </p>
+  `;
+
+  return emailWrapper(content);
+}
+
+export function bookingResponseEmail(data: {
+  recipientName: string;
+  responderName: string;
+  eventName: string;
+  responseType: 'accepted' | 'declined' | 'countered';
+  amount?: string;
+  note?: string;
+  actionUrl: string;
+}): string {
+  const headline = data.responseType === 'accepted'
+    ? 'Your booking was accepted'
+    : data.responseType === 'declined'
+      ? 'Your booking was declined'
+      : 'You received a counter-offer';
+
+  const body = data.responseType === 'accepted'
+    ? `${data.responderName} accepted your booking for <strong>${data.eventName}</strong>. You can now complete payment to confirm it.`
+    : data.responseType === 'declined'
+      ? `${data.responderName} declined your booking request for <strong>${data.eventName}</strong>.`
+      : `${data.responderName} sent a counter-offer for <strong>${data.eventName}</strong>. Review the updated amount and decide on the next step.`;
+
+  const content = `
+    <h1>${headline}</h1>
+    <p>Hi ${data.recipientName},</p>
+    <p>${body}</p>
+
+    <div class="highlight-box">
+      <div class="detail-row">
+        <span class="detail-label">Event</span>
+        <span class="detail-value">${data.eventName}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Response</span>
+        <span class="detail-value">${data.responseType}</span>
+      </div>
+      ${data.amount ? `<div class="detail-row"><span class="detail-label">Amount</span><span class="detail-value">${data.amount}</span></div>` : ''}
+    </div>
+
+    ${data.note ? `<div style="background-color: #f3f4f6; border-radius: 8px; padding: 16px; margin: 20px 0;"><strong>Message:</strong><br/>${data.note}</div>` : ''}
+
+    <p style="text-align: center;">
+      <a href="${data.actionUrl}" class="button">
+        Open Booking Details
+      </a>
+    </p>
+  `;
+
+  return emailWrapper(content);
+}
+
+export function bookingPaymentConfirmedEmail(data: {
+  recipientName: string;
+  eventName: string;
+  eventDate: string;
+  eventLocation: string;
+  amount: string;
+  bookingRoleLabel: string;
+  actionUrl: string;
+}): string {
+  const content = `
+    <h1>Payment secured for your booking</h1>
+    <p>Hi ${data.recipientName},</p>
+    <p>The organiser has completed payment for your ${data.bookingRoleLabel.toLowerCase()} booking on <strong>${data.eventName}</strong>.</p>
+
+    <div class="highlight-box">
+      <div class="detail-row">
+        <span class="detail-label">Event</span>
+        <span class="detail-value">${data.eventName}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Date</span>
+        <span class="detail-value">${data.eventDate}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Location</span>
+        <span class="detail-value">${data.eventLocation}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Amount held in escrow</span>
+        <span class="detail-value">${data.amount}</span>
+      </div>
+    </div>
+
+    <p>The funds are protected in escrow and will be released when the job is completed according to Ziyawa's workflow.</p>
+
+    <p style="text-align: center;">
+      <a href="${data.actionUrl}" class="button">
+        Open Booking
+      </a>
+    </p>
+  `;
+
+  return emailWrapper(content);
+}
+
+export function eventCancelledEmail(data: {
+  recipientName: string;
+  eventName: string;
+  eventDate: string;
+  reason?: string;
+  actionLabel: string;
+  actionUrl: string;
+  roleLabel: 'attendee' | 'artist' | 'provider' | 'crew';
+}): string {
+  const nextStep = data.roleLabel === 'attendee'
+    ? 'Any eligible refund will be processed according to your payment and ticket status.'
+    : 'Please open Ziyawa to review the change and any follow-up actions for this booking or assignment.';
+
+  const content = `
+    <h1>Event cancelled</h1>
+    <p>Hi ${data.recipientName},</p>
+    <p>We need to let you know that <strong>${data.eventName}</strong>, scheduled for ${data.eventDate}, has been cancelled.</p>
+
+    ${data.reason ? `<div style="background-color: #fff7ed; border-left: 4px solid #f97316; padding: 15px; margin: 20px 0; border-radius: 4px;"><p style="margin:0;"><strong>Reason:</strong> ${data.reason}</p></div>` : ''}
+
+    <p>${nextStep}</p>
+
+    <p style="text-align: center;">
+      <a href="${data.actionUrl}" class="button">
+        ${data.actionLabel}
+      </a>
+    </p>
+  `;
+
+  return emailWrapper(content);
+}
+
+export function criticalEventChangeEmail(data: {
+  recipientName: string;
+  eventName: string;
+  changes: string[];
+  eventDate: string;
+  eventTime: string;
+  eventLocation: string;
+  actionUrl: string;
+}): string {
+  const listItems = data.changes.map((item) => `<li>${item}</li>`).join('')
+
+  const content = `
+    <h1>Important update for ${data.eventName}</h1>
+    <p>Hi ${data.recipientName},</p>
+    <p>Some important event details have changed. Please review the latest information below.</p>
+
+    <div class="highlight-box">
+      <div class="detail-row">
+        <span class="detail-label">Date</span>
+        <span class="detail-value">${data.eventDate}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Time</span>
+        <span class="detail-value">${data.eventTime}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Venue</span>
+        <span class="detail-value">${data.eventLocation}</span>
+      </div>
+    </div>
+
+    <p><strong>What changed:</strong></p>
+    <ul style="color: #374151; margin-bottom: 20px;">${listItems}</ul>
+
+    <p style="text-align: center;">
+      <a href="${data.actionUrl}" class="button">
+        View Updated Event
+      </a>
+    </p>
+  `;
+
+  return emailWrapper(content);
+}
+
+export function payoutStatusEmail(data: {
+  recipientName: string;
+  amount: string;
+  status: 'initiated' | 'completed' | 'failed' | 'reversed';
+  bankAccount?: string;
+  actionUrl: string;
+}): string {
+  const title = data.status === 'initiated'
+    ? 'Your payout is on the way'
+    : data.status === 'completed'
+      ? 'Your payout is complete'
+      : data.status === 'failed'
+        ? 'Your payout could not be completed'
+        : 'Your payout was reversed';
+
+  const body = data.status === 'initiated'
+    ? `Your payout of <strong>${data.amount}</strong> has been initiated and is being sent to ${data.bankAccount || 'your bank account'}.`
+    : data.status === 'completed'
+      ? `Your payout of <strong>${data.amount}</strong> has been completed successfully.`
+      : data.status === 'failed'
+        ? `Your payout of <strong>${data.amount}</strong> could not be completed. The funds have been restored to your wallet.`
+        : `Your payout of <strong>${data.amount}</strong> was reversed. The funds are now back in your wallet.`;
+
+  const content = `
+    <h1>${title}</h1>
+    <p>Hi ${data.recipientName},</p>
+    <p>${body}</p>
+
+    <p style="text-align: center;">
+      <a href="${data.actionUrl}" class="button">
+        Open Wallet
+      </a>
+    </p>
+  `;
+
+  return emailWrapper(content);
+}
+
+export function brandedNotificationEmail(data: {
+  recipientName: string;
+  title: string;
+  message: string;
+  actionUrl?: string;
+  actionLabel?: string;
+}): string {
+  const content = `
+    <h1>${data.title}</h1>
+    <p>Hi ${data.recipientName},</p>
+    <p>${data.message}</p>
+    ${data.actionUrl ? `
+      <p style="text-align: center;">
+        <a href="${data.actionUrl}" class="button">
+          ${data.actionLabel || 'Open Ziyawa'}
+        </a>
+      </p>
+    ` : ''}
+  `;
+
+  return emailWrapper(content);
+}
+
+export function crewInviteEmail(data: {
+  recipientName: string;
+  eventName: string;
+  roleLabel: string;
+  eventDate: string;
+  eventLocation: string;
+  offerLine?: string;
+  noteLine?: string;
+  inviteUrl: string;
+}): string {
+  const content = `
+    <h1>You have a crew invite</h1>
+    <p>Hi ${data.recipientName},</p>
+    <p>You have been invited to join the Ziyawa team for <strong>${data.eventName}</strong>.</p>
+
+    <div class="highlight-box">
+      <div class="detail-row">
+        <span class="detail-label">Role</span>
+        <span class="detail-value">${data.roleLabel}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Date</span>
+        <span class="detail-value">${data.eventDate}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Venue</span>
+        <span class="detail-value">${data.eventLocation}</span>
+      </div>
+      ${data.offerLine ? `<div class="detail-row"><span class="detail-label">Proposed rate</span><span class="detail-value">${data.offerLine}</span></div>` : ''}
+    </div>
+
+    ${data.noteLine ? `<div style="background-color: #f3f4f6; border-radius: 8px; padding: 16px; margin: 20px 0;">${data.noteLine}</div>` : ''}
+
+    <p>You can accept this invite and activate your Ziyawa crew access using the link below.</p>
+
+    <p style="text-align: center;">
+      <a href="${data.inviteUrl}" class="button">
+        Activate Crew Dashboard
+      </a>
+    </p>
+  `;
+
+  return emailWrapper(content);
+}
+
+export function attendeeContactOrganizerEmail(data: {
+  organizerName: string;
+  eventName: string;
+  attendeeName: string;
+  attendeeEmail: string;
+  attendeePhone?: string;
+  message: string;
+}): string {
+  const content = `
+    <h1>New attendee message</h1>
+    <p>Hi ${data.organizerName},</p>
+    <p>You received a new message from a ticket holder for <strong>${data.eventName}</strong>.</p>
+
+    <div class="highlight-box">
+      <div class="detail-row">
+        <span class="detail-label">Name</span>
+        <span class="detail-value">${data.attendeeName}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Email</span>
+        <span class="detail-value">${data.attendeeEmail}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Phone</span>
+        <span class="detail-value">${data.attendeePhone || 'Not provided'}</span>
+      </div>
+    </div>
+
+    <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 20px 0; color: #374151;">
+      ${data.message.replace(/\n/g, '<br/>')}
+    </div>
+
+    <p>You can reply directly to this email to respond to the attendee.</p>
   `;
 
   return emailWrapper(content);

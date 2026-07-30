@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { createNotification } from '@/lib/notifications'
+import { createBulkNotifications, createNotification } from '@/lib/notifications'
+import { sendEventCancelledEmail } from '@/lib/email'
+import { getEventEmailAudience } from '@/lib/event-email-audience'
 
 const supabaseAdmin = createServiceClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -112,6 +114,76 @@ export async function POST(
         },
         sendEmail: false,
       })
+    }
+
+    const audience = await getEventEmailAudience(eventId)
+    const eventDate = new Date(now).toLocaleDateString('en-ZA', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    })
+
+    const directEmails = [
+      ...audience.attendees.map((recipient) => sendEventCancelledEmail(recipient.email, {
+        recipientName: recipient.name.split(' ')[0] || recipient.name,
+        eventName: event.title,
+        eventDate,
+        reason,
+        roleLabel: 'attendee' as const,
+        actionLabel: 'Open My Tickets',
+        actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/dashboard/tickets`,
+      })),
+      ...audience.artists.map((recipient) => sendEventCancelledEmail(recipient.email, {
+        recipientName: recipient.name.split(' ')[0] || recipient.name,
+        eventName: event.title,
+        eventDate,
+        reason,
+        roleLabel: 'artist' as const,
+        actionLabel: 'Open Artist Dashboard',
+        actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/dashboard/artist`,
+      })),
+      ...audience.providers.map((recipient) => sendEventCancelledEmail(recipient.email, {
+        recipientName: recipient.name.split(' ')[0] || recipient.name,
+        eventName: event.title,
+        eventDate,
+        reason,
+        roleLabel: 'provider' as const,
+        actionLabel: 'Open Crew Dashboard',
+        actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/dashboard/provider`,
+      })),
+      ...audience.crew.map((recipient) => sendEventCancelledEmail(recipient.email, {
+        recipientName: recipient.name.split(' ')[0] || recipient.name,
+        eventName: event.title,
+        eventDate,
+        reason,
+        roleLabel: 'crew' as const,
+        actionLabel: 'Open Crew Dashboard',
+        actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/dashboard/event-work`,
+      })),
+    ]
+
+    await Promise.all(directEmails)
+
+    const recipientNotifications = [
+      ...audience.attendees,
+      ...audience.artists,
+      ...audience.providers,
+      ...audience.crew,
+    ]
+      .filter((recipient) => recipient.userId)
+      .map((recipient) => ({
+        userId: recipient.userId!,
+        type: 'event_cancelled' as const,
+        title: `Event cancelled: ${event.title}`,
+        message: `${event.title} has been cancelled. ${recipient.role === 'attendee' ? 'Refund processing will follow where applicable.' : 'Please review your dashboard for next steps.'}`,
+        link: recipient.role === 'attendee' ? '/dashboard/tickets' : recipient.role === 'artist' ? '/dashboard/artist' : recipient.role === 'provider' ? '/dashboard/provider' : '/dashboard/event-work',
+        eventId,
+        sendEmail: false,
+      }))
+
+    if (recipientNotifications.length > 0) {
+      await createBulkNotifications(recipientNotifications)
     }
 
     return NextResponse.json({

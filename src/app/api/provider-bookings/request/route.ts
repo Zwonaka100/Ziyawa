@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createNotification } from '@/lib/notifications'
+import { sendProviderBookingRequestEmail } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
   try {
@@ -172,6 +173,32 @@ export async function POST(request: NextRequest) {
         bookingId: newBooking.id,
         sendEmail: false,
       })
+
+      const { data: providerProfile } = await supabase
+        .from('profiles')
+        .select('email, full_name')
+        .eq('id', provider.profile_id)
+        .maybeSingle()
+
+      if (providerProfile?.email) {
+        await sendProviderBookingRequestEmail(providerProfile.email, {
+          recipientName: providerProfile.full_name || provider.business_name || 'there',
+          organizerName: organizerProfile.full_name || 'Organizer',
+          eventName: event.title,
+          eventDate: new Date(event.event_date).toLocaleDateString('en-ZA', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          }),
+          eventLocation: event.venue || 'Venue to be confirmed',
+          serviceName: service.service_name,
+          amount: `R${offeredAmount.toFixed(2)}`,
+          quantity,
+          notes: notes || undefined,
+          actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/dashboard/provider`,
+        })
+      }
     }
 
     return NextResponse.json({

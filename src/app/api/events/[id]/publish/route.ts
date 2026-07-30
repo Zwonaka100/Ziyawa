@@ -70,13 +70,13 @@ export async function POST(
 
     const { data: emailPrefs } = await supabaseAdmin
       .from('notification_preferences')
-      .select('email_enabled, event_notifications')
+      .select('email_events')
       .eq('user_id', event.organizer_id)
       .maybeSingle()
 
     const shouldSendPublishEmail = Boolean(
       organizerProfile?.email &&
-      (emailPrefs == null || (emailPrefs.email_enabled && emailPrefs.event_notifications))
+      (emailPrefs == null || emailPrefs.email_events !== false)
     )
 
     if (shouldSendPublishEmail && organizerProfile) {

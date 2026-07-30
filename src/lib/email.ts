@@ -265,6 +265,194 @@ export async function sendEventPublishedEmail(
   });
 }
 
+export async function sendProviderBookingRequestEmail(
+  to: string,
+  data: {
+    recipientName: string;
+    organizerName: string;
+    eventName: string;
+    eventDate: string;
+    eventLocation: string;
+    serviceName: string;
+    amount: string;
+    quantity: number;
+    notes?: string;
+    actionUrl: string;
+  }
+): Promise<SendEmailResult> {
+  return sendEmail({
+    to,
+    subject: `New service booking request for ${data.eventName}`,
+    html: EmailTemplates.providerBookingRequestEmail(data),
+    tags: [{ name: 'category', value: 'provider-booking-request' }],
+  })
+}
+
+export async function sendBookingResponseEmail(
+  to: string,
+  data: {
+    recipientName: string;
+    responderName: string;
+    eventName: string;
+    responseType: 'accepted' | 'declined' | 'countered';
+    amount?: string;
+    note?: string;
+    actionUrl: string;
+  }
+): Promise<SendEmailResult> {
+  return sendEmail({
+    to,
+    subject: `Booking update for ${data.eventName}`,
+    html: EmailTemplates.bookingResponseEmail(data),
+    tags: [{ name: 'category', value: 'booking-response' }],
+  })
+}
+
+export async function sendBookingPaymentConfirmedEmail(
+  to: string,
+  data: {
+    recipientName: string;
+    eventName: string;
+    eventDate: string;
+    eventLocation: string;
+    amount: string;
+    bookingRoleLabel: string;
+    actionUrl: string;
+  }
+): Promise<SendEmailResult> {
+  return sendEmail({
+    to,
+    subject: `Payment secured for ${data.eventName}`,
+    html: EmailTemplates.bookingPaymentConfirmedEmail(data),
+    tags: [{ name: 'category', value: 'booking-confirmed' }],
+  })
+}
+
+export async function sendEventCancelledEmail(
+  to: string,
+  data: {
+    recipientName: string;
+    eventName: string;
+    eventDate: string;
+    reason?: string;
+    actionLabel: string;
+    actionUrl: string;
+    roleLabel: 'attendee' | 'artist' | 'provider' | 'crew';
+  }
+): Promise<SendEmailResult> {
+  return sendEmail({
+    to,
+    subject: `Event cancelled: ${data.eventName}`,
+    html: EmailTemplates.eventCancelledEmail(data),
+    tags: [{ name: 'category', value: 'event-cancelled' }],
+  })
+}
+
+export async function sendCriticalEventChangeEmail(
+  to: string,
+  data: {
+    recipientName: string;
+    eventName: string;
+    changes: string[];
+    eventDate: string;
+    eventTime: string;
+    eventLocation: string;
+    actionUrl: string;
+  }
+): Promise<SendEmailResult> {
+  return sendEmail({
+    to,
+    subject: `Important update: ${data.eventName}`,
+    html: EmailTemplates.criticalEventChangeEmail(data),
+    tags: [{ name: 'category', value: 'event-critical-update' }],
+  })
+}
+
+export async function sendPayoutStatusEmail(
+  to: string,
+  data: {
+    recipientName: string;
+    amount: string;
+    status: 'initiated' | 'completed' | 'failed' | 'reversed';
+    bankAccount?: string;
+    actionUrl: string;
+  }
+): Promise<SendEmailResult> {
+  return sendEmail({
+    to,
+    subject: data.status === 'initiated'
+      ? 'Your payout has been initiated'
+      : data.status === 'completed'
+        ? 'Your payout has been completed'
+        : data.status === 'failed'
+          ? 'Your payout failed'
+          : 'Your payout was reversed',
+    html: EmailTemplates.payoutStatusEmail(data),
+    tags: [{ name: 'category', value: `payout-${data.status}` }],
+  })
+}
+
+export async function sendBrandedNotificationEmail(
+  to: string,
+  data: {
+    recipientName: string;
+    title: string;
+    message: string;
+    actionUrl?: string;
+    actionLabel?: string;
+  }
+): Promise<SendEmailResult> {
+  return sendEmail({
+    to,
+    subject: data.title,
+    html: EmailTemplates.brandedNotificationEmail(data),
+    tags: [{ name: 'category', value: 'system-notification' }],
+  })
+}
+
+export async function sendCrewInviteEmail(
+  to: string,
+  data: {
+    recipientName: string;
+    eventName: string;
+    roleLabel: string;
+    eventDate: string;
+    eventLocation: string;
+    offerLine?: string;
+    noteLine?: string;
+    inviteUrl: string;
+  }
+): Promise<SendEmailResult> {
+  return sendEmail({
+    to,
+    subject: `You have been invited to join ${data.eventName}`,
+    html: EmailTemplates.crewInviteEmail(data),
+    tags: [{ name: 'category', value: 'event-team-invite' }],
+  })
+}
+
+export async function sendAttendeeContactOrganizerEmail(
+  to: string,
+  data: {
+    organizerName: string;
+    eventName: string;
+    attendeeName: string;
+    attendeeEmail: string;
+    attendeePhone?: string;
+    message: string;
+  },
+  replyTo?: string
+): Promise<SendEmailResult> {
+  return sendEmail({
+    to,
+    replyTo,
+    subject: `New attendee message about ${data.eventName}`,
+    html: EmailTemplates.attendeeContactOrganizerEmail(data),
+    text: `New attendee message for ${data.eventName}\n\nName: ${data.attendeeName}\nEmail: ${data.attendeeEmail}\nPhone: ${data.attendeePhone || 'Not provided'}\n\nMessage:\n${data.message}`,
+    tags: [{ name: 'category', value: 'contact-organizer' }],
+  })
+}
+
 /**
  * Send review request
  */

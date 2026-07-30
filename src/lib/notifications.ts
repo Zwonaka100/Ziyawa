@@ -4,7 +4,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { sendEmail } from './email';
+import { sendBrandedNotificationEmail } from './email';
 import { SITE_URL } from './constants';
 
 // Service client for server-side operations
@@ -373,30 +373,20 @@ async function sendNotificationEmail(
   if (!shouldSend) return false;
 
   const appUrl = SITE_URL;
-  const emailResult = await sendEmail({
-    to: profile.email,
-    subject: title,
-    html: `
-      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="padding: 20px; background-color: #f5f5f5;">
-          <h1 style="color: #333; margin: 0;">Ziyawa</h1>
-        </div>
-        <div style="padding: 20px;">
-          <p>Hi ${profile.full_name || 'there'},</p>
-          <p>${message}</p>
-          ${link ? `<p><a href="${appUrl}${link}" style="color:#7c3aed; font-weight:600;">Open in Ziyawa</a></p>` : ''}
-        </div>
-      </div>
-    `,
-    tags: [{ name: 'category', value: type }],
-  });
+  const emailResult = await sendBrandedNotificationEmail(profile.email, {
+    recipientName: profile.full_name || 'there',
+    title,
+    message,
+    actionUrl: link ? `${appUrl}${link}` : undefined,
+    actionLabel: 'Open in Ziyawa',
+  })
 
   return emailResult.success;
 }
 
 function shouldSendEmail(
   type: NotificationType, 
-  prefs: { email_bookings?: boolean; email_payments?: boolean; email_events?: boolean } | null
+  prefs: { email_bookings?: boolean; email_payments?: boolean; email_events?: boolean; email_marketing?: boolean } | null
 ): boolean {
   if (!prefs) return true; // Default to sending if no preferences
 

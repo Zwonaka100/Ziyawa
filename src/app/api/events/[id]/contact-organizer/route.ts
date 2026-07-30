@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { sendEmail } from '@/lib/email'
+import { sendAttendeeContactOrganizerEmail } from '@/lib/email'
 
 export async function POST(
   request: NextRequest,
@@ -57,27 +57,18 @@ export async function POST(
       return NextResponse.json({ error: 'Organiser contact is not available right now' }, { status: 404 })
     }
 
-    const emailResult = await sendEmail({
-      to: organizer.email,
-      subject: `New attendee message about ${event.title}`,
-      replyTo: email,
-      html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
-          <h2 style="margin-bottom: 12px;">New attendee message</h2>
-          <p>You received a message from a ticket holder for <strong>${event.title}</strong>.</p>
-          <div style="margin: 16px 0; padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb;">
-            <p><strong>Name:</strong> ${name}</p>
-            <p><strong>Email:</strong> ${email}</p>
-            <p><strong>Phone:</strong> ${phone || 'Not provided'}</p>
-            <p><strong>Message:</strong></p>
-            <p>${message.replace(/\n/g, '<br/>')}</p>
-          </div>
-          <p>You can reply directly to this email to respond to the attendee.</p>
-        </div>
-      `,
-      text: `New attendee message for ${event.title}\n\nName: ${name}\nEmail: ${email}\nPhone: ${phone || 'Not provided'}\n\nMessage:\n${message}`,
-      tags: [{ name: 'category', value: 'contact-organizer' }],
-    })
+    const emailResult = await sendAttendeeContactOrganizerEmail(
+      organizer.email,
+      {
+        organizerName: organizer.full_name || 'Organizer',
+        eventName: event.title,
+        attendeeName: name,
+        attendeeEmail: email,
+        attendeePhone: phone || undefined,
+        message,
+      },
+      email,
+    )
 
     if (!emailResult.success) {
       return NextResponse.json({ error: emailResult.error || 'Failed to send message' }, { status: 500 })

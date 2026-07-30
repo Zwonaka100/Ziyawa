@@ -10,6 +10,8 @@ import { createClient } from '@/lib/supabase/server';
 import { createTransferRecipient, initiateTransfer, generatePaymentReference } from '@/lib/paystack';
 import { calculateWithdrawalFee, PLATFORM_FEES } from '@/lib/constants';
 import { adjustProfileBalanceBuckets } from '@/lib/payments/escrow';
+import { createNotification } from '@/lib/notifications';
+import { sendPayoutStatusEmail } from '@/lib/email';
 
 function resolveRecipientType(profile: { is_artist?: boolean; is_provider?: boolean }) {
   if (profile.is_artist) return 'artist';
@@ -236,6 +238,26 @@ export async function POST(request: NextRequest) {
         gateway_response: transferResult.data,
       })
       .eq('id', transaction.id);
+
+    await createNotification({
+      userId: user.id,
+      type: 'payout_sent',
+      title: 'Payout initiated',
+      message: `Your payout of R${amountInRands.toFixed(2)} has been initiated and is on its way to your bank account.`,
+      link: '/wallet',
+      transactionId: transaction.id,
+      sendEmail: false,
+    })
+
+    if (profile.email) {
+      await sendPayoutStatusEmail(profile.email, {
+        recipientName: profile.full_name || 'there',
+        amount: `R${amountInRands.toFixed(2)}`,
+        status: 'initiated',
+        bankAccount: `account ending ${String(accountNumber).slice(-4)}`,
+        actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/wallet`,
+      })
+    }
 
     return NextResponse.json({
       success: true,

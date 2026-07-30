@@ -13,7 +13,7 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyWebhookSignature, verifyPayment, generateTicketCode } from '@/lib/paystack';
 import { adjustProfileBalanceBuckets } from '@/lib/payments/escrow';
 import { createNotification } from '@/lib/notifications';
-import { sendTicketAssignedEmail, sendTicketPurchasedEmail } from '@/lib/email';
+import { sendBookingPaymentConfirmedEmail, sendPayoutStatusEmail, sendTicketAssignedEmail, sendTicketPurchasedEmail } from '@/lib/email';
 import { captureServerError, logOpsEvent } from '@/lib/monitoring';
 
 // Use service role for webhooks (no user context)
@@ -501,6 +501,40 @@ async function processBookingPayment(
         link: '/wallet',
         sendEmail: false,
       })
+
+      const { data: recipientProfile } = await supabase
+        .from('profiles')
+        .select('email, full_name')
+        .eq('id', transaction.recipient_id as string)
+        .maybeSingle()
+
+      if (recipientProfile?.email) {
+        const bookingDetails = bookingType === 'vendor'
+          ? await supabase
+              .from('provider_bookings')
+              .select('event_id, events(title, event_date, venue)')
+              .eq('id', bookingId)
+              .single()
+          : await supabase
+              .from('bookings')
+              .select('event_id, events(title, event_date, venue)')
+              .eq('id', bookingId)
+              .single()
+
+        const eventRecord = Array.isArray(bookingDetails.data?.events)
+          ? bookingDetails.data?.events[0]
+          : bookingDetails.data?.events
+
+        await sendBookingPaymentConfirmedEmail(recipientProfile.email, {
+          recipientName: recipientProfile.full_name || 'there',
+          eventName: eventRecord?.title || 'your booking',
+          eventDate: formatEventDate(eventRecord?.event_date as string | null),
+          eventLocation: (eventRecord?.venue as string | null) || 'Venue to be confirmed',
+          amount: formattedAmount,
+          bookingRoleLabel: bookingType === 'vendor' ? 'service' : 'artist',
+          actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/${bookingType === 'vendor' ? 'dashboard/provider' : 'dashboard/artist'}`,
+        })
+      }
     }
 
     logOpsEvent('paystack-webhook', 'info', `Booking payment processed: ${bookingType} ${bookingId}`, { bookingId, bookingType });
@@ -569,6 +603,33 @@ async function handleTransferSuccess(data: { reference: string }) {
     })
     .eq('reference', reference);
 
+  if (transaction.payer_id) {
+    await createNotification({
+      userId: transaction.payer_id,
+      type: 'payout_completed',
+      title: 'Payout completed',
+      message: `Your payout of ${formatZarFromCents((transaction.amount as number) || 0)} has been completed successfully.`,
+      link: '/wallet',
+      transactionId: transaction.id,
+      sendEmail: false,
+    })
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('email, full_name')
+      .eq('id', transaction.payer_id)
+      .maybeSingle()
+
+    if (profile?.email) {
+      await sendPayoutStatusEmail(profile.email, {
+        recipientName: profile.full_name || 'there',
+        amount: formatZarFromCents((transaction.amount as number) || 0),
+        status: 'completed',
+        actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/wallet`,
+      })
+    }
+  }
+
   logOpsEvent('paystack-webhook', 'info', 'Transfer completed', { reference });
 }
 
@@ -623,8 +684,23 @@ async function handleTransferFailed(data: { reference: string; reason: string })
       message: `Your payout of ${formatZarFromCents((transaction.amount as number) || 0)} could not be completed. The funds have been returned to your wallet.`,
       link: '/wallet',
       transactionId: transaction.id,
-      sendEmail: true,
+      sendEmail: false,
     });
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('email, full_name')
+      .eq('id', transaction.payer_id)
+      .maybeSingle()
+
+    if (profile?.email) {
+      await sendPayoutStatusEmail(profile.email, {
+        recipientName: profile.full_name || 'there',
+        amount: formatZarFromCents((transaction.amount as number) || 0),
+        status: 'failed',
+        actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/wallet`,
+      })
+    }
   }
 
   await supabase
@@ -685,8 +761,23 @@ async function handleTransferReversed(data: { reference: string }) {
       message: `Paystack reversed your payout of ${formatZarFromCents((transaction.amount as number) || 0)}. The funds are now back in your wallet.`,
       link: '/wallet',
       transactionId: transaction.id,
-      sendEmail: true,
+      sendEmail: false,
     });
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('email, full_name')
+      .eq('id', transaction.payer_id)
+      .maybeSingle()
+
+    if (profile?.email) {
+      await sendPayoutStatusEmail(profile.email, {
+        recipientName: profile.full_name || 'there',
+        amount: formatZarFromCents((transaction.amount as number) || 0),
+        status: 'reversed',
+        actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/wallet`,
+      })
+    }
   }
 
   await supabase

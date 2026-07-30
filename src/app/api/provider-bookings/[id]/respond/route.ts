@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createNotification } from '@/lib/notifications'
+import { sendBookingResponseEmail } from '@/lib/email'
 
 type ProviderBookingAction = 'accept' | 'decline' | 'counter'
 
@@ -95,6 +96,12 @@ export async function POST(
       .eq('id', booking.event_id)
       .single()
 
+    const { data: organizerProfile } = await supabase
+      .from('profiles')
+      .select('email, full_name')
+      .eq('id', booking.organizer_id)
+      .maybeSingle()
+
     if (action === 'accept') {
       await createNotification({
         userId: booking.organizer_id,
@@ -128,6 +135,18 @@ export async function POST(
         eventId: booking.event_id,
         metadata: { counterAmount },
         sendEmail: false,
+      })
+    }
+
+    if (organizerProfile?.email) {
+      await sendBookingResponseEmail(organizerProfile.email, {
+        recipientName: organizerProfile.full_name || 'there',
+        responderName: provider.business_name,
+        eventName: event?.title || 'your event',
+        responseType: action === 'counter' ? 'countered' : action === 'accept' ? 'accepted' : 'declined',
+        amount: action === 'counter' ? `R${counterAmount.toFixed(2)}` : undefined,
+        note: notes || undefined,
+        actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/dashboard/organizer/events/${booking.event_id}/bookings`,
       })
     }
 

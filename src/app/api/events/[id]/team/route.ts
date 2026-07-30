@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import { sendEmail } from '@/lib/email'
+import { sendCrewInviteEmail } from '@/lib/email'
 import { SITE_URL } from '@/lib/constants'
 import { EVENT_TEAM_ROLE_LABELS } from '@/lib/event-team'
 import { adjustProfileBalanceBuckets } from '@/lib/payments/escrow'
@@ -579,37 +579,15 @@ export async function POST(
     const inviteUrl = `${appUrl}${invitePath}`
     const roleLabel = EVENT_TEAM_ROLE_LABELS[role as keyof typeof EVENT_TEAM_ROLE_LABELS]
 
-    const offerLine = Number.isFinite(offeredRate) && offeredRate > 0
-      ? `<p><strong>Proposed rate:</strong> R${offeredRate.toFixed(2)}</p>`
-      : ''
-
-    const noteLine = inviteMessage
-      ? `<p><strong>Message from organiser:</strong><br/>${inviteMessage}</p>`
-      : ''
-
-    await sendEmail({
-      from: INFO_FROM_EMAIL,
-      to: email,
-      subject: `You have been invited to join the crew for ${access.event.title}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
-          <h2 style="margin-bottom: 12px;">You have a crew invite</h2>
-          <p>Hello ${fullName},</p>
-          <p>You have been invited to join the Ziyawa event team for <strong>${access.event.title}</strong>.</p>
-          <p><strong>Role:</strong> ${roleLabel}</p>
-          <p><strong>Date:</strong> ${new Date(access.event.event_date).toLocaleDateString('en-ZA')}</p>
-          <p><strong>Venue:</strong> ${access.event.venue || 'Venue to be confirmed'}</p>
-          ${offerLine}
-          ${noteLine}
-          <p>You can accept this invite, or sign in and use Ziyawa messages to discuss details with the organiser.</p>
-          <p style="margin: 20px 0;">
-            <a href="${inviteUrl}" style="display: inline-block; padding: 12px 18px; border-radius: 8px; background: #7c3aed; color: white; text-decoration: none; font-weight: 600;">Activate Crew Dashboard</a>
-          </p>
-          <p>If you do not have a Ziyawa account yet, create one with this email first and then open the invite again.</p>
-        </div>
-      `,
-      text: `You have been invited to join the crew for ${access.event.title} as ${roleLabel}.${offeredRate > 0 ? ` Proposed rate: R${offeredRate.toFixed(2)}.` : ''}${inviteMessage ? ` Message from organiser: ${inviteMessage}.` : ''} Open this link to activate your access: ${inviteUrl}`,
-      tags: [{ name: 'category', value: 'event-team-invite' }],
+    await sendCrewInviteEmail(email, {
+      recipientName: fullName,
+      eventName: access.event.title,
+      roleLabel,
+      eventDate: new Date(access.event.event_date).toLocaleDateString('en-ZA'),
+      eventLocation: access.event.venue || 'Venue to be confirmed',
+      offerLine: Number.isFinite(offeredRate) && offeredRate > 0 ? `R${offeredRate.toFixed(2)}` : undefined,
+      noteLine: inviteMessage ? `<strong>Message from organiser:</strong><br/>${inviteMessage}` : undefined,
+      inviteUrl,
     })
 
     return NextResponse.json({ success: true, inviteUrl, resent: Boolean(existingInvite) })

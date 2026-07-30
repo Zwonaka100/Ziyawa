@@ -35,6 +35,14 @@ export default function EditEventPage({ params }: EditEventPageProps) {
   const { profile, loading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [originalEventSnapshot, setOriginalEventSnapshot] = useState<null | {
+    title: string
+    venue: string
+    location: string
+    event_date: string
+    start_time: string
+    state: string
+  }>(null)
   
   const [formData, setFormData] = useState({
     title: '',
@@ -106,6 +114,15 @@ export default function EditEventPage({ params }: EditEventPageProps) {
         event_date: event.event_date || '',
         start_time: event.start_time || '',
         end_time: event.end_time || '',
+        state: event.state || 'draft',
+      })
+
+      setOriginalEventSnapshot({
+        title: event.title || '',
+        venue: event.venue || '',
+        location: event.location || '',
+        event_date: event.event_date || '',
+        start_time: event.start_time || '',
         state: event.state || 'draft',
       })
 
@@ -253,7 +270,41 @@ export default function EditEventPage({ params }: EditEventPageProps) {
         }
       }
 
-      toast.success('Event and ticket tiers updated successfully!')
+      const materialChanges: string[] = []
+      if (originalEventSnapshot?.event_date && originalEventSnapshot.event_date !== formData.event_date) {
+        materialChanges.push(`The date changed from ${originalEventSnapshot.event_date} to ${formData.event_date}.`)
+      }
+      if (originalEventSnapshot?.start_time && originalEventSnapshot.start_time !== formData.start_time) {
+        materialChanges.push(`The start time changed from ${originalEventSnapshot.start_time} to ${formData.start_time}.`)
+      }
+      if (originalEventSnapshot?.venue && originalEventSnapshot.venue !== formData.venue) {
+        materialChanges.push(`The venue changed from ${originalEventSnapshot.venue} to ${formData.venue}.`)
+      }
+      if (originalEventSnapshot?.location && originalEventSnapshot.location !== formData.location) {
+        materialChanges.push(`The location changed from ${originalEventSnapshot.location} to ${formData.location}.`)
+      }
+
+      let criticalUpdateNoticeFailed = false
+      if (originalEventSnapshot?.state === 'published' && materialChanges.length > 0) {
+        const response = await fetch(`/api/events/${id}/critical-update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ changes: materialChanges }),
+        })
+
+        criticalUpdateNoticeFailed = !response.ok
+      }
+
+      setOriginalEventSnapshot({
+        title: formData.title,
+        venue: formData.venue,
+        location: formData.location,
+        event_date: formData.event_date,
+        start_time: formData.start_time,
+        state: formData.state,
+      })
+
+      toast.success(criticalUpdateNoticeFailed ? 'Event updated, but critical attendee emails could not be sent.' : 'Event and ticket tiers updated successfully!')
       router.push('/dashboard/organizer')
       
     } catch (error) {
