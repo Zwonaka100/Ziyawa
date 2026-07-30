@@ -12,7 +12,7 @@ export default async function OrganizerPage({ params }: OrganizerPageProps) {
   const supabase = await createClient();
 
   // Fetch organizer profile
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from('profiles')
     .select(`
       id,
@@ -20,22 +20,12 @@ export default async function OrganizerPage({ params }: OrganizerPageProps) {
       avatar_url,
       location,
       company_name,
-      bio,
       is_organizer,
-      total_events_hosted,
-      total_artists_paid,
-      payment_completion_rate,
-      organizer_rating,
-      total_organizer_reviews,
-      years_in_business,
       verified_at,
-      is_verified,
-      verified_entity_type,
       created_at
     `)
     .eq('id', id)
-    .eq('is_organizer', true)
-    .single();
+    .maybeSingle();
 
   if (!profile) {
     notFound();

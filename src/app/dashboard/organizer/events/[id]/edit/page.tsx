@@ -267,35 +267,14 @@ export default function EditEventPage({ params }: EditEventPageProps) {
   const handlePublish = async () => {
     setSaving(true)
     try {
-      const supabase = createClient()
+      const response = await fetch(`/api/events/${id}/publish`, {
+        method: 'POST',
+      })
 
-      const { data, error } = await supabase
-        .from('events')
-        .update({
-          state: 'published',
-          is_published: true,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id)
-        .select('id, state, is_published')
-        .single()
+      const payload = await response.json().catch(() => ({}))
 
-      if (error) throw error
-
-      if (!data?.is_published || data?.state !== 'published') {
-        throw new Error('Publish write did not persist correctly')
-      }
-
-      const { data: refreshedEvent, error: refreshError } = await supabase
-        .from('events')
-        .select('id, state, is_published')
-        .eq('id', id)
-        .single()
-
-      if (refreshError) throw refreshError
-
-      if (!refreshedEvent?.is_published || refreshedEvent?.state !== 'published') {
-        throw new Error('Publish state could not be verified')
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to publish event')
       }
 
       toast.success('Event published! It is now visible to everyone.')

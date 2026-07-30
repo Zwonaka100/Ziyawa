@@ -302,33 +302,14 @@ export function EventMediaManager({
   const handlePublishEvent = async () => {
     setPublishing(true);
     try {
-      const { data, error } = await supabase
-        .from('events')
-        .update({
-          state: 'published',
-          is_published: true,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', eventId)
-        .select('id, state, is_published')
-        .single();
+      const response = await fetch(`/api/events/${eventId}/publish`, {
+        method: 'POST',
+      });
 
-      if (error) throw error;
+      const payload = await response.json().catch(() => ({}));
 
-      if (!data?.is_published || data?.state !== 'published') {
-        throw new Error('Publish write did not persist correctly');
-      }
-
-      const { data: refreshedEvent, error: refreshError } = await supabase
-        .from('events')
-        .select('id, state, is_published')
-        .eq('id', eventId)
-        .single();
-
-      if (refreshError) throw refreshError;
-
-      if (!refreshedEvent?.is_published || refreshedEvent?.state !== 'published') {
-        throw new Error('Publish state could not be verified');
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to publish event');
       }
 
       toast.success('Event published successfully');

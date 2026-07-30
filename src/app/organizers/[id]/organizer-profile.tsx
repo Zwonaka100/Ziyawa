@@ -27,17 +27,17 @@ interface OrganizerProfileProps {
     avatar_url: string | null;
     location: string | null;
     company_name: string | null;
-    bio: string | null;
-    total_events_hosted: number;
-    total_artists_paid: number;
-    payment_completion_rate: number;
-    organizer_rating: number;
-    total_organizer_reviews: number;
-    years_in_business: number | null;
-    verified_at: string | null;
+    bio?: string | null;
+    total_events_hosted?: number;
+    total_artists_paid?: number;
+    payment_completion_rate?: number;
+    organizer_rating?: number;
+    total_organizer_reviews?: number;
+    years_in_business?: number | null;
+    verified_at?: string | null;
     is_verified?: boolean;
     verified_entity_type?: string | null;
-    created_at: string;
+    created_at?: string;
   };
   socialLinks: OrganizerSocialLink[];
   media: OrganizerMedia[];
@@ -76,6 +76,11 @@ export function OrganizerProfile({
   const displayName = profile.company_name || profile.full_name || 'Organizer';
   const coverImage = pastEvents[0]?.cover_image || media.find(m => m.is_featured)?.url;
   const logoImage = media.find(m => m.is_logo)?.url || profile.avatar_url;
+  const totalEventsHosted = profile.total_events_hosted ?? pastEvents.length;
+  const totalArtistsPaid = profile.total_artists_paid ?? 0;
+  const paymentCompletionRate = profile.payment_completion_rate ?? 100;
+  const organizerRating = profile.organizer_rating ?? 0;
+  const totalOrganizerReviews = profile.total_organizer_reviews ?? reviews.length;
 
   // Calculate total attendees
   const totalAttendees = pastEvents.reduce((sum, e) => sum + e.tickets_sold, 0);
@@ -129,8 +134,8 @@ export function OrganizerProfile({
                   <TrustBadge 
                     type="organizer" 
                     isVerified={true}
-                    totalBookings={profile.total_events_hosted}
-                    rating={profile.organizer_rating}
+                    totalBookings={totalEventsHosted}
+                    rating={organizerRating}
                   />
                 )}
                 {profile.is_verified && (
@@ -161,7 +166,7 @@ export function OrganizerProfile({
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
             <div>
-              <p className="text-2xl font-bold text-neutral-900">{profile.total_events_hosted}</p>
+              <p className="text-2xl font-bold text-neutral-900">{totalEventsHosted}</p>
               <p className="text-sm text-neutral-500">Events Hosted</p>
             </div>
             <div>
@@ -169,21 +174,21 @@ export function OrganizerProfile({
               <p className="text-sm text-neutral-500">Total Attendees</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-neutral-900">{profile.total_artists_paid}</p>
+              <p className="text-2xl font-bold text-neutral-900">{totalArtistsPaid}</p>
               <p className="text-sm text-neutral-500">Artists Paid</p>
             </div>
             <div>
-              <p className="text-2xl font-bold text-green-600">{profile.payment_completion_rate}%</p>
+              <p className="text-2xl font-bold text-green-600">{paymentCompletionRate}%</p>
               <p className="text-sm text-neutral-500">Payment Rate</p>
             </div>
             <div>
               <div className="flex items-center justify-center gap-1">
                 <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
                 <span className="text-2xl font-bold text-neutral-900">
-                  {profile.organizer_rating > 0 ? profile.organizer_rating.toFixed(1) : 'New'}
+                  {organizerRating > 0 ? organizerRating.toFixed(1) : 'New'}
                 </span>
               </div>
-              <p className="text-sm text-neutral-500">{profile.total_organizer_reviews} Reviews</p>
+              <p className="text-sm text-neutral-500">{totalOrganizerReviews} Reviews</p>
             </div>
           </div>
         </div>
@@ -311,8 +316,8 @@ export function OrganizerProfile({
                 {reviews.length > 0 ? (
                   <ReviewsList 
                     reviews={reviews} 
-                    averageRating={profile.organizer_rating}
-                    totalReviews={profile.total_organizer_reviews}
+                    averageRating={organizerRating}
+                    totalReviews={totalOrganizerReviews}
                   />
                 ) : (
                   <div className="text-center py-12 bg-white rounded-xl border border-neutral-200">
@@ -329,13 +334,13 @@ export function OrganizerProfile({
             {/* Trust Card */}
             <TrackRecordCard
               type="organizer"
-              totalBookings={profile.total_events_hosted}
-              completedBookings={profile.total_events_hosted}
+              totalBookings={totalEventsHosted}
+              completedBookings={totalEventsHosted}
               cancelledBookings={0}
               totalPaid={0}
-              rating={profile.organizer_rating}
-              totalReviews={profile.total_organizer_reviews}
-              memberSince={profile.created_at}
+              rating={organizerRating}
+              totalReviews={totalOrganizerReviews}
+              memberSince={profile.created_at || new Date().toISOString()}
               isVerified={!!profile.verified_at}
             />
 
@@ -349,7 +354,7 @@ export function OrganizerProfile({
                 </li>
                 <li className="flex items-center gap-2 text-neutral-600">
                   <Shield className="h-4 w-4 text-neutral-400" />
-                  {profile.payment_completion_rate}% payment completion
+                  {paymentCompletionRate}% payment completion
                 </li>
                 <li className="flex items-center gap-2 text-neutral-600">
                   <Users className="h-4 w-4 text-neutral-400" />
