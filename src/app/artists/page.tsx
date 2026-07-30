@@ -103,16 +103,31 @@ async function ArtistsContent({
 
   if (error) {
     // Final fallback for older policy/schema combinations where join-based reads can fail.
-    const minimalFallback = await supabase
+    // Keep enforcing visibility when the column exists.
+    const minimalWithVisibility = await supabase
       .from('artists')
-      .select('id, stage_name, bio, genre, base_price, location, is_available, profile_image')
+      .select('id, stage_name, bio, genre, base_price, location, is_available, is_public, profile_image')
       .eq('is_available', true)
+      .eq('is_public', true)
       .order('stage_name', { ascending: true })
 
-    if (!minimalFallback.error) {
+    if (!minimalWithVisibility.error) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      artists = (minimalFallback.data || []) as any
+      artists = (minimalWithVisibility.data || []) as any
       error = null
+    } else if (String(minimalWithVisibility.error.message || '').toLowerCase().includes('is_public')) {
+      // Only drop visibility filter on legacy schemas that truly lack is_public.
+      const minimalLegacy = await supabase
+        .from('artists')
+        .select('id, stage_name, bio, genre, base_price, location, is_available, profile_image')
+        .eq('is_available', true)
+        .order('stage_name', { ascending: true })
+
+      if (!minimalLegacy.error) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        artists = (minimalLegacy.data || []) as any
+        error = null
+      }
     }
   }
 

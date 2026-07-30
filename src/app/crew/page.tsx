@@ -109,6 +109,7 @@ export default function CrewPage() {
           let fallbackQuery = supabase
             .from('providers')
             .select('*')
+            .eq('is_public', true)
             .eq('is_available', true)
             .order('completed_bookings', { ascending: false })
 
@@ -121,11 +122,34 @@ export default function CrewPage() {
           }
 
           const { data: fallbackData, error: fallbackError } = await fallbackQuery
-          if (fallbackError) {
+          if (!fallbackError) {
+            setProviders((fallbackData || []) as PublicProvider[])
+          } else if (String(fallbackError.message || '').toLowerCase().includes('is_public')) {
+            // Legacy schema fallback where providers.is_public is unavailable.
+            let legacyFallbackQuery = supabase
+              .from('providers')
+              .select('*')
+              .eq('is_available', true)
+              .order('completed_bookings', { ascending: false })
+
+            if (selectedCategory !== 'all') {
+              legacyFallbackQuery = legacyFallbackQuery.eq('primary_category', selectedCategory)
+            }
+
+            if (selectedProvince !== 'all') {
+              legacyFallbackQuery = legacyFallbackQuery.eq('location', selectedProvince)
+            }
+
+            const { data: legacyFallbackData, error: legacyFallbackError } = await legacyFallbackQuery
+            if (legacyFallbackError) {
+              console.error('Error fetching providers legacy fallback:', legacyFallbackError)
+              setProviders([])
+            } else {
+              setProviders((legacyFallbackData || []) as PublicProvider[])
+            }
+          } else {
             console.error('Error fetching providers fallback:', fallbackError)
             setProviders([])
-          } else {
-            setProviders((fallbackData || []) as PublicProvider[])
           }
         }
       } else {
