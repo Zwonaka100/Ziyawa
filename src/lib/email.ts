@@ -239,6 +239,32 @@ export async function sendEventReminderEmail(
   });
 }
 
+export async function sendEventPublishedEmail(
+  to: string,
+  data: {
+    recipientName: string;
+    eventName: string;
+    eventDate: string;
+    eventLocation: string;
+    eventId: string;
+  }
+): Promise<SendEmailResult> {
+  const eventUrl = `${SITE_URL}/events/${data.eventId}`;
+  const manageUrl = `${SITE_URL}/dashboard/organizer/events/${data.eventId}/manage`;
+
+  return sendEmail({
+    to,
+    from: 'Ziyawa <noreply@zande.io>',
+    subject: `Your event is now live: ${data.eventName}`,
+    html: EmailTemplates.eventPublishedEmail({
+      ...data,
+      eventUrl,
+      manageUrl,
+    }),
+    tags: [{ name: 'category', value: 'event-published' }],
+  });
+}
+
 /**
  * Send review request
  */

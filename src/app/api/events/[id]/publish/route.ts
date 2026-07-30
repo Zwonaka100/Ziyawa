@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { sendEventPublishedEmail } from '@/lib/email'
 
 const supabaseAdmin = createServiceClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -59,6 +60,52 @@ export async function POST(
 
     if (!updated?.is_published || updated?.state !== 'published') {
       return NextResponse.json({ error: 'Publish write did not persist correctly.' }, { status: 500 })
+    }
+
+    const { data: organizerProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('id, email, full_name')
+      .eq('id', event.organizer_id)
+      .maybeSingle()
+
+    const { data: emailPrefs } = await supabaseAdmin
+      .from('notification_preferences')
+      .select('email_enabled, event_notifications')
+      .eq('user_id', event.organizer_id)
+      .maybeSingle()
+
+    const shouldSendPublishEmail = Boolean(
+      organizerProfile?.email &&
+      (emailPrefs == null || (emailPrefs.email_enabled && emailPrefs.event_notifications))
+    )
+
+    if (shouldSendPublishEmail && organizerProfile) {
+      const { data: emailEvent } = await supabaseAdmin
+        .from('events')
+        .select('id, title, event_date, venue, location')
+        .eq('id', id)
+        .single()
+
+      if (emailEvent) {
+        const eventDate = new Date(emailEvent.event_date).toLocaleDateString('en-ZA', {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        })
+
+        const emailResult = await sendEventPublishedEmail(organizerProfile.email, {
+          recipientName: organizerProfile.full_name || 'there',
+          eventName: emailEvent.title,
+          eventDate,
+          eventLocation: emailEvent.venue || emailEvent.location || 'Venue to be confirmed',
+          eventId: emailEvent.id,
+        })
+
+        if (!emailResult.success) {
+          console.error('Event published email error:', emailResult.error)
+        }
+      }
     }
 
     return NextResponse.json({ success: true, event: updated })

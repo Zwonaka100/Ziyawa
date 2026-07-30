@@ -558,6 +558,52 @@ export function eventFollowUpEmail(data: {
   return emailWrapper(content);
 }
 
+export function eventPublishedEmail(data: {
+  recipientName: string;
+  eventName: string;
+  eventDate: string;
+  eventLocation: string;
+  eventUrl: string;
+  manageUrl: string;
+}): string {
+  const content = `
+    <h1>Your event is live! 🚀</h1>
+    <p>Hi ${data.recipientName},</p>
+    <p><strong>${data.eventName}</strong> has been published successfully and is now visible on Ziyawa.</p>
+
+    <div class="highlight-box">
+      <div class="detail-row">
+        <span class="detail-label">Event</span>
+        <span class="detail-value">${data.eventName}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Date</span>
+        <span class="detail-value">${data.eventDate}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Location</span>
+        <span class="detail-value">${data.eventLocation}</span>
+      </div>
+    </div>
+
+    <p>You can now start sharing the listing, monitor ticket sales, and manage attendees from your organizer dashboard.</p>
+
+    <p style="text-align: center;">
+      <a href="${data.eventUrl}" class="button">
+        View Live Event
+      </a>
+    </p>
+
+    <p style="text-align: center; margin-top: 10px;">
+      <a href="${data.manageUrl}" style="color: #7c3aed; text-decoration: none; font-weight: 600;">
+        Manage this event
+      </a>
+    </p>
+  `;
+
+  return emailWrapper(content);
+}
+
 // Review request email
 export function reviewRequestEmail(data: {
   recipientName: string;
