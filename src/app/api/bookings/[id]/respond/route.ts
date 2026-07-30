@@ -32,15 +32,39 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
 
-    const { data: booking, error: bookingError } = await supabase
+    let bookingResult = await supabase
       .from('bookings')
       .select('id, state, organizer_id, artist_id, offered_amount, final_amount, event_id')
       .eq('id', id)
       .single()
 
+    let booking = bookingResult.data as {
+      id: string
+      state?: string
+      status?: string
+      organizer_id: string
+      artist_id: string
+      offered_amount: number
+      final_amount: number | null
+      event_id: string
+    } | null
+    let bookingError = bookingResult.error
+
+    if (bookingError && String(bookingError.message || '').toLowerCase().includes('state')) {
+      bookingResult = await supabase
+        .from('bookings')
+        .select('id, status, organizer_id, artist_id, offered_amount, final_amount, event_id')
+        .eq('id', id)
+        .single()
+      booking = bookingResult.data as typeof booking
+      bookingError = bookingResult.error
+    }
+
     if (bookingError || !booking) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
     }
+
+    const bookingState = booking.state || booking.status
 
     const { data: artist } = await supabase
       .from('artists')
@@ -52,8 +76,8 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    if (booking.state !== 'pending') {
-      return NextResponse.json({ error: `Booking is no longer pending (${booking.state})` }, { status: 400 })
+    if (bookingState !== 'pending') {
+      return NextResponse.json({ error: `Booking is no longer pending (${bookingState})` }, { status: 400 })
     }
 
     if (action === 'counter' && (!Number.isFinite(counterAmount) || counterAmount <= 0)) {
@@ -78,10 +102,24 @@ export async function POST(
       updates.artist_notes = notes || `Counter-offer: R${counterAmount.toFixed(2)}`
     }
 
-    const { error: updateError } = await supabase
+    let updateResult = await supabase
       .from('bookings')
       .update(updates)
       .eq('id', booking.id)
+
+    if (updateResult.error && String(updateResult.error.message || '').toLowerCase().includes('state')) {
+      const legacyUpdates = { ...updates }
+      // Legacy schema uses "status" instead of "state".
+      legacyUpdates.status = legacyUpdates.state
+      delete legacyUpdates.state
+
+      updateResult = await supabase
+        .from('bookings')
+        .update(legacyUpdates)
+        .eq('id', booking.id)
+    }
+
+    const updateError = updateResult.error
 
     if (updateError) {
       return NextResponse.json({ error: 'Failed to update booking' }, { status: 500 })
@@ -158,7 +196,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       bookingId: booking.id,
-      state: updates.state || booking.state,
+      state: updates.state || bookingState,
     })
   } catch (error) {
     console.error('Artist booking response error:', error)

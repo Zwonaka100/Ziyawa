@@ -102,6 +102,21 @@ async function ArtistsContent({
   }
 
   if (error) {
+    // Final fallback for older policy/schema combinations where join-based reads can fail.
+    const minimalFallback = await supabase
+      .from('artists')
+      .select('id, stage_name, bio, genre, base_price, location, is_available, profile_image')
+      .eq('is_available', true)
+      .order('stage_name', { ascending: true })
+
+    if (!minimalFallback.error) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      artists = (minimalFallback.data || []) as any
+      error = null
+    }
+  }
+
+  if (error) {
     console.error('Error fetching artists:', error)
     return (
       <div className="text-center py-12">

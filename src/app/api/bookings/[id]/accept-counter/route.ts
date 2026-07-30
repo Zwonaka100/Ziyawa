@@ -15,11 +15,33 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: booking, error: bookingError } = await supabase
+    let bookingResult = await supabase
       .from('bookings')
       .select('id, state, organizer_id, artist_id, offered_amount, final_amount, event_id')
       .eq('id', id)
       .single()
+
+    let booking = bookingResult.data as {
+      id: string
+      state?: string
+      status?: string
+      organizer_id: string
+      artist_id: string
+      offered_amount: number
+      final_amount: number | null
+      event_id: string
+    } | null
+    let bookingError = bookingResult.error
+
+    if (bookingError && String(bookingError.message || '').toLowerCase().includes('state')) {
+      bookingResult = await supabase
+        .from('bookings')
+        .select('id, status, organizer_id, artist_id, offered_amount, final_amount, event_id')
+        .eq('id', id)
+        .single()
+      booking = bookingResult.data as typeof booking
+      bookingError = bookingResult.error
+    }
 
     if (bookingError || !booking) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 })
@@ -29,8 +51,10 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    if (booking.state !== 'pending') {
-      return NextResponse.json({ error: `Booking is no longer pending (${booking.state})` }, { status: 400 })
+    const bookingState = booking.state || booking.status
+
+    if (bookingState !== 'pending') {
+      return NextResponse.json({ error: `Booking is no longer pending (${bookingState})` }, { status: 400 })
     }
 
     const counterAmount = Number(booking.final_amount)
@@ -38,12 +62,19 @@ export async function POST(
       return NextResponse.json({ error: 'No valid counter-offer found to accept' }, { status: 400 })
     }
 
-    const { error: updateError } = await supabase
+    let updateResult = await supabase
       .from('bookings')
-      .update({
-        state: 'accepted',
-      })
+      .update({ state: 'accepted' })
       .eq('id', booking.id)
+
+    if (updateResult.error && String(updateResult.error.message || '').toLowerCase().includes('state')) {
+      updateResult = await supabase
+        .from('bookings')
+        .update({ status: 'accepted' })
+        .eq('id', booking.id)
+    }
+
+    const updateError = updateResult.error
 
     if (updateError) {
       return NextResponse.json({ error: 'Failed to accept counter-offer' }, { status: 500 })
