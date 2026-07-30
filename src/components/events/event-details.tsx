@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Calendar, MapPin, Clock, Users, Ticket, ArrowLeft, Play, ImageIcon, Star, CheckCircle, Flag } from 'lucide-react'
 import { formatCurrency, formatDate, formatTime, getDaysUntilEvent, isEventPast } from '@/lib/helpers'
-import { PROVINCES } from '@/lib/constants'
+import { PROVINCES, calculateTicketSaleBreakdown } from '@/lib/constants'
 import { useAuth } from '@/components/providers/auth-provider'
 import { PaymentDialog } from '@/components/payments/payment-dialog'
 import { ReportDialog } from '@/components/report-dialog'
@@ -69,6 +69,17 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
     ? ticketTiers.filter((tier) => tier.is_public !== false)
     : [fallbackTier]
   const selectedTier = resolvedTicketTiers.find((tier) => tier.id === selectedTierId) || resolvedTicketTiers[0]
+  const selectedTierRemaining = Math.max(0, Number(selectedTier?.quantity || 0) - Number(selectedTier?.sold_count || 0))
+  const maxSelectableQuantity = Math.max(1, Math.min(10, selectedTierRemaining || 1))
+  const unitTicketPriceCents = Number(selectedTier?.price ?? event.ticket_price ?? 0) * 100
+  const perTicketBreakdown = calculateTicketSaleBreakdown(unitTicketPriceCents)
+  const liveTicketSubtotalCents = perTicketBreakdown.ticketPrice * ticketQuantity
+  const liveBookingFeeCents = perTicketBreakdown.bookingFee * ticketQuantity
+  const liveOrderTotalCents = perTicketBreakdown.buyerTotal * ticketQuantity
+
+  useEffect(() => {
+    setTicketQuantity((current) => Math.min(Math.max(1, current), maxSelectableQuantity))
+  }, [maxSelectableQuantity])
 
   const handleBuyTicket = () => {
     if (!user) {
@@ -404,16 +415,37 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
 
               <div className="space-y-2 text-sm">
                 <label className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Quantity</span>
+                  <span className="text-neutral-900 font-medium">Quantity</span>
                   <input
                     type="number"
                     min="1"
-                    max={Math.max(1, Math.min(10, (selectedTier?.quantity || 1) - (selectedTier?.sold_count || 0)))}
+                    max={maxSelectableQuantity}
                     value={ticketQuantity}
-                    onChange={(e) => setTicketQuantity(Math.max(1, Number(e.target.value) || 1))}
+                    onChange={(e) => {
+                      const parsed = Number(e.target.value) || 1
+                      const clamped = Math.min(Math.max(1, parsed), maxSelectableQuantity)
+                      setTicketQuantity(clamped)
+                    }}
                     className="w-20 rounded-md border border-input bg-background px-2 py-1 text-right"
                   />
                 </label>
+                <div className="rounded-md bg-muted/40 p-3 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Ticket subtotal</span>
+                    <span>{formatCurrency(liveTicketSubtotalCents / 100)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Booking fee ({ticketQuantity}x)</span>
+                    <span>{formatCurrency(liveBookingFeeCents / 100)}</span>
+                  </div>
+                  <div className="flex items-center justify-between font-semibold">
+                    <span>Total due now</span>
+                    <span>{formatCurrency(liveOrderTotalCents / 100)}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Only {selectedTierRemaining} left in {selectedTier?.name || 'this tier'}. Max 10 per order.
+                </p>
                 <p className="text-xs text-muted-foreground">
                   Buying for another groovist? You can assign each ticket holder at checkout.
                 </p>

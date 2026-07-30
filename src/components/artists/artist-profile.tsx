@@ -9,7 +9,6 @@ import { Separator } from '@/components/ui/separator'
 import { MapPin, Music, ArrowLeft, Calendar, DollarSign } from 'lucide-react'
 import { formatCurrency } from '@/lib/helpers'
 import { PROVINCES } from '@/lib/constants'
-import { useAuth } from '@/components/providers/auth-provider'
 import type { Artist, Profile } from '@/types/database'
 
 interface ArtistWithProfile extends Artist {
@@ -21,9 +20,6 @@ interface ArtistProfileProps {
 }
 
 export function ArtistProfile({ artist }: ArtistProfileProps) {
-  const { profile } = useAuth()
-  const isOrganizer = profile?.is_organizer || profile?.is_admin
-
   return (
     <div className="max-w-4xl mx-auto">
       {/* Back Button */}
@@ -155,24 +151,13 @@ export function ArtistProfile({ artist }: ArtistProfileProps) {
 
               <Separator />
 
-              {isOrganizer ? (
-                <Link href={`/dashboard/organizer/book?artist=${artist.id}`}>
+              <div className="space-y-3">
+                <Link href={`/dashboard/organizer/book-artist/${artist.id}`}>
                   <Button className="w-full" size="lg" disabled={!artist.is_available}>
                     {artist.is_available ? 'Request Booking' : 'Not Available'}
                   </Button>
                 </Link>
-              ) : (
-                <div className="text-center">
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Only event organizers can book artists
-                  </p>
-                  <Link href="/profile">
-                    <Button variant="outline" className="w-full">
-                      Become an Organizer
-                    </Button>
-                  </Link>
-                </div>
-              )}
+              </div>
             </CardContent>
           </Card>
         </div>

@@ -156,10 +156,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const bucketUpdate = await adjustProfileBalanceBuckets(user.id, {
-      walletDelta: -amountInRands,
-      pendingPayoutDelta: amountInRands,
-    });
+    const bucketUpdate = await adjustProfileBalanceBuckets(
+      user.id,
+      {
+        walletDelta: -amountInRands,
+        pendingPayoutDelta: amountInRands,
+      },
+      {
+        reasonCode: 'wallet_withdraw_reserved',
+        referenceType: 'transaction',
+        referenceId: String(transaction.id),
+        actorUserId: user.id,
+        metadata: {
+          reference,
+          grossAmountRands: amountInRands,
+          feeCents: fees.fee,
+        },
+      }
+    );
 
     if (!bucketUpdate.success) {
       await supabase
@@ -181,10 +195,23 @@ export async function POST(request: NextRequest) {
     });
 
     if (!transferResult.status) {
-      await adjustProfileBalanceBuckets(user.id, {
-        walletDelta: amountInRands,
-        pendingPayoutDelta: -amountInRands,
-      });
+      await adjustProfileBalanceBuckets(
+        user.id,
+        {
+          walletDelta: amountInRands,
+          pendingPayoutDelta: -amountInRands,
+        },
+        {
+          reasonCode: 'wallet_withdraw_restore_failed_transfer',
+          referenceType: 'transaction',
+          referenceId: String(transaction.id),
+          actorUserId: user.id,
+          metadata: {
+            reference,
+            failure: transferResult.message || 'Transfer initiation failed',
+          },
+        }
+      );
 
       await supabase
         .from('transactions')

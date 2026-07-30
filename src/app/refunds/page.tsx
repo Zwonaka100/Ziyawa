@@ -33,9 +33,10 @@ export default function RefundsPage() {
           <h3 className="font-medium mt-3 mb-1">2.1 Event Cancellation by Organizer</h3>
           <p>
             If an event is cancelled by the organizer, all ticket holders are entitled to a
-            full refund of the ticket purchase price, including the booking fee paid at
-            checkout. Refunds will be processed automatically to the original payment method
-            within 7–14 business days.
+            full refund work item review. Refunds are never automatic. Admin or super admin
+            approval is required, and approved refunds are credited to the user&apos;s Ziyawa wallet.
+            Users can withdraw refunded funds through the standard wallet withdrawal flow,
+            with normal withdrawal fees applied.
           </p>
 
           <h3 className="font-medium mt-3 mb-1">2.2 Voluntary Cancellation by Ticket Holder</h3>

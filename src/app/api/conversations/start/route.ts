@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
         supabase.from('artists').select('id').eq('profile_id', recipientId).maybeSingle(),
       ])
 
-      const ACTIVE = ['pending', 'accepted', 'paid']
+      const ACTIVE = ['pending', 'accepted', 'confirmed']
 
       // Step 2: parallel booking checks across all relationship types
       const checks = await Promise.all([
@@ -64,28 +64,28 @@ export async function POST(request: NextRequest) {
         recipientProvider?.id
           ? supabase.from('provider_bookings').select('id')
               .eq('organizer_id', user.id).eq('provider_id', recipientProvider.id)
-              .in('status', ACTIVE).limit(1).maybeSingle()
+              .in('state', ACTIVE).limit(1).maybeSingle()
           : Promise.resolve({ data: null }),
 
         // Provider → org (provider viewing their own booking with org)
         senderProvider?.id
           ? supabase.from('provider_bookings').select('id')
               .eq('provider_id', senderProvider.id).eq('organizer_id', recipientId)
-              .in('status', ACTIVE).limit(1).maybeSingle()
+              .in('state', ACTIVE).limit(1).maybeSingle()
           : Promise.resolve({ data: null }),
 
         // Org → artist booking
         recipientArtist?.id
           ? supabase.from('bookings').select('id')
               .eq('organizer_id', user.id).eq('artist_id', recipientArtist.id)
-              .in('status', ACTIVE).limit(1).maybeSingle()
+              .in('state', ACTIVE).limit(1).maybeSingle()
           : Promise.resolve({ data: null }),
 
         // Artist → org (artist responding to booking)
         senderArtist?.id
           ? supabase.from('bookings').select('id')
               .eq('artist_id', senderArtist.id).eq('organizer_id', recipientId)
-              .in('status', ACTIVE).limit(1).maybeSingle()
+              .in('state', ACTIVE).limit(1).maybeSingle()
           : Promise.resolve({ data: null }),
 
         // Crew team member ↔ organizer who invited them

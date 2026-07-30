@@ -85,13 +85,8 @@ export default function BookCrewPage() {
 
   useEffect(() => {
     if (!profile) {
-      router.push('/auth/signin')
-      return
-    }
-
-    if (!profile.is_organizer) {
-      router.push('/profile')
-      toast.error('Only organisers can book crew')
+      const modeParam = requestedMode ? `?mode=${requestedMode}` : ''
+      router.push(`/auth/signin?redirect=/dashboard/organizer/book-crew/${providerId}${modeParam}`)
       return
     }
 
@@ -160,22 +155,26 @@ export default function BookCrewPage() {
         setOfferedAmount(servicesData[0].base_price.toString())
       }
 
-      // Fetch organiser's upcoming events (published or locked)
-      const { data: eventsData } = await supabase
-        .from('events')
-        .select('*')
-        .eq('organizer_id', profile.id)
-        .in('state', ['published', 'locked'])
-        .gte('event_date', new Date().toISOString().split('T')[0])
-        .order('event_date', { ascending: true })
+      if (profile.is_organizer) {
+        // Fetch organiser's upcoming published events
+        const { data: eventsData } = await supabase
+          .from('events')
+          .select('*')
+          .eq('organizer_id', profile.id)
+          .eq('is_published', true)
+          .gte('event_date', new Date().toISOString().split('T')[0])
+          .order('event_date', { ascending: true })
 
-      setEvents(eventsData || [])
+        setEvents(eventsData || [])
 
-      // Pre-select event if passed in URL
-      if (preselectedEventId && eventsData?.some(e => e.id === preselectedEventId)) {
-        setSelectedEventId(preselectedEventId)
-      } else if (eventsData && eventsData.length > 0) {
-        setSelectedEventId(eventsData[0].id)
+        // Pre-select event if passed in URL
+        if (preselectedEventId && eventsData?.some(e => e.id === preselectedEventId)) {
+          setSelectedEventId(preselectedEventId)
+        } else if (eventsData && eventsData.length > 0) {
+          setSelectedEventId(eventsData[0].id)
+        }
+      } else {
+        setEvents([])
       }
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -256,56 +255,35 @@ export default function BookCrewPage() {
         return
       }
 
-      const { data: newBooking, error } = await supabase
-        .from('provider_bookings')
-        .insert({
-          event_id: selectedEventId,
-          provider_id: providerId,
-          service_id: selectedServiceId,
-          organizer_id: profile!.id,
-          offered_amount: parseFloat(offeredAmount),
-          service_date: selectedEvent.event_date,
-          quantity: quantity,
-          special_requirements: specialRequirements.trim() || null,
-          organizer_notes: specialRequirements.trim() || null,
-        })
-        .select('id')
-        .single()
+      const response = await fetch('/api/provider-bookings/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: selectedEventId,
+          providerId,
+          serviceId: selectedServiceId,
+          quantity,
+          offeredAmount: parseFloat(offeredAmount),
+          notes: specialRequirements,
+        }),
+      })
 
-      if (error) {
-        if (error.code === '23505') {
-          toast.error('You have already booked this service for this event')
-        } else {
-          throw error
-        }
-        return
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send booking request')
       }
 
-      toast.success('Booking request sent! 🎉')
+      toast.success(data.message || 'Booking request sent! 🎉')
 
-      // Auto-open conversation linked to this booking
-      try {
-        const convoRes = await fetch('/api/conversations/start', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            recipientId: provider?.profile_id,
-            contextType: 'provider_booking',
-            contextId: newBooking.id,
-          }),
-        })
-        const convoData = await convoRes.json()
-        if (convoData.conversationId) {
-          router.push(`/messages?chat=${convoData.conversationId}`)
-          return
-        }
-      } catch {
-        // fallback to crew dashboard if chat fails
+      if (data.conversationId) {
+        router.push(`/messages?chat=${data.conversationId}`)
+      } else {
+        router.push('/dashboard/organizer/crew')
       }
-      router.push('/dashboard/organizer/crew')
     } catch (error) {
       console.error('Error creating booking:', error)
-      toast.error('Failed to send booking request')
+      toast.error(error instanceof Error ? error.message : 'Failed to send booking request')
     } finally {
       setSubmitting(false)
     }
@@ -325,6 +303,10 @@ export default function BookCrewPage() {
 
   const selectedService = services.find(s => s.id === selectedServiceId)
   const selectedEvent = events.find(e => e.id === selectedEventId)
+  const supportsWork = provider.work_mode === 'looking_for_work' || provider.work_mode === 'both'
+  const supportsServices = provider.work_mode === 'offering_services' || provider.work_mode === 'both' || services.length > 0
+  const isOrganizer = Boolean(profile?.is_organizer)
+  const isProviderAvailable = Boolean(provider.is_available)
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
@@ -377,28 +359,68 @@ export default function BookCrewPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {events.length === 0 ? (
+          {!isOrganizer ? (
             <div className="text-center py-8">
               <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="font-semibold mb-2">No upcoming events</h3>
+              <h3 className="font-semibold mb-2">You are not an event organizer yet</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                You need a published event to book crew
+                Upgrade your profile to organizer in settings to book crew for events.
               </p>
-              <Link href="/dashboard/organizer/events/new">
-                <Button>Create Event</Button>
+              <Link href="/dashboard/settings">
+                <Button>Upgrade Organizer Profile</Button>
               </Link>
             </div>
-          ) : services.length === 0 ? (
+          ) : events.length === 0 ? (
+            <div className="text-center py-8">
+              <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="font-semibold mb-2">No published upcoming events</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                You need at least one published upcoming event to book crew.
+              </p>
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <Link href="/dashboard/organizer/events/new">
+                  <Button>Create Event</Button>
+                </Link>
+                <Link href="/dashboard/organizer/events">
+                  <Button variant="outline">Manage Events</Button>
+                </Link>
+              </div>
+            </div>
+          ) : !isProviderAvailable ? (
+            <div className="text-center py-8">
+              <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="font-semibold mb-2">Provider currently unavailable</h3>
+              <p className="text-sm text-muted-foreground">
+                This provider is not available for new booking requests right now.
+              </p>
+            </div>
+          ) : bookingMode === 'services' && !supportsServices ? (
+            <div className="text-center py-8">
+              <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="font-semibold mb-2">Services not available</h3>
+              <p className="text-sm text-muted-foreground">
+                This provider is not currently offering bookable services.
+              </p>
+            </div>
+          ) : bookingMode === 'work' && !supportsWork ? (
+            <div className="text-center py-8">
+              <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="font-semibold mb-2">Event work not available</h3>
+              <p className="text-sm text-muted-foreground">
+                This provider is not currently accepting event work invites.
+              </p>
+            </div>
+          ) : bookingMode === 'services' && services.length === 0 ? (
             <div className="text-center py-8">
               <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="font-semibold mb-2">No services available</h3>
               <p className="text-sm text-muted-foreground">
-                This provider hasn&apos;t listed any services yet
+                This provider hasn&apos;t listed any services yet.
               </p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
-              {(provider.work_mode === 'both' || (provider.work_mode === 'looking_for_work' && services.length > 0)) && (
+              {supportsWork && supportsServices && (
                 <div className="grid gap-2 md:grid-cols-2">
                   <Button
                     type="button"

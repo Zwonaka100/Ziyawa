@@ -70,8 +70,19 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      if (booking.final_amount != null && Number(booking.final_amount) <= 0) {
+        return NextResponse.json(
+          { error: 'Invalid final amount on booking. Please refresh and request support if this persists.' },
+          { status: 400 }
+        )
+      }
+
       const amountRands = Number(booking.final_amount ?? booking.offered_amount)
       const amountCents = Math.round(amountRands * 100)
+
+      if (!Number.isFinite(amountRands) || amountRands <= 0) {
+        return NextResponse.json({ error: 'Invalid booking amount' }, { status: 400 })
+      }
 
       const { commissionAmount, artistPayout } = calculateArtistCommission(amountCents)
 
@@ -169,8 +180,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (booking.final_amount != null && Number(booking.final_amount) <= 0) {
+      return NextResponse.json(
+        { error: 'Invalid final amount on booking. Please refresh and request support if this persists.' },
+        { status: 400 }
+      )
+    }
+
     const amountRands = Number(booking.final_amount ?? booking.offered_amount)
     const amountCents = Math.round(amountRands * 100)
+
+    if (!Number.isFinite(amountRands) || amountRands <= 0) {
+      return NextResponse.json({ error: 'Invalid booking amount' }, { status: 400 })
+    }
 
     const { commissionAmount, vendorPayout } = calculateVendorCommission(amountCents)
 

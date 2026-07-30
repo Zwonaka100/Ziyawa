@@ -228,6 +228,22 @@ export default function EventBookingsPage() {
     }
   }
 
+  const acceptArtistCounterOffer = async (bookingId: string) => {
+    if (!confirm('Accept this counter-offer? This will move the booking to accepted so you can pay.')) return
+    setBusyId(bookingId)
+    try {
+      const res = await fetch(`/api/bookings/${bookingId}/accept-counter`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast.success('Counter-offer accepted. You can now proceed to payment.')
+      await load()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to accept counter-offer')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const cancelProviderBooking = async (bookingId: string) => {
     if (!confirm('Cancel this service booking?')) return
     setBusyId(bookingId)
@@ -478,6 +494,7 @@ export default function EventBookingsPage() {
                 const canComplete = booking.state === 'confirmed'
                 const canDispute  = booking.state === 'confirmed'
                 const canChat     = ['pending', 'accepted', 'confirmed'].includes(booking.state)
+                const hasCounterOffer = booking.state === 'pending' && booking.final_amount != null && booking.final_amount !== booking.offered_amount
 
                 return (
                   <Card key={booking.id}>
@@ -507,6 +524,11 @@ export default function EventBookingsPage() {
                           {booking.state === 'pending' && (
                             <p className="text-xs text-amber-600 font-medium">Waiting for artist to respond</p>
                           )}
+                          {hasCounterOffer && (
+                            <p className="text-xs text-indigo-600 font-medium">
+                              Counter-offer received — review the updated final amount and accept to continue.
+                            </p>
+                          )}
                           {canPay && (
                             <p className="text-xs text-blue-600 font-medium">
                               Artist accepted — click Pay Artist to lock in the booking
@@ -527,6 +549,19 @@ export default function EventBookingsPage() {
                             >
                               <MessageSquare className="h-3.5 w-3.5 mr-1" />
                               Chat
+                            </Button>
+                          )}
+                          {hasCounterOffer && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => acceptArtistCounterOffer(booking.id)}
+                              disabled={isBusy}
+                            >
+                              {isBusy
+                                ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                                : <CheckCircle className="h-3.5 w-3.5 mr-1" />}
+                              Accept Counter
                             </Button>
                           )}
                           {canPay && (

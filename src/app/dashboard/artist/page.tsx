@@ -77,10 +77,10 @@ export default async function ArtistDashboardPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bookings = bookingsData as any[] | null
 
-  const pendingBookings = bookings?.filter(b => b.status === 'pending') || []
-  const acceptedBookings = bookings?.filter(b => ['accepted', 'paid'].includes(b.status)) || []
-  const completedBookings = bookings?.filter(b => b.status === 'completed') || []
-  const declinedBookings = bookings?.filter(b => ['declined', 'cancelled'].includes(b.status)) || []
+  const pendingBookings = bookings?.filter(b => b.state === 'pending') || []
+  const acceptedBookings = bookings?.filter(b => ['accepted', 'confirmed'].includes(b.state)) || []
+  const completedBookings = bookings?.filter(b => b.state === 'completed') || []
+  const declinedBookings = bookings?.filter(b => ['declined', 'cancelled'].includes(b.state)) || []
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -247,8 +247,8 @@ export default async function ArtistDashboardPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                           <h3 className="font-semibold">{booking.events?.title}</h3>
-                          <Badge className={BOOKING_STATUS[booking.status as keyof typeof BOOKING_STATUS].color}>
-                            {BOOKING_STATUS[booking.status as keyof typeof BOOKING_STATUS].label}
+                          <Badge className={BOOKING_STATUS[booking.state as keyof typeof BOOKING_STATUS].color}>
+                            {BOOKING_STATUS[booking.state as keyof typeof BOOKING_STATUS].label}
                           </Badge>
                         </div>
                         <div className="text-sm text-muted-foreground space-y-1">
@@ -276,7 +276,7 @@ export default async function ArtistDashboardPage() {
                               category: 'event',
                               priority: 'high',
                               subject: `Artist booking issue: ${booking.events?.title || 'Booking'}`,
-                              message: `I need help with this artist booking. Event: ${booking.events?.title || 'Unknown'}. Status: ${booking.status}.`,
+                              message: `I need help with this artist booking. Event: ${booking.events?.title || 'Unknown'}. Status: ${booking.state}.`,
                             },
                           }}
                         >
@@ -312,8 +312,8 @@ export default async function ArtistDashboardPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                           <h3 className="font-semibold">{booking.events?.title}</h3>
-                          <Badge className={BOOKING_STATUS[booking.status as keyof typeof BOOKING_STATUS].color}>
-                            {BOOKING_STATUS[booking.status as keyof typeof BOOKING_STATUS].label}
+                          <Badge className={BOOKING_STATUS[booking.state as keyof typeof BOOKING_STATUS].color}>
+                            {BOOKING_STATUS[booking.state as keyof typeof BOOKING_STATUS].label}
                           </Badge>
                         </div>
                         <div className="text-sm text-muted-foreground space-y-1">
@@ -330,7 +330,7 @@ export default async function ArtistDashboardPage() {
                             category: 'event',
                             priority: 'medium',
                             subject: `Artist booking follow-up: ${booking.events?.title || 'Booking'}`,
-                            message: `I need help with this booking. Event: ${booking.events?.title || 'Unknown'}. Status: ${booking.status}.`,
+                              message: `I need help with this booking. Event: ${booking.events?.title || 'Unknown'}. Status: ${booking.state}.`,
                           },
                         }}
                       >
@@ -367,8 +367,8 @@ export default async function ArtistDashboardPage() {
                         <div>
                           <div className="flex items-center gap-2 mb-2">
                             <h3 className="font-semibold">{booking.events?.title}</h3>
-                            <Badge className={BOOKING_STATUS[booking.status as keyof typeof BOOKING_STATUS].color}>
-                              {BOOKING_STATUS[booking.status as keyof typeof BOOKING_STATUS].label}
+                            <Badge className={BOOKING_STATUS[booking.state as keyof typeof BOOKING_STATUS].color}>
+                              {BOOKING_STATUS[booking.state as keyof typeof BOOKING_STATUS].label}
                             </Badge>
                           </div>
                           <p className="text-sm text-muted-foreground">

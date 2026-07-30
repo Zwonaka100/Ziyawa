@@ -3,9 +3,13 @@
  * Based on Phase 0 Foundational Design
  */
 
-export const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || (process.env.NODE_ENV === 'production'
-  ? 'https://ziyawa.com'
-  : 'http://localhost:3000')
+const DEFAULT_SITE_URL = 'https://ziyawa.com'
+
+export const SITE_URL =
+  process.env.NEXT_PUBLIC_APP_URL ||
+  process.env.APP_URL ||
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : DEFAULT_SITE_URL)
 
 // South African provinces with display names
 export const PROVINCES = {

@@ -213,21 +213,22 @@ export default function ProviderDashboardPage() {
   const handleBookingAction = async (bookingId: string, action: 'accept' | 'decline') => {
     setProcessingBooking(bookingId)
     try {
-      const supabase = createClient()
-      
-      const newState = action === 'accept' ? 'accepted' : 'declined'
-      const { error } = await supabase
-        .from('provider_bookings')
-        .update({ state: newState })
-        .eq('id', bookingId)
+      const res = await fetch(`/api/provider-bookings/${bookingId}/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      })
 
-      if (error) throw error
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to update booking')
+      }
 
       toast.success(action === 'accept' ? 'Booking accepted!' : 'Booking declined')
       fetchProviderData()
     } catch (error) {
       console.error('Error updating booking:', error)
-      toast.error('Failed to update booking')
+      toast.error(error instanceof Error ? error.message : 'Failed to update booking')
     } finally {
       setProcessingBooking(null)
     }

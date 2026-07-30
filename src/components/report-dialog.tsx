@@ -129,21 +129,26 @@ export function ReportDialog({ type, targetId, targetName, trigger, onSuccess }:
     setSubmitting(true)
 
     try {
-      const { error } = await supabase
-        .from('reports')
-        .insert({
-          reporter_id: user.id,
+      const response = await fetch('/api/reports', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           reported_type: type,
           reported_id: targetId,
-          reason: reason,
+          reason,
           description: description.trim(),
-          status: 'pending',
-          priority: 'medium',
-        })
+        }),
+      })
 
-      if (error) throw error
+      const data = await response.json()
 
-      toast.success('Report submitted. Our team will review it shortly.')
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to submit report')
+      }
+
+      toast.success(data.message || 'Report submitted. Our team will review it shortly.')
       setOpen(false)
       setReason('')
       setDescription('')

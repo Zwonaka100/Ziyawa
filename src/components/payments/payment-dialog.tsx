@@ -38,23 +38,40 @@ interface TicketAttendeeInput {
 export function PaymentDialog({ open, onOpenChange, event, user, quantity = 1, selectedTier }: PaymentDialogProps) {
   const [loading, setLoading] = useState(false)
   const [attendees, setAttendees] = useState<TicketAttendeeInput[]>([])
+  const maxQuantityFromTier = Math.max(
+    1,
+    Math.min(
+      10,
+      Math.max(0, Number(selectedTier?.quantity || 1) - Number(selectedTier?.sold_count || 0)) || 1
+    )
+  )
+  const effectiveQuantity = Math.min(Math.max(1, quantity), maxQuantityFromTier)
   const _router = useRouter()
 
-  // Calculate fees using our fee structure
+  // Keep checkout totals aligned with API logic: per-ticket fees multiplied by quantity.
   const unitPrice = Number(selectedTier?.price ?? event.ticket_price ?? 0)
-  const ticketBasePriceCents = unitPrice * 100 * quantity // Convert Rands to cents
-  const breakdown = calculateTicketSaleBreakdown(ticketBasePriceCents)
+  const unitBreakdown = calculateTicketSaleBreakdown(unitPrice * 100)
+  const breakdown = {
+    ...unitBreakdown,
+    ticketPrice: unitBreakdown.ticketPrice * effectiveQuantity,
+    bookingFee: unitBreakdown.bookingFee * effectiveQuantity,
+    buyerTotal: unitBreakdown.buyerTotal * effectiveQuantity,
+    ticketingCommission: unitBreakdown.ticketingCommission * effectiveQuantity,
+    platformFee: unitBreakdown.platformFee * effectiveQuantity,
+    organizerNet: unitBreakdown.organizerNet * effectiveQuantity,
+    ziyawaTotal: unitBreakdown.ziyawaTotal * effectiveQuantity,
+  }
   const totalAmount = breakdown.buyerTotal // This is what the buyer pays (in cents)
 
   useEffect(() => {
     if (!open) return
 
-    setAttendees((current) => Array.from({ length: quantity }, (_, index) => current[index] || {
+    setAttendees((current) => Array.from({ length: effectiveQuantity }, (_, index) => current[index] || {
       fullName: user.full_name || '',
       email: user.email || '',
       phone: '',
     }))
-  }, [open, quantity, user.email, user.full_name])
+  }, [open, effectiveQuantity, user.email, user.full_name])
 
   const updateAttendee = (index: number, field: keyof TicketAttendeeInput, value: string) => {
     setAttendees((current) => current.map((attendee, attendeeIndex) => (
@@ -89,7 +106,7 @@ export function PaymentDialog({ open, onOpenChange, event, user, quantity = 1, s
         },
         body: JSON.stringify({
           eventId: event.id,
-          quantity: quantity,
+          quantity: effectiveQuantity,
           ticketTypeId: selectedTier?.id && !selectedTier.id.startsWith('legacy-') ? selectedTier.id : undefined,
           ticketTypeName: selectedTier?.name,
           attendees: cleanedAttendees,
@@ -126,11 +143,11 @@ export function PaymentDialog({ open, onOpenChange, event, user, quantity = 1, s
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Complete Your Purchase</DialogTitle>
           <DialogDescription>
-            You&apos;re buying {quantity} {selectedTier?.name || 'ticket'}{quantity > 1 ? 's' : ''} for {event.title}
+            You&apos;re buying {effectiveQuantity} {selectedTier?.name || 'ticket'}{effectiveQuantity > 1 ? 's' : ''} for {event.title}
           </DialogDescription>
         </DialogHeader>
 
@@ -144,7 +161,7 @@ export function PaymentDialog({ open, onOpenChange, event, user, quantity = 1, s
               </div>
             )}
             <div className="flex justify-between">
-              <span>Ticket Price {quantity > 1 ? `(${quantity}x)` : ''}</span>
+              <span>Ticket Price {effectiveQuantity > 1 ? `(${effectiveQuantity}x)` : ''}</span>
               <span>{formatCurrency(breakdown.ticketPrice / 100)}</span>
             </div>
             <div className="flex justify-between text-sm text-muted-foreground">

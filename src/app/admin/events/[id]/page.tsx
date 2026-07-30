@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   Table,
@@ -55,6 +56,9 @@ import {
   Flag,
   Trash2,
   Users,
+  Pencil,
+  Printer,
+  Lock,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { formatCurrency } from '@/lib/helpers'
@@ -119,6 +123,24 @@ const STATE_CONFIG: Record<string, { label: string; color: string }> = {
   completed: { label: 'Completed', color: 'bg-green-100 text-green-700' },
 }
 
+function isPastEvent(eventDate: string) {
+  if (!eventDate) return false
+  const eventDateValue = new Date(`${eventDate}T23:59:59`)
+  return eventDateValue < new Date()
+}
+
+function getEventLifecycleStatus(event: EventDetail) {
+  if (event.state === 'cancelled') return { label: 'Cancelled', color: 'bg-gray-100 text-gray-700' }
+  if (event.state === 'suspended') return { label: 'Suspended', color: 'bg-red-100 text-red-700' }
+  if (event.state === 'completed') return { label: 'Completed', color: 'bg-green-100 text-green-700' }
+  if (event.state === 'locked') return { label: 'Locked', color: 'bg-purple-100 text-purple-700' }
+  if (event.state === 'pending_approval') return { label: 'Pending Approval', color: 'bg-yellow-100 text-yellow-700' }
+  if (event.state === 'rejected') return { label: 'Rejected', color: 'bg-red-100 text-red-700' }
+  if (event.is_published && isPastEvent(event.event_date)) return { label: 'Past Published', color: 'bg-amber-100 text-amber-700' }
+  if (event.is_published) return { label: 'Published', color: 'bg-blue-100 text-blue-700' }
+  return { label: 'Draft', color: 'bg-gray-100 text-gray-700' }
+}
+
 export default function AdminEventDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -129,6 +151,21 @@ export default function AdminEventDetailPage() {
   const [bookings, setBookings] = useState<BookingSummary[]>([])
   const [reports, setReports] = useState<Array<{ id: string; reason: string; status: string; created_at: string; description?: string | null }>>([])
   const [loading, setLoading] = useState(true)
+  const [savingChanges, setSavingChanges] = useState(false)
+  const [publishLoading, setPublishLoading] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editForm, setEditForm] = useState({
+    title: '',
+    description: '',
+    venue: '',
+    location: '',
+    address: '',
+    event_date: '',
+    start_time: '',
+    end_time: '',
+    ticket_price: 0,
+    capacity: 0,
+  })
 
   // Action dialog
   const [actionOpen, setActionOpen] = useState(false)
@@ -160,6 +197,18 @@ export default function AdminEventDetailPage() {
       console.error(error)
     } else {
       setEvent(data)
+      setEditForm({
+        title: data.title || '',
+        description: data.description || '',
+        venue: data.venue || '',
+        location: data.location || '',
+        address: data.address || '',
+        event_date: data.event_date || '',
+        start_time: data.start_time || '',
+        end_time: data.end_time || '',
+        ticket_price: Number(data.ticket_price || 0),
+        capacity: Number(data.capacity || 0),
+      })
     }
 
     setLoading(false)
@@ -201,6 +250,41 @@ export default function AdminEventDetailPage() {
     setActionType(type)
     setActionNotes('')
     setActionOpen(true)
+  }
+
+  const handleUpdateEvent = async () => {
+    if (!event) return
+
+    setSavingChanges(true)
+
+    try {
+      const { error } = await supabase
+        .from('events')
+        .update({
+          title: editForm.title.trim(),
+          description: editForm.description.trim(),
+          venue: editForm.venue.trim(),
+          location: editForm.location.trim(),
+          address: editForm.address.trim(),
+          event_date: editForm.event_date,
+          start_time: editForm.start_time,
+          end_time: editForm.end_time,
+          ticket_price: Number(editForm.ticket_price),
+          capacity: Number(editForm.capacity),
+        })
+        .eq('id', eventId)
+
+      if (error) throw error
+
+      toast.success('Event updated successfully')
+      setEditOpen(false)
+      void fetchEvent()
+    } catch (error) {
+      console.error('Update error:', error)
+      toast.error('Failed to update event')
+    } finally {
+      setSavingChanges(false)
+    }
   }
 
   const handleAction = async () => {
@@ -297,16 +381,119 @@ export default function AdminEventDetailPage() {
   }
 
   const handlePublish = async (publish: boolean) => {
-    const { error } = await supabase
-      .from('events')
-      .update({ is_published: publish })
-      .eq('id', eventId)
+    if (!event) return
 
-    if (error) {
-      toast.error('Failed to update event')
-    } else {
+    setPublishLoading(true)
+
+    try {
+      const nextState = publish ? 'published' : 'draft'
+      const { data, error } = await supabase
+        .from('events')
+        .update({ is_published: publish, state: nextState, updated_at: new Date().toISOString() })
+        .eq('id', eventId)
+        .select('id, state, is_published')
+        .single()
+
+      if (error) throw error
+
+      if (publish && (!data?.is_published || data?.state !== 'published')) {
+        throw new Error('Publish write did not persist correctly')
+      }
+
+      const { data: refreshedEvent, error: refreshError } = await supabase
+        .from('events')
+        .select('id, state, is_published')
+        .eq('id', eventId)
+        .single()
+
+      if (refreshError) throw refreshError
+
+      if (publish && (!refreshedEvent?.is_published || refreshedEvent?.state !== 'published')) {
+        throw new Error('Publish state could not be verified')
+      }
+
       toast.success(publish ? 'Event published' : 'Event unpublished')
       void fetchEvent()
+    } catch (error) {
+      console.error('Publish error:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to update event')
+    } finally {
+      setPublishLoading(false)
+    }
+  }
+
+  const handleLockEvent = async () => {
+    if (!event) return
+
+    setPublishLoading(true)
+
+    try {
+      const { error } = await supabase
+        .from('events')
+        .update({ state: 'locked' })
+        .eq('id', eventId)
+
+      if (error) throw error
+
+      toast.success('Event locked')
+      void fetchEvent()
+    } catch (error) {
+      console.error('Lock error:', error)
+      toast.error('Failed to lock event')
+    } finally {
+      setPublishLoading(false)
+    }
+  }
+
+  const handleCancelEvent = async () => {
+    if (!event) return
+
+    const confirmed = window.confirm('Cancel this event? It will be hidden from the public listing and marked cancelled.')
+    if (!confirmed) return
+
+    setPublishLoading(true)
+
+    try {
+      const { error } = await supabase
+        .from('events')
+        .update({ state: 'cancelled', is_published: false })
+        .eq('id', eventId)
+
+      if (error) throw error
+
+      toast.success('Event cancelled')
+      void fetchEvent()
+    } catch (error) {
+      console.error('Cancel error:', error)
+      toast.error('Failed to cancel event')
+    } finally {
+      setPublishLoading(false)
+    }
+  }
+
+  const handleCompleteEvent = async () => {
+    if (!event) return
+
+    const confirmed = window.confirm('Mark this event as completed? This will update the lifecycle state for the event.')
+    if (!confirmed) return
+
+    setPublishLoading(true)
+
+    try {
+      const response = await fetch(`/api/events/${eventId}/complete`, { method: 'POST' })
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to complete event')
+      }
+
+      toast.success(data.message || 'Event marked complete')
+      void fetchEvent()
+    } catch (error) {
+      console.error('Complete error:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to complete event')
+    } finally {
+      setPublishLoading(false)
     }
   }
 
@@ -330,13 +517,13 @@ export default function AdminEventDetailPage() {
   }
 
   const isFeatured = event.featured && event.featured.length > 0
-  const stateConfig = STATE_CONFIG[event.state] || STATE_CONFIG.draft
+  const lifecycleStatus = getEventLifecycleStatus(event)
   const revenue = bookings.reduce((sum, b) => sum + (b.total_amount || 0), 0)
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-4 print:hidden">
         <div className="flex items-center gap-4">
           <Link href="/admin/events">
             <Button variant="ghost" size="sm">
@@ -347,7 +534,7 @@ export default function AdminEventDetailPage() {
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-2xl font-bold">{event.title}</h2>
-              <Badge className={stateConfig.color}>{stateConfig.label}</Badge>
+              <Badge className={lifecycleStatus.color}>{lifecycleStatus.label}</Badge>
               {isFeatured && (
                 <Badge className="bg-yellow-100 text-yellow-700">
                   <Star className="h-3 w-3 mr-1 fill-current" />
@@ -366,6 +553,10 @@ export default function AdminEventDetailPage() {
               View Public
             </Button>
           </Link>
+          <Button variant="outline" size="sm" onClick={() => window.print()}>
+            <Printer className="h-4 w-4 mr-2" />
+            Print
+          </Button>
         </div>
       </div>
 
@@ -373,6 +564,16 @@ export default function AdminEventDetailPage() {
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setEditOpen(true)} disabled={publishLoading}>
+              <Pencil className="h-4 w-4 mr-2" />
+              Edit Event
+            </Button>
+
+            <Button variant="outline" onClick={() => window.print()} disabled={publishLoading}>
+              <Printer className="h-4 w-4 mr-2" />
+              Print Details
+            </Button>
+
             {event.state === 'pending_approval' && (
               <>
                 <Button onClick={() => openAction('approve')} className="bg-green-600 hover:bg-green-700">
@@ -387,16 +588,31 @@ export default function AdminEventDetailPage() {
             )}
 
             {event.is_published ? (
-              <Button onClick={() => handlePublish(false)} variant="outline">
-                <XCircle className="h-4 w-4 mr-2" />
+              <Button onClick={() => handlePublish(false)} variant="outline" disabled={publishLoading}>
+                {publishLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <XCircle className="h-4 w-4 mr-2" />}
                 Unpublish
               </Button>
             ) : event.state === 'approved' && (
-              <Button onClick={() => handlePublish(true)} variant="outline">
-                <CheckCircle className="h-4 w-4 mr-2" />
+              <Button onClick={() => handlePublish(true)} variant="outline" disabled={publishLoading}>
+                {publishLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
                 Publish
               </Button>
             )}
+
+            <Button onClick={() => handleLockEvent()} variant="outline" disabled={publishLoading || event.state === 'locked' || event.state === 'completed' || event.state === 'cancelled'}>
+              <Lock className="h-4 w-4 mr-2" />
+              Lock
+            </Button>
+
+            <Button onClick={() => handleCompleteEvent()} variant="outline" disabled={publishLoading || event.state === 'completed' || event.state === 'cancelled'}>
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Complete
+            </Button>
+
+            <Button onClick={() => handleCancelEvent()} variant="outline" className="text-orange-600 border-orange-300 hover:bg-orange-50" disabled={publishLoading || event.state === 'cancelled' || event.state === 'completed'}>
+              <XCircle className="h-4 w-4 mr-2" />
+              Cancel
+            </Button>
 
             {isFeatured ? (
               <Button onClick={() => openAction('unfeature')} variant="outline">
@@ -726,6 +942,72 @@ export default function AdminEventDetailPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Event</DialogTitle>
+            <DialogDescription>Update the core event details for this listing.</DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 md:grid-cols-2 mt-4">
+            <div className="md:col-span-2 space-y-2">
+              <Label htmlFor="edit-title">Title</Label>
+              <Input id="edit-title" value={editForm.title} onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value }))} />
+            </div>
+            <div className="md:col-span-2 space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea id="edit-description" rows={4} value={editForm.description} onChange={(e) => setEditForm((prev) => ({ ...prev, description: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-venue">Venue</Label>
+              <Input id="edit-venue" value={editForm.venue} onChange={(e) => setEditForm((prev) => ({ ...prev, venue: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-location">Location</Label>
+              <Input id="edit-location" value={editForm.location} onChange={(e) => setEditForm((prev) => ({ ...prev, location: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-address">Address</Label>
+              <Input id="edit-address" value={editForm.address} onChange={(e) => setEditForm((prev) => ({ ...prev, address: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-date">Event Date</Label>
+              <Input id="edit-date" type="date" value={editForm.event_date} onChange={(e) => setEditForm((prev) => ({ ...prev, event_date: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-start">Start Time</Label>
+              <Input id="edit-start" value={editForm.start_time} onChange={(e) => setEditForm((prev) => ({ ...prev, start_time: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-end">End Time</Label>
+              <Input id="edit-end" value={editForm.end_time} onChange={(e) => setEditForm((prev) => ({ ...prev, end_time: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-price">Ticket Price</Label>
+              <Input id="edit-price" type="number" min="0" step="0.01" value={editForm.ticket_price} onChange={(e) => setEditForm((prev) => ({ ...prev, ticket_price: Number(e.target.value) }))} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-capacity">Capacity</Label>
+              <Input id="edit-capacity" type="number" min="1" value={editForm.capacity} onChange={(e) => setEditForm((prev) => ({ ...prev, capacity: Number(e.target.value) }))} />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateEvent} disabled={savingChanges}>
+              {savingChanges ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : 'Save Changes'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Action Dialog */}
       <Dialog open={actionOpen} onOpenChange={setActionOpen}>

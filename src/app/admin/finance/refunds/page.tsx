@@ -1,17 +1,8 @@
 'use client'
 
 import Image from 'next/image'
-
-/**
- * ADMIN REFUNDS PAGE
- * /admin/finance/refunds
- * 
- * Process refund requests and manage refund history
- */
-
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -66,49 +57,46 @@ import { formatCurrency } from '@/lib/helpers'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 
-interface RefundRequest {
+interface RefundQueueItem {
   id: string
-  booking_id: string
+  event_id: string | null
+  source_transaction_id: string | null
   user_id: string
   amount: number
   reason: string
-  status: string
+  status: 'new' | 'under_review' | 'approved' | 'rejected' | 'executed' | 'failed'
   requested_at: string
-  processed_at: string | null
+  reviewed_at: string | null
+  executed_at: string | null
   admin_notes: string | null
-  refund_method: string
+  refund_method: 'wallet'
   user?: {
-    full_name: string
-    email: string
-    avatar_url: string
-  }
-  booking?: {
+    full_name: string | null
+    email: string | null
+    avatar_url: string | null
+  } | null
+  event?: {
     id: string
-    event_id: string
-    quantity: number
-    total_amount: number
-    created_at: string
-    event?: {
-      title: string
-      start_date: string
-    }
-  }
+    title: string
+    event_date: string
+  } | null
   transaction?: {
     id: string
     reference: string
-    gateway_provider: string
-  }
+    type: string
+    state: string
+  } | null
 }
 
 const ITEMS_PER_PAGE = 25
 
-const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  pending: { label: 'Pending Review', color: 'bg-yellow-100 text-yellow-700' },
+const STATUS_CONFIG: Record<RefundQueueItem['status'], { label: string; color: string }> = {
+  new: { label: 'New', color: 'bg-yellow-100 text-yellow-700' },
+  under_review: { label: 'Under Review', color: 'bg-blue-100 text-blue-700' },
   approved: { label: 'Approved', color: 'bg-blue-100 text-blue-700' },
-  processing: { label: 'Processing', color: 'bg-purple-100 text-purple-700' },
-  completed: { label: 'Refunded', color: 'bg-green-100 text-green-700' },
   rejected: { label: 'Rejected', color: 'bg-red-100 text-red-700' },
-  partial: { label: 'Partial Refund', color: 'bg-orange-100 text-orange-700' },
+  executed: { label: 'Executed', color: 'bg-green-100 text-green-700' },
+  failed: { label: 'Failed', color: 'bg-orange-100 text-orange-700' },
 }
 
 const REFUND_REASONS: Record<string, string> = {
@@ -118,240 +106,172 @@ const REFUND_REASONS: Record<string, string> = {
   wrong_tickets: 'Wrong Tickets',
   unable_to_attend: 'Unable to Attend',
   dissatisfied: 'Dissatisfied with Service',
+  admin_requested: 'Admin Requested',
   other: 'Other',
 }
 
 export default function AdminRefundsPage() {
-  const [refunds, setRefunds] = useState<RefundRequest[]>([])
+  const [allItems, setAllItems] = useState<RefundQueueItem[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('pending')
+  const [statusFilter, setStatusFilter] = useState('new')
   const [reasonFilter, setReasonFilter] = useState('all')
   const [page, setPage] = useState(1)
-  const [totalCount, setTotalCount] = useState(0)
 
-  // Process dialog
   const [processOpen, setProcessOpen] = useState(false)
-  const [selectedRefund, setSelectedRefund] = useState<RefundRequest | null>(null)
-  const [processAction, setProcessAction] = useState<'approve' | 'reject' | 'process'>('approve')
+  const [selectedItem, setSelectedItem] = useState<RefundQueueItem | null>(null)
+  const [processAction, setProcessAction] = useState<'approve' | 'reject' | 'review'>('approve')
   const [adminNotes, setAdminNotes] = useState('')
-  const [partialAmount, setPartialAmount] = useState('')
   const [processing, setProcessing] = useState(false)
 
-  // Stats
-  const [stats, setStats] = useState({
-    pendingCount: 0,
-    pendingAmount: 0,
-    refundedThisMonth: 0,
-    refundedAmount: 0,
-  })
+  const fetchItems = useCallback(async () => {
+    setLoading(true)
+    try {
+      const query = statusFilter !== 'all' ? `?status=${encodeURIComponent(statusFilter)}` : ''
+      const response = await fetch(`/api/admin/refunds${query}`, { cache: 'no-store' })
+      const data = await response.json()
 
-  const fetchStats = useCallback(async () => {
-    const supabase = createClient()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to load refund queue')
+      }
+
+      const items: RefundQueueItem[] = (data.items || []).map((item: {
+        id: string
+        event_id: string | null
+        source_transaction_id: string | null
+        user_id: string
+        amount_cents: number
+        reason_code: string
+        status: RefundQueueItem['status']
+        created_at: string
+        reviewed_at: string | null
+        executed_at: string | null
+        admin_notes: string | null
+        user?: RefundQueueItem['user']
+        event?: RefundQueueItem['event']
+        sourceTransaction?: RefundQueueItem['transaction']
+      }) => ({
+        id: item.id,
+        event_id: item.event_id,
+        source_transaction_id: item.source_transaction_id,
+        user_id: item.user_id,
+        amount: Number(item.amount_cents || 0) / 100,
+        reason: item.reason_code,
+        status: item.status,
+        requested_at: item.created_at,
+        reviewed_at: item.reviewed_at,
+        executed_at: item.executed_at,
+        admin_notes: item.admin_notes,
+        refund_method: 'wallet',
+        user: item.user,
+        event: item.event,
+        transaction: item.sourceTransaction,
+      }))
+
+      setAllItems(items)
+    } catch (error) {
+      console.error('Refund queue load error:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to load refund queue')
+    } finally {
+      setLoading(false)
+    }
+  }, [statusFilter])
+
+  useEffect(() => {
+    void fetchItems()
+  }, [fetchItems])
+
+  const filteredItems = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    return allItems.filter((item) => {
+      const reasonOk = reasonFilter === 'all' || item.reason === reasonFilter
+      if (!reasonOk) return false
+
+      if (!term) return true
+
+      const haystack = [
+        item.user?.full_name || '',
+        item.user?.email || '',
+        item.event?.title || '',
+        item.transaction?.reference || '',
+      ].join(' ').toLowerCase()
+
+      return haystack.includes(term)
+    })
+  }, [allItems, search, reasonFilter])
+
+  const totalCount = filteredItems.length
+  const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE))
+
+  const paginatedItems = useMemo(() => {
+    const from = (page - 1) * ITEMS_PER_PAGE
+    const to = from + ITEMS_PER_PAGE
+    return filteredItems.slice(from, to)
+  }, [filteredItems, page])
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
+
+  const stats = useMemo(() => {
     const firstOfMonth = new Date()
     firstOfMonth.setDate(1)
     firstOfMonth.setHours(0, 0, 0, 0)
-    
-    const [pending, refunded] = await Promise.all([
-      supabase.from('refund_requests').select('amount').eq('status', 'pending'),
-      supabase.from('refund_requests').select('amount').eq('status', 'completed').gte('processed_at', firstOfMonth.toISOString()),
-    ])
 
-    setStats({
-      pendingCount: pending.data?.length || 0,
-      pendingAmount: pending.data?.reduce((sum, r) => sum + (r.amount || 0), 0) || 0,
-      refundedThisMonth: refunded.data?.length || 0,
-      refundedAmount: refunded.data?.reduce((sum, r) => sum + (r.amount || 0), 0) || 0,
-    })
-  }, [])
+    const pending = allItems.filter((item) => item.status === 'new' || item.status === 'under_review')
+    const refunded = allItems.filter((item) => item.status === 'executed' && item.executed_at && new Date(item.executed_at) >= firstOfMonth)
 
-  const fetchRefunds = useCallback(async () => {
-    const supabase = createClient()
-    setLoading(true)
-
-    let query = supabase
-      .from('refund_requests')
-      .select(`
-        *,
-        user:profiles!refund_requests_user_id_fkey(full_name, email, avatar_url),
-        booking:bookings(
-          id,
-          event_id,
-          quantity,
-          total_amount,
-          created_at,
-          event:events(title, start_date)
-        ),
-        transaction:transactions(id, reference, gateway_provider)
-      `, { count: 'exact' })
-      .order('requested_at', { ascending: false })
-
-    if (statusFilter !== 'all') {
-      query = query.eq('status', statusFilter)
+    return {
+      pendingCount: pending.length,
+      pendingAmount: pending.reduce((sum, item) => sum + item.amount, 0),
+      refundedThisMonth: refunded.length,
+      refundedAmount: refunded.reduce((sum, item) => sum + item.amount, 0),
     }
+  }, [allItems])
 
-    if (reasonFilter !== 'all') {
-      query = query.eq('reason', reasonFilter)
-    }
-
-    if (search) {
-      query = query.or(`user.full_name.ilike.%${search}%,user.email.ilike.%${search}%`)
-    }
-
-    const from = (page - 1) * ITEMS_PER_PAGE
-    const to = from + ITEMS_PER_PAGE - 1
-    query = query.range(from, to)
-
-    const { data, count, error } = await query
-
-    if (!error && data) {
-      setRefunds(data)
-      setTotalCount(count || 0)
-    }
-
-    setLoading(false)
-  }, [page, statusFilter, reasonFilter, search])
-
-  useEffect(() => {
-    void fetchRefunds()
-    void fetchStats()
-  }, [fetchRefunds, fetchStats])
-
-  const openProcess = (refund: RefundRequest, action: 'approve' | 'reject' | 'process') => {
-    setSelectedRefund(refund)
+  const openProcess = (item: RefundQueueItem, action: 'approve' | 'reject' | 'review') => {
+    setSelectedItem(item)
     setProcessAction(action)
     setAdminNotes('')
-    setPartialAmount('')
     setProcessOpen(true)
   }
 
   const handleProcess = async () => {
-    if (!selectedRefund) return
+    if (!selectedItem) return
 
     setProcessing(true)
-
     try {
-      const supabase = createClient()
-      const { data: { user: admin } } = await supabase.auth.getUser()
-      
-      let newStatus = ''
-      let refundAmount = selectedRefund.amount
-      
-      if (processAction === 'approve') newStatus = 'approved'
-      else if (processAction === 'reject') newStatus = 'rejected'
-      else if (processAction === 'process') {
-        newStatus = 'completed'
-        if (partialAmount && parseFloat(partialAmount) < selectedRefund.amount) {
-          newStatus = 'partial'
-          refundAmount = parseFloat(partialAmount)
-        }
-      }
-
-      const updates: Record<string, unknown> = {
-        status: newStatus,
-        admin_notes: adminNotes || null,
-        processed_by: admin?.id,
-      }
-
-      if (newStatus === 'completed' || newStatus === 'partial' || newStatus === 'rejected') {
-        updates.processed_at = new Date().toISOString()
-      }
-
-      if (newStatus === 'partial') {
-        updates.refunded_amount = refundAmount
-      }
-
-      // Update refund request
-      const { error } = await supabase
-        .from('refund_requests')
-        .update(updates)
-        .eq('id', selectedRefund.id)
-
-      if (error) throw error
-
-      // If processing refund, create refund transaction and update original
-      if (newStatus === 'completed' || newStatus === 'partial') {
-        // Create refund transaction
-        await supabase.from('transactions').insert({
-          reference: `REFUND-${selectedRefund.transaction?.reference || selectedRefund.id}`,
-          type: 'refund',
-          status: 'completed',
-          amount: refundAmount,
-          platform_fee: 0,
-          net_amount: -refundAmount,
-          payer_id: admin?.id,
-          recipient_id: selectedRefund.user_id,
-          event_id: selectedRefund.booking?.event_id,
-          booking_id: selectedRefund.booking_id,
-          gateway_provider: selectedRefund.transaction?.gateway_provider || 'manual',
-          metadata: {
-            original_transaction_id: selectedRefund.transaction?.id,
-            refund_reason: selectedRefund.reason,
-            admin_notes: adminNotes,
-          },
-        })
-
-        // Update original transaction status to refunded
-        if (selectedRefund.transaction?.id) {
-          await supabase
-            .from('transactions')
-            .update({ status: newStatus === 'partial' ? 'partial_refund' : 'refunded' })
-            .eq('id', selectedRefund.transaction.id)
-        }
-
-        // Credit user's wallet if refund method is wallet
-        if (selectedRefund.refund_method === 'wallet') {
-          await supabase.rpc('credit_wallet_balance', {
-            p_user_id: selectedRefund.user_id,
-            p_amount: refundAmount,
-          })
-        }
-
-        // Cancel booking tickets if full refund
-        if (newStatus === 'completed') {
-          await supabase
-            .from('tickets')
-            .update({ status: 'refunded' })
-            .eq('booking_id', selectedRefund.booking_id)
-        }
-      }
-
-      // Audit log
-      await supabase.from('admin_audit_logs').insert({
-        admin_id: admin?.id,
-        action: `refund_${processAction}`,
-        entity_type: 'refund',
-        entity_id: selectedRefund.id,
-        details: {
-          amount: refundAmount,
-          status: newStatus,
-          notes: adminNotes,
-          user_email: selectedRefund.user?.email,
-          event_title: selectedRefund.booking?.event?.title,
-        },
+      const response = await fetch(`/api/admin/refunds/${selectedItem.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision: processAction, notes: adminNotes || undefined }),
       })
 
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to process refund decision')
+      }
+
       toast.success(
-        processAction === 'approve' ? 'Refund approved' :
-        processAction === 'reject' ? 'Refund rejected' :
-        `${formatCurrency(refundAmount)} refunded successfully`
+        processAction === 'approve'
+          ? 'Refund approved and credited to wallet'
+          : processAction === 'review'
+            ? 'Refund moved to review'
+            : 'Refund rejected'
       )
+
       setProcessOpen(false)
-      void fetchRefunds()
-      void fetchStats()
+      await fetchItems()
     } catch (error) {
-      console.error('Process error:', error)
-      toast.error('Failed to process refund')
+      console.error('Refund decision error:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to process refund decision')
     } finally {
       setProcessing(false)
     }
   }
 
-  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE)
-
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/admin/finance">
           <Button variant="ghost" size="sm">
@@ -360,12 +280,11 @@ export default function AdminRefundsPage() {
           </Button>
         </Link>
         <div>
-          <h2 className="text-2xl font-bold">Refunds</h2>
-          <p className="text-muted-foreground">Process refund requests and manage refund history</p>
+          <h2 className="text-2xl font-bold">Refund Queue</h2>
+          <p className="text-muted-foreground">Admin-reviewed wallet-credit refunds</p>
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card className="border-yellow-200 bg-yellow-50">
           <CardContent className="p-4">
@@ -383,53 +302,52 @@ export default function AdminRefundsPage() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Refund Policy</p>
-            <p className="text-2xl font-bold">48 hrs</p>
-            <p className="text-sm text-muted-foreground">Before event</p>
+            <p className="text-sm text-muted-foreground">Refund Model</p>
+            <p className="text-2xl font-bold">Wallet</p>
+            <p className="text-sm text-muted-foreground">Admin-approved only</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Auto-approve</p>
-            <p className="text-2xl font-bold">Events</p>
-            <p className="text-sm text-muted-foreground">Cancelled events only</p>
+            <p className="text-sm text-muted-foreground">Execution Mode</p>
+            <p className="text-2xl font-bold">Manual</p>
+            <p className="text-sm text-muted-foreground">Review then approve</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters */}
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-4">
-            <div className="relative flex-1 min-w-[200px]">
+            <div className="relative flex-1 min-w-[220px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by user name or email..."
+                placeholder="Search by name, email, event, transaction..."
                 value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                onChange={(e) => { setSearch(e.target.value); setPage(1) }}
                 className="pl-10"
               />
             </div>
-            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
-              <SelectTrigger className="w-[180px]">
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1) }}>
+              <SelectTrigger className="w-[190px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="pending">Pending Review</SelectItem>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="new">New</SelectItem>
+                <SelectItem value="under_review">Under review</SelectItem>
                 <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="processing">Processing</SelectItem>
-                <SelectItem value="completed">Refunded</SelectItem>
-                <SelectItem value="partial">Partial Refund</SelectItem>
+                <SelectItem value="executed">Executed</SelectItem>
                 <SelectItem value="rejected">Rejected</SelectItem>
+                <SelectItem value="failed">Failed</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={reasonFilter} onValueChange={(v) => { setReasonFilter(v); setPage(1); }}>
-              <SelectTrigger className="w-[200px]">
+            <Select value={reasonFilter} onValueChange={(v) => { setReasonFilter(v); setPage(1) }}>
+              <SelectTrigger className="w-[220px]">
                 <SelectValue placeholder="Reason" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Reasons</SelectItem>
+                <SelectItem value="all">All reasons</SelectItem>
                 {Object.entries(REFUND_REASONS).map(([value, label]) => (
                   <SelectItem key={value} value={value}>{label}</SelectItem>
                 ))}
@@ -439,14 +357,13 @@ export default function AdminRefundsPage() {
         </CardContent>
       </Card>
 
-      {/* Refunds Table */}
       <Card>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>User</TableHead>
-                <TableHead>Event / Booking</TableHead>
+                <TableHead>Event / Transaction</TableHead>
                 <TableHead>Reason</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead>Status</TableHead>
@@ -461,86 +378,79 @@ export default function AdminRefundsPage() {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
                   </TableCell>
                 </TableRow>
-              ) : refunds.length === 0 ? (
+              ) : paginatedItems.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    No refund requests found
+                    No refund work items found
                   </TableCell>
                 </TableRow>
               ) : (
-                refunds.map((refund) => {
-                  const statusConfig = STATUS_CONFIG[refund.status] || STATUS_CONFIG.pending
-
+                paginatedItems.map((item) => {
+                  const statusConfig = STATUS_CONFIG[item.status] || STATUS_CONFIG.new
                   return (
-                    <TableRow key={refund.id}>
+                    <TableRow key={item.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center">
-                            {refund.user?.avatar_url ? (
+                          <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center overflow-hidden">
+                            {item.user?.avatar_url ? (
                               <Image
-                                src={refund.user.avatar_url}
+                                src={item.user.avatar_url}
                                 alt=""
                                 width={32}
                                 height={32}
-                                className="w-full h-full rounded-full object-cover"
+                                className="w-full h-full object-cover"
                               />
                             ) : (
                               <User className="h-4 w-4 text-muted-foreground" />
                             )}
                           </div>
                           <div>
-                            <Link href={`/admin/users/${refund.user_id}`} className="font-medium hover:underline">
-                              {refund.user?.full_name || 'Unknown'}
+                            <Link href={`/admin/users/${item.user_id}`} className="font-medium hover:underline">
+                              {item.user?.full_name || 'Unknown user'}
                             </Link>
-                            <p className="text-xs text-muted-foreground">{refund.user?.email}</p>
+                            <p className="text-xs text-muted-foreground">{item.user?.email || 'No email'}</p>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        {refund.booking?.event ? (
+                        {item.event ? (
                           <div className="text-sm">
-                            <Link 
-                              href={`/admin/events/${refund.booking.event_id}`}
-                              className="font-medium hover:underline flex items-center gap-1"
-                            >
-                              {refund.booking.event.title}
+                            <Link href={`/admin/events/${item.event.id}`} className="font-medium hover:underline flex items-center gap-1">
+                              {item.event.title}
                               <ExternalLink className="h-3 w-3" />
                             </Link>
                             <div className="flex items-center gap-2 text-muted-foreground text-xs">
                               <Calendar className="h-3 w-3" />
-                              {format(new Date(refund.booking.event.start_date), 'MMM d, yyyy')}
-                              <Ticket className="h-3 w-3 ml-2" />
-                              {refund.booking.quantity} ticket(s)
+                              {format(new Date(item.event.event_date), 'MMM d, yyyy')}
+                              {item.transaction?.reference && (
+                                <>
+                                  <Ticket className="h-3 w-3 ml-2" />
+                                  {item.transaction.reference}
+                                </>
+                              )}
                             </div>
                           </div>
                         ) : (
-                          <span className="text-muted-foreground">-</span>
+                          <span className="text-muted-foreground">No event context</span>
                         )}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1 text-sm">
                           <AlertTriangle className="h-3 w-3 text-muted-foreground" />
-                          {REFUND_REASONS[refund.reason] || refund.reason}
+                          {REFUND_REASONS[item.reason] || item.reason}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <span className="font-bold text-lg">{formatCurrency(refund.amount)}</span>
-                        {refund.booking?.total_amount && refund.amount < refund.booking.total_amount && (
-                          <p className="text-xs text-muted-foreground">
-                            of {formatCurrency(refund.booking.total_amount)}
-                          </p>
-                        )}
+                        <span className="font-bold text-lg">{formatCurrency(item.amount)}</span>
                       </TableCell>
                       <TableCell>
-                        <Badge className={statusConfig.color}>
-                          {statusConfig.label}
-                        </Badge>
+                        <Badge className={statusConfig.color}>{statusConfig.label}</Badge>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {format(new Date(refund.requested_at), 'MMM d, HH:mm')}
+                        {format(new Date(item.requested_at), 'MMM d, HH:mm')}
                       </TableCell>
                       <TableCell className="text-right">
-                        {refund.status === 'pending' && (
+                        {['new', 'under_review'].includes(item.status) ? (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="sm">
@@ -548,25 +458,22 @@ export default function AdminRefundsPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openProcess(refund, 'approve')}>
-                                <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
-                                Approve
+                              <DropdownMenuItem onClick={() => openProcess(item, 'review')}>
+                                <Loader2 className="h-4 w-4 mr-2 text-blue-600" />
+                                Mark in review
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => openProcess(refund, 'reject')}>
+                              <DropdownMenuItem onClick={() => openProcess(item, 'approve')}>
+                                <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                                Approve and execute
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openProcess(item, 'reject')}>
                                 <XCircle className="h-4 w-4 mr-2 text-red-600" />
                                 Reject
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
-                        )}
-                        {refund.status === 'approved' && (
-                          <Button
-                            size="sm"
-                            onClick={() => openProcess(refund, 'process')}
-                          >
-                            <RotateCcw className="h-4 w-4 mr-2" />
-                            Process Refund
-                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">No actions</span>
                         )}
                       </TableCell>
                     </TableRow>
@@ -578,7 +485,6 @@ export default function AdminRefundsPage() {
         </CardContent>
       </Card>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
@@ -588,7 +494,7 @@ export default function AdminRefundsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPage(p => Math.max(1, p - 1))}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
             >
               <ChevronLeft className="h-4 w-4" />
@@ -597,7 +503,7 @@ export default function AdminRefundsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
             >
               <ChevronRight className="h-4 w-4" />
@@ -606,60 +512,38 @@ export default function AdminRefundsPage() {
         </div>
       )}
 
-      {/* Process Dialog */}
       <Dialog open={processOpen} onOpenChange={setProcessOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {processAction === 'approve' && 'Approve Refund Request'}
-              {processAction === 'reject' && 'Reject Refund Request'}
-              {processAction === 'process' && 'Process Refund'}
+              {processAction === 'approve' && 'Approve Refund'}
+              {processAction === 'review' && 'Move Refund To Review'}
+              {processAction === 'reject' && 'Reject Refund'}
             </DialogTitle>
             <DialogDescription>
-              {processAction === 'approve' && 'Approve this refund request for processing'}
-              {processAction === 'reject' && 'Reject this refund request'}
-              {processAction === 'process' && 'Process the refund - funds will be returned to customer'}
+              {processAction === 'approve' && 'This will execute a wallet credit to the user immediately.'}
+              {processAction === 'review' && 'This marks the refund for additional admin checks.'}
+              {processAction === 'reject' && 'This closes the request with a rejection decision.'}
             </DialogDescription>
           </DialogHeader>
 
-          {selectedRefund && (
+          {selectedItem && (
             <div className="space-y-4 mt-4">
-              {/* Refund Summary */}
               <div className="p-4 rounded-lg bg-neutral-50">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="font-medium">{selectedRefund.user?.full_name}</p>
-                    <p className="text-sm text-muted-foreground">{selectedRefund.user?.email}</p>
+                    <p className="font-medium">{selectedItem.user?.full_name || 'Unknown user'}</p>
+                    <p className="text-sm text-muted-foreground">{selectedItem.user?.email || 'No email'}</p>
                   </div>
-                  <p className="text-xl font-bold">{formatCurrency(selectedRefund.amount)}</p>
+                  <p className="text-xl font-bold">{formatCurrency(selectedItem.amount)}</p>
                 </div>
-                {selectedRefund.booking?.event && (
-                  <div className="mt-3 pt-3 border-t text-sm">
-                    <p><strong>Event:</strong> {selectedRefund.booking.event.title}</p>
-                    <p><strong>Tickets:</strong> {selectedRefund.booking.quantity}</p>
-                    <p><strong>Reason:</strong> {REFUND_REASONS[selectedRefund.reason] || selectedRefund.reason}</p>
-                    <p><strong>Refund Method:</strong> {selectedRefund.refund_method === 'wallet' ? 'Wallet Credit' : 'Original Payment Method'}</p>
-                  </div>
-                )}
+                <div className="mt-3 pt-3 border-t text-sm space-y-1">
+                  <p><strong>Reason:</strong> {REFUND_REASONS[selectedItem.reason] || selectedItem.reason}</p>
+                  <p><strong>Refund Method:</strong> Wallet credit</p>
+                  {selectedItem.event && <p><strong>Event:</strong> {selectedItem.event.title}</p>}
+                  {selectedItem.transaction?.reference && <p><strong>Transaction:</strong> {selectedItem.transaction.reference}</p>}
+                </div>
               </div>
-
-              {/* Partial Refund Option (only when processing) */}
-              {processAction === 'process' && (
-                <div className="space-y-2">
-                  <Label htmlFor="partial">Refund Amount</Label>
-                  <Input
-                    id="partial"
-                    type="number"
-                    value={partialAmount || selectedRefund.amount.toString()}
-                    onChange={(e) => setPartialAmount(e.target.value)}
-                    max={selectedRefund.amount}
-                    min={0}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Enter a lower amount for partial refund. Max: {formatCurrency(selectedRefund.amount)}
-                  </p>
-                </div>
-              )}
 
               <div className="space-y-2">
                 <Label htmlFor="notes">Admin Notes {processAction === 'reject' ? '(required)' : '(optional)'}</Label>
@@ -667,7 +551,7 @@ export default function AdminRefundsPage() {
                   id="notes"
                   value={adminNotes}
                   onChange={(e) => setAdminNotes(e.target.value)}
-                  placeholder={processAction === 'reject' ? 'Reason for rejection (required)...' : 'Any notes for this refund...'}
+                  placeholder={processAction === 'reject' ? 'Reason for rejection (required)...' : 'Optional notes...'}
                   rows={3}
                 />
               </div>
@@ -689,11 +573,11 @@ export default function AdminRefundsPage() {
                   ) : (
                     <>
                       {processAction === 'approve' && <CheckCircle className="h-4 w-4 mr-2" />}
+                      {processAction === 'review' && <RotateCcw className="h-4 w-4 mr-2" />}
                       {processAction === 'reject' && <XCircle className="h-4 w-4 mr-2" />}
-                      {processAction === 'process' && <RotateCcw className="h-4 w-4 mr-2" />}
-                      {processAction === 'approve' && 'Approve Request'}
-                      {processAction === 'reject' && 'Reject Request'}
-                      {processAction === 'process' && `Refund ${formatCurrency(parseFloat(partialAmount) || selectedRefund.amount)}`}
+                      {processAction === 'approve' && 'Approve and Execute'}
+                      {processAction === 'review' && 'Move to Review'}
+                      {processAction === 'reject' && 'Reject'}
                     </>
                   )}
                 </Button>

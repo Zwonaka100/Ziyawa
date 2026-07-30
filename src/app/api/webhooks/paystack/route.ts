@@ -126,10 +126,27 @@ async function handleChargeSuccess(data: {
     return;
   }
 
-  // Already processed?
-  if (transaction.state !== 'initiated') {
-    console.log('Transaction already processed:', reference);
-    return;
+  // Atomically claim the transaction from initiated -> authorized to avoid duplicate processing.
+  const existingGatewayResponse = ((transaction.gateway_response as Record<string, unknown> | null) || {})
+  const { data: claimedTransaction, error: claimError } = await supabase
+    .from('transactions')
+    .update({
+      state: 'authorized',
+      gateway_response: {
+        ...existingGatewayResponse,
+        paystack: verification.data,
+      },
+      authorized_at: new Date().toISOString(),
+      failure_reason: null,
+    })
+    .eq('id', transaction.id)
+    .eq('state', 'initiated')
+    .select('*')
+    .single()
+
+  if (claimError || !claimedTransaction) {
+    console.log('Transaction already claimed or processed:', reference)
+    return
   }
 
   const paymentType = metadata.type as string;
@@ -137,15 +154,15 @@ async function handleChargeSuccess(data: {
   // Handle based on payment type
   switch (paymentType) {
     case 'ticket_purchase':
-      await processTicketPurchase(transaction, verification.data, metadata);
+      await processTicketPurchase(claimedTransaction, verification.data, metadata);
       break;
     
     case 'wallet_deposit':
-      await processWalletDeposit(transaction, verification.data, metadata);
+      await processWalletDeposit(claimedTransaction, verification.data, metadata);
       break;
     
     case 'booking_payment':
-      await processBookingPayment(transaction, verification.data, metadata);
+      await processBookingPayment(claimedTransaction, verification.data, metadata);
       break;
 
     default:
@@ -183,20 +200,7 @@ async function processTicketPurchase(
       .eq('id', eventId)
       .single();
 
-    // 1. Update transaction state
-    await supabase
-      .from('transactions')
-      .update({
-        state: 'authorized',
-        gateway_response: {
-          ...existingGatewayResponse,
-          paystack: paystackData,
-        },
-        authorized_at: new Date().toISOString(),
-      })
-      .eq('id', transaction.id);
-
-    // 2. Create tickets
+    // 1. Create tickets
     const tickets = Array.from({ length: quantity }, (_, index) => {
       const attendee = ((rawAttendees[index] as Record<string, unknown> | undefined) || {});
       const attendeeName = String(attendee.fullName || buyerName || `Ticket Holder ${index + 1}`).trim();
@@ -258,7 +262,7 @@ async function processTicketPurchase(
       insertedTickets = insertedWithRecipientFields || [];
     }
 
-    // 3. Update event tickets_sold count
+    // 2. Update event tickets_sold count
     await supabase
       .from('events')
       .update({
@@ -282,7 +286,7 @@ async function processTicketPurchase(
         .eq('id', ticketTypeId);
     }
 
-    // 4. Move transaction to "held" state (escrow until event completes)
+    // 3. Move transaction to "held" state (escrow until event completes)
     await supabase
       .from('transactions')
       .update({
@@ -292,9 +296,21 @@ async function processTicketPurchase(
       .eq('id', transaction.id);
 
     if (transaction.recipient_id) {
-      await adjustProfileBalanceBuckets(transaction.recipient_id as string, {
-        heldDelta: ((transaction.net_amount as number) || 0) / 100,
-      });
+      await adjustProfileBalanceBuckets(
+        transaction.recipient_id as string,
+        {
+          heldDelta: ((transaction.net_amount as number) || 0) / 100,
+        },
+        {
+          reasonCode: 'ticket_revenue_held',
+          referenceType: 'transaction',
+          referenceId: String(transaction.id),
+          metadata: {
+            eventId,
+            reference: String(transaction.reference || ''),
+          },
+        }
+      );
     }
 
     if (userId) {
@@ -373,29 +389,32 @@ async function processWalletDeposit(
 
   try {
     // 1. Update transaction state
+    const existingGatewayResponse = ((transaction.gateway_response as Record<string, unknown> | null) || {})
     await supabase
       .from('transactions')
       .update({
         state: 'settled', // Deposits settle immediately
-        gateway_response: paystackData,
-        authorized_at: new Date().toISOString(),
+        gateway_response: {
+          ...existingGatewayResponse,
+          paystack: paystackData,
+        },
         settled_at: new Date().toISOString(),
       })
       .eq('id', transaction.id);
 
     // 2. Update user wallet balance
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('wallet_balance')
-      .eq('id', userId)
-      .single();
-
-    await supabase
-      .from('profiles')
-      .update({
-        wallet_balance: (profile?.wallet_balance || 0) + depositAmount,
-      })
-      .eq('id', userId);
+    await adjustProfileBalanceBuckets(
+      userId,
+      { walletDelta: depositAmount },
+      {
+        reasonCode: 'wallet_deposit_settled',
+        referenceType: 'transaction',
+        referenceId: String(transaction.id),
+        metadata: {
+          depositAmount,
+        },
+      }
+    )
 
     console.log(`✅ Wallet deposit completed: R${depositAmount} for user ${userId}`);
 
@@ -442,9 +461,21 @@ async function processBookingPayment(
       .eq('id', transaction.id);
 
     if (transaction.recipient_id) {
-      await adjustProfileBalanceBuckets(transaction.recipient_id as string, {
-        heldDelta: ((transaction.net_amount as number) || 0) / 100,
-      });
+      await adjustProfileBalanceBuckets(
+        transaction.recipient_id as string,
+        {
+          heldDelta: ((transaction.net_amount as number) || 0) / 100,
+        },
+        {
+          reasonCode: 'booking_payment_held',
+          referenceType: 'transaction',
+          referenceId: String(transaction.id),
+          metadata: {
+            bookingId,
+            bookingType,
+          },
+        }
+      );
     }
 
     // 2. Update booking state to confirmed (= payment received)
@@ -516,9 +547,18 @@ async function handleTransferSuccess(data: { reference: string }) {
   }
 
   if (transaction.payer_id) {
-    await adjustProfileBalanceBuckets(transaction.payer_id, {
-      pendingPayoutDelta: -(((transaction.amount as number) || 0) / 100),
-    });
+    await adjustProfileBalanceBuckets(
+      transaction.payer_id,
+      {
+        pendingPayoutDelta: -(((transaction.amount as number) || 0) / 100),
+      },
+      {
+        reasonCode: 'payout_settled',
+        referenceType: 'transaction',
+        referenceId: String(transaction.id),
+        metadata: { reference },
+      }
+    );
   }
 
   await supabase
@@ -562,10 +602,19 @@ async function handleTransferFailed(data: { reference: string; reason: string })
   const refundAmount = ((transaction.amount as number) || 0) / 100;
 
   if (transaction.payer_id) {
-    await adjustProfileBalanceBuckets(transaction.payer_id, {
-      walletDelta: refundAmount,
-      pendingPayoutDelta: -refundAmount,
-    });
+    await adjustProfileBalanceBuckets(
+      transaction.payer_id,
+      {
+        walletDelta: refundAmount,
+        pendingPayoutDelta: -refundAmount,
+      },
+      {
+        reasonCode: 'payout_failed_restore',
+        referenceType: 'transaction',
+        referenceId: String(transaction.id),
+        metadata: { reason },
+      }
+    );
 
     await createNotification({
       userId: transaction.payer_id,
@@ -615,10 +664,19 @@ async function handleTransferReversed(data: { reference: string }) {
   const refundAmount = ((transaction.amount as number) || 0) / 100;
 
   if (transaction.payer_id && transaction.state !== 'failed') {
-    await adjustProfileBalanceBuckets(transaction.payer_id, {
-      walletDelta: refundAmount,
-      pendingPayoutDelta: ['initiated', 'released'].includes(transaction.state) ? -refundAmount : 0,
-    });
+    await adjustProfileBalanceBuckets(
+      transaction.payer_id,
+      {
+        walletDelta: refundAmount,
+        pendingPayoutDelta: ['initiated', 'released'].includes(transaction.state) ? -refundAmount : 0,
+      },
+      {
+        reasonCode: 'payout_reversed_restore',
+        referenceType: 'transaction',
+        referenceId: String(transaction.id),
+        metadata: { reference },
+      }
+    );
 
     await createNotification({
       userId: transaction.payer_id,

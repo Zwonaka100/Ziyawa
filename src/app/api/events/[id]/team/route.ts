@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email'
 import { SITE_URL } from '@/lib/constants'
 import { EVENT_TEAM_ROLE_LABELS } from '@/lib/event-team'
+import { adjustProfileBalanceBuckets } from '@/lib/payments/escrow'
 
 const supabaseAdmin = createAdminClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,6 +12,11 @@ const supabaseAdmin = createAdminClient(
 )
 
 const INFO_FROM_EMAIL = process.env.INFO_FROM_EMAIL || 'Ziyawa <info@zande.io>'
+const TEAM_PAYOUT_FEE_PERCENT = Number(process.env.EVENT_TEAM_PAYOUT_FEE_PERCENT || '5')
+
+function roundMoney(value: number) {
+  return Math.round(value * 100) / 100
+}
 
 function isMissingTableError(error: { code?: string } | null | undefined) {
   return Boolean(error && (error.code === 'PGRST205' || error.code === '42P01'))
@@ -19,7 +25,7 @@ function isMissingTableError(error: { code?: string } | null | undefined) {
 async function getOwnedEvent(eventId: string, userId: string) {
   const { data: event, error } = await supabaseAdmin
     .from('events')
-    .select('id, title, event_date, venue, organizer_id')
+    .select('id, title, event_date, venue, organizer_id, is_published')
     .eq('id', eventId)
     .single()
 
@@ -203,6 +209,16 @@ export async function POST(
     const body = await request.json()
     const action = String(body.action || 'invite')
 
+    if (action === 'invite') {
+      const today = new Date().toISOString().split('T')[0]
+      if (!access.event.is_published || access.event.event_date < today) {
+        return NextResponse.json(
+          { error: 'Team invites are only allowed for upcoming published events' },
+          { status: 400 }
+        )
+      }
+    }
+
     if (action === 'revokeMember') {
       const memberId = String(body.memberId || '').trim()
       if (!memberId) {
@@ -331,9 +347,154 @@ export async function POST(
         return NextResponse.json({ error: 'Payment ID is required' }, { status: 400 })
       }
 
+      const { data: payment, error: paymentError } = await supabaseAdmin
+        .from('event_team_payments')
+        .select('id, member_id, amount, status, payout_transaction_id')
+        .eq('id', paymentId)
+        .eq('event_id', eventId)
+        .single()
+
+      if (paymentError || !payment) {
+        return NextResponse.json({ error: 'Payment record not found' }, { status: 404 })
+      }
+
+      if (payment.status === 'paid' && payment.payout_transaction_id) {
+        return NextResponse.json({ success: true, alreadyPaid: true })
+      }
+
+      const member = await ensureEventMember(eventId, payment.member_id)
+      if (!member?.user_id) {
+        return NextResponse.json({ error: 'Staff member not found for this event' }, { status: 404 })
+      }
+
+      const { data: organizerProfile, error: organizerProfileError } = await supabaseAdmin
+        .from('profiles')
+        .select('id, wallet_balance')
+        .eq('id', user.id)
+        .single()
+
+      if (organizerProfileError || !organizerProfile) {
+        return NextResponse.json({ error: 'Organizer profile not found' }, { status: 404 })
+      }
+
+      const grossAmountRands = roundMoney(Number(payment.amount || 0))
+      const platformFeeRands = roundMoney(grossAmountRands * (TEAM_PAYOUT_FEE_PERCENT / 100))
+      const netAmountRands = roundMoney(grossAmountRands - platformFeeRands)
+
+      if (grossAmountRands <= 0 || netAmountRands <= 0) {
+        return NextResponse.json({ error: 'Invalid payout amount configuration' }, { status: 400 })
+      }
+
+      if (Number(organizerProfile.wallet_balance || 0) < grossAmountRands) {
+        return NextResponse.json({ error: 'Insufficient organizer wallet balance to pay this staff member' }, { status: 400 })
+      }
+
+      const organizerDebit = await adjustProfileBalanceBuckets(
+        user.id,
+        { walletDelta: -grossAmountRands },
+        {
+          reasonCode: 'team_payroll_debit',
+          referenceType: 'event_team_payment',
+          referenceId: payment.id,
+          actorUserId: user.id,
+          metadata: {
+            eventId,
+            memberId: payment.member_id,
+            grossAmountRands,
+            platformFeeRands,
+            netAmountRands,
+          },
+        }
+      )
+
+      if (!organizerDebit.success) {
+        return NextResponse.json({ error: 'Failed to reserve payroll funds from organizer wallet' }, { status: 500 })
+      }
+
+      const workerCredit = await adjustProfileBalanceBuckets(
+        member.user_id,
+        { walletDelta: netAmountRands },
+        {
+          reasonCode: 'team_payroll_credit',
+          referenceType: 'event_team_payment',
+          referenceId: payment.id,
+          actorUserId: user.id,
+          metadata: {
+            eventId,
+            memberId: payment.member_id,
+            grossAmountRands,
+            platformFeeRands,
+            netAmountRands,
+          },
+        }
+      )
+
+      if (!workerCredit.success) {
+        await adjustProfileBalanceBuckets(user.id, { walletDelta: grossAmountRands }, {
+          reasonCode: 'team_payroll_reversal',
+          referenceType: 'event_team_payment',
+          referenceId: payment.id,
+          actorUserId: user.id,
+        })
+        return NextResponse.json({ error: 'Failed to credit employee wallet' }, { status: 500 })
+      }
+
+      const reference = `TEAM-${eventId.slice(0, 8)}-${payment.id.slice(0, 8)}-${Date.now()}`
+
+      const { data: payoutTransaction, error: payoutError } = await supabaseAdmin
+        .from('transactions')
+        .insert({
+          reference,
+          type: 'vendor_service',
+          state: 'settled',
+          amount: Math.round(grossAmountRands * 100),
+          platform_fee: Math.round(platformFeeRands * 100),
+          net_amount: Math.round(netAmountRands * 100),
+          payer_id: user.id,
+          recipient_id: member.user_id,
+          recipient_type: 'vendor',
+          event_id: eventId,
+          gateway_provider: 'internal_wallet',
+          authorized_at: new Date().toISOString(),
+          settled_at: new Date().toISOString(),
+          gateway_response: {
+            payment_source: 'event_team_payroll',
+            event_id: eventId,
+            member_id: payment.member_id,
+            fee_percent: TEAM_PAYOUT_FEE_PERCENT,
+          },
+        })
+        .select('id')
+        .single()
+
+      if (payoutError || !payoutTransaction) {
+        await adjustProfileBalanceBuckets(user.id, { walletDelta: grossAmountRands }, {
+          reasonCode: 'team_payroll_reversal',
+          referenceType: 'event_team_payment',
+          referenceId: payment.id,
+          actorUserId: user.id,
+        })
+        await adjustProfileBalanceBuckets(member.user_id, { walletDelta: -netAmountRands }, {
+          reasonCode: 'team_payroll_reversal',
+          referenceType: 'event_team_payment',
+          referenceId: payment.id,
+          actorUserId: user.id,
+        })
+        return NextResponse.json({ error: 'Failed to persist payroll transaction' }, { status: 500 })
+      }
+
       const { error } = await supabaseAdmin
         .from('event_team_payments')
-        .update({ status: 'paid', paid_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .update({
+          status: 'paid',
+          payment_method: 'platform_wallet',
+          paid_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          platform_fee: platformFeeRands,
+          net_amount: netAmountRands,
+          payout_transaction_id: payoutTransaction.id,
+          processed_by: user.id,
+        })
         .eq('id', paymentId)
         .eq('event_id', eventId)
 

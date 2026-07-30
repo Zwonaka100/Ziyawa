@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { createNotification } from '@/lib/notifications'
+import { recordBalanceLedgerEntries, type BalanceLedgerContext } from '@/lib/payments/balance-ledger'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -78,7 +79,8 @@ export async function adjustProfileBalanceBuckets(
     walletDelta?: number
     heldDelta?: number
     pendingPayoutDelta?: number
-  }
+  },
+  context?: BalanceLedgerContext
 ) {
   const walletDelta = deltas.walletDelta || 0
   const heldDelta = deltas.heldDelta || 0
@@ -110,6 +112,18 @@ export async function adjustProfileBalanceBuckets(
       .update(fallbackUpdate)
       .eq('id', userId)
 
+    if (!fallbackUpdateError && context && walletDelta !== 0) {
+      await recordBalanceLedgerEntries([
+        {
+          userId,
+          bucket: 'wallet',
+          deltaAmount: walletDelta,
+          balanceAfter: fallbackUpdate.wallet_balance,
+          context,
+        },
+      ])
+    }
+
     return { success: !fallbackUpdateError, degraded: true, error: fallbackUpdateError }
   }
 
@@ -126,6 +140,32 @@ export async function adjustProfileBalanceBuckets(
     .eq('id', userId)
 
   if (!updateError) {
+    if (context) {
+      await recordBalanceLedgerEntries([
+        {
+          userId,
+          bucket: 'wallet',
+          deltaAmount: walletDelta,
+          balanceAfter: updatePayload.wallet_balance,
+          context,
+        },
+        {
+          userId,
+          bucket: 'held',
+          deltaAmount: heldDelta,
+          balanceAfter: updatePayload.held_balance,
+          context,
+        },
+        {
+          userId,
+          bucket: 'pending_payout',
+          deltaAmount: pendingPayoutDelta,
+          balanceAfter: updatePayload.pending_payout_balance,
+          context,
+        },
+      ])
+    }
+
     return { success: true }
   }
 
@@ -137,6 +177,18 @@ export async function adjustProfileBalanceBuckets(
     .from('profiles')
     .update(fallbackUpdate)
     .eq('id', userId)
+
+  if (!secondUpdateError && context && walletDelta !== 0) {
+    await recordBalanceLedgerEntries([
+      {
+        userId,
+        bucket: 'wallet',
+        deltaAmount: walletDelta,
+        balanceAfter: fallbackUpdate.wallet_balance,
+        context,
+      },
+    ])
+  }
 
   return { success: !secondUpdateError, degraded: true, error: secondUpdateError || updateError }
 }

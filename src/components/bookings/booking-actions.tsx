@@ -14,8 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { AlertTriangle, CheckCircle, XCircle, Loader2, MessageSquare } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { AlertTriangle, CheckCircle, XCircle, Loader2, MessageSquare, HandCoins } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Booking } from '@/types/database'
 
@@ -29,6 +28,11 @@ export function BookingActions({ booking }: BookingActionsProps) {
   const [messaging, setMessaging] = useState(false)
   const [showDeclineDialog, setShowDeclineDialog] = useState(false)
   const [declineNotes, setDeclineNotes] = useState('')
+  const [showCounterDialog, setShowCounterDialog] = useState(false)
+  const [counterNotes, setCounterNotes] = useState('')
+  const [counterAmount, setCounterAmount] = useState(
+    String(Number(booking.final_amount ?? booking.offered_amount ?? 0))
+  )
 
   // Dispute state
   const [showDisputeDialog, setShowDisputeDialog] = useState(false)
@@ -39,17 +43,14 @@ export function BookingActions({ booking }: BookingActionsProps) {
     setLoading(true)
 
     try {
-      const supabase = createClient()
+      const response = await fetch(`/api/bookings/${booking.id}/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'accept' }),
+      })
 
-      const { error } = await supabase
-        .from('bookings')
-        .update({ 
-          status: 'accepted',
-          artist_notes: 'Booking accepted!'
-        })
-        .eq('id', booking.id)
-
-      if (error) throw error
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Failed to accept booking')
 
       toast.success('Booking accepted! The organizer will be notified.')
       router.refresh()
@@ -98,17 +99,17 @@ export function BookingActions({ booking }: BookingActionsProps) {
     setLoading(true)
 
     try {
-      const supabase = createClient()
+      const response = await fetch(`/api/bookings/${booking.id}/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'decline',
+          notes: declineNotes,
+        }),
+      })
 
-      const { error } = await supabase
-        .from('bookings')
-        .update({ 
-          status: 'declined',
-          artist_notes: declineNotes || 'Booking declined.'
-        })
-        .eq('id', booking.id)
-
-      if (error) throw error
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Failed to decline booking')
 
       toast.success('Booking declined.')
       setShowDeclineDialog(false)
@@ -122,7 +123,40 @@ export function BookingActions({ booking }: BookingActionsProps) {
     }
   }
 
-  if (booking.status !== 'pending') {
+  const handleCounterOffer = async () => {
+    const parsedAmount = Number(counterAmount)
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      toast.error('Please enter a valid counter-offer amount')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/bookings/${booking.id}/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'counter',
+          counterAmount: parsedAmount,
+          notes: counterNotes,
+        }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Failed to send counter-offer')
+
+      toast.success('Counter-offer sent to organizer.')
+      setShowCounterDialog(false)
+      router.refresh()
+    } catch (error) {
+      console.error('Error sending counter-offer:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to send counter-offer')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (booking.state !== 'pending') {
     // Show dispute button for confirmed bookings
     if (booking.state === 'confirmed') {
       return (
@@ -224,6 +258,55 @@ export function BookingActions({ booking }: BookingActionsProps) {
         )}
         Message
       </Button>
+
+      <Dialog open={showCounterDialog} onOpenChange={setShowCounterDialog}>
+        <DialogTrigger asChild>
+          <Button variant="outline" disabled={loading}>
+            <HandCoins className="h-4 w-4 mr-1" />
+            Counter Offer
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Propose a Counter-Offer</DialogTitle>
+            <DialogDescription>
+              Suggest a different amount for this booking. The organizer can accept it and proceed to payment.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="counter-amount">Counter amount (ZAR)</Label>
+              <Input
+                id="counter-amount"
+                type="number"
+                min="1"
+                step="0.01"
+                value={counterAmount}
+                onChange={(e) => setCounterAmount(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="counter-notes">Message (optional)</Label>
+              <Textarea
+                id="counter-notes"
+                placeholder="Explain your proposed amount or terms"
+                value={counterNotes}
+                onChange={(e) => setCounterNotes(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setShowCounterDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleCounterOffer} disabled={loading}>
+                {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Send Counter
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showDeclineDialog} onOpenChange={setShowDeclineDialog}>
         <DialogTrigger asChild>

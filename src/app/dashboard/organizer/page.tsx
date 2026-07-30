@@ -93,7 +93,7 @@ export default async function OrganizerDashboardPage() {
     return eventDate < today
   }) || []
 
-  const pendingBookings = bookings?.filter(b => b.status === 'pending') || []
+  const pendingBookings = bookings?.filter(b => b.state === 'pending') || []
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -274,8 +274,8 @@ export default async function OrganizerDashboardPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                           <h3 className="font-semibold">{booking.artists?.stage_name}</h3>
-                          <Badge className={BOOKING_STATUS[booking.status as keyof typeof BOOKING_STATUS].color}>
-                            {BOOKING_STATUS[booking.status as keyof typeof BOOKING_STATUS].label}
+                          <Badge className={BOOKING_STATUS[booking.state as keyof typeof BOOKING_STATUS].color}>
+                            {BOOKING_STATUS[booking.state as keyof typeof BOOKING_STATUS].label}
                           </Badge>
                         </div>
                         <div className="text-sm text-muted-foreground space-y-1">
@@ -288,7 +288,7 @@ export default async function OrganizerDashboardPage() {
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        {booking.status === 'accepted' && (
+                        {booking.state === 'accepted' && (
                           <Link href={`/dashboard/organizer/bookings/${booking.id}/pay`}>
                             <Button size="sm">Pay Artist</Button>
                           </Link>

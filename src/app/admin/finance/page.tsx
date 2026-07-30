@@ -7,7 +7,8 @@ import {
   ArrowUpRight, 
   ArrowDownRight,
   CreditCard,
-  RefreshCcw
+  RefreshCcw,
+  ShieldCheck
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/helpers'
 
@@ -97,7 +98,7 @@ export default async function AdminFinancePage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
         <Link href="/admin/finance/transactions">
           <Card className="hover:shadow-md transition-shadow h-full cursor-pointer group">
             <CardHeader>
@@ -165,6 +166,24 @@ export default async function AdminFinancePage() {
             <CardContent>
               <p className="text-muted-foreground">
                 Process refund requests and manage refund history.
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/admin/finance/reconciliation">
+          <Card className="hover:shadow-md transition-shadow h-full cursor-pointer group">
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-purple-100 group-hover:bg-purple-200 transition-colors">
+                  <ShieldCheck className="h-6 w-6 text-purple-600" />
+                </div>
+                <CardTitle className="text-lg">Reconciliation</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                Review daily money movement and resolve failed payout or refund exceptions.
               </p>
             </CardContent>
           </Card>

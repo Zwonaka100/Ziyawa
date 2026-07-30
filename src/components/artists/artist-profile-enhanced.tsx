@@ -19,7 +19,6 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency } from '@/lib/helpers';
 import { PROVINCES } from '@/lib/constants';
-import { useAuth } from '@/components/providers/auth-provider';
 
 import { 
   SocialLinksRow, 
@@ -80,9 +79,7 @@ export function ArtistProfileEnhanced({
   reviews,
   upcomingBookings
 }: ArtistProfileEnhancedProps) {
-  const { profile } = useAuth();
   const _router = useRouter();
-  const isOrganizer = profile?.is_organizer || profile?.is_admin;
   const [showFullBio, setShowFullBio] = useState(false);
 
   // Separate media by type
@@ -498,40 +495,13 @@ export function ArtistProfileEnhanced({
                   </div>
                 </div>
 
-                {isOrganizer ? (
-                  <div className="space-y-3">
-                    <Link href={`/dashboard/organizer/book?artist=${artist.id}`}>
-                      <Button className="w-full" size="lg" disabled={!artist.is_available}>
-                        {artist.is_available ? 'Request Booking' : 'Not Available'}
-                      </Button>
-                    </Link>
-                    <p className="text-xs text-muted-foreground text-center">
-                      Chat becomes available once you send a booking request.
-                    </p>
-                  </div>
-                ) : profile ? (
-                  <div className="text-center">
-                    <p className="text-sm text-neutral-500 mb-3">
-                      Only event organizers can book artists
-                    </p>
-                    <Link href="/profile">
-                      <Button variant="outline" className="w-full">
-                        Become an Organizer
-                      </Button>
-                    </Link>
-                  </div>
-                ) : (
-                  <div className="text-center">
-                    <p className="text-sm text-neutral-500 mb-3">
-                      Sign in to contact this artist
-                    </p>
-                    <Link href="/auth/signin">
-                      <Button className="w-full">
-                        Sign In
-                      </Button>
-                    </Link>
-                  </div>
-                )}
+                <div className="space-y-3">
+                  <Link href={`/dashboard/organizer/book-artist/${artist.id}`}>
+                    <Button className="w-full" size="lg" disabled={!artist.is_available}>
+                      {artist.is_available ? 'Request Booking' : 'Not Available'}
+                    </Button>
+                  </Link>
+                </div>
               </div>
 
               {/* Track Record Card */}
@@ -545,6 +515,8 @@ export function ArtistProfileEnhanced({
                 totalReviews={artist.total_reviews}
                 memberSince={artist.created_at}
                 isVerified={!!artist.verified_at}
+                showFinancials={false}
+                showMemberSince={false}
               />
 
               {/* Contact Info */}

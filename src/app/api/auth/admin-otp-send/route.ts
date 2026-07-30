@@ -5,6 +5,17 @@ import { randomInt, createHash } from 'crypto'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
+function getFromAddress() {
+  const configured = process.env.FROM_EMAIL?.trim()
+  if (configured) return configured
+
+  if (process.env.NODE_ENV === 'production') {
+    return 'noreply@zande.io'
+  }
+
+  return 'onboarding@resend.dev'
+}
+
 export async function POST(_request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -29,9 +40,14 @@ export async function POST(_request: NextRequest) {
   const hash = createHash('sha256').update(code).digest('hex')
   const expiresAt = Date.now() + 10 * 60 * 1000 // 10 minutes
 
+  // In development, always log the code to the server console as a fallback
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`\n🔐 ADMIN OTP for ${user.email}: ${code}\n`)
+  }
+
   // Send the code via email
   const { error: emailError } = await resend.emails.send({
-    from: process.env.FROM_EMAIL ?? 'noreply@zande.io',
+    from: getFromAddress(),
     to: user.email,
     subject: 'Ziyawa Admin — Your verification code',
     html: `
@@ -48,7 +64,17 @@ export async function POST(_request: NextRequest) {
   })
 
   if (emailError) {
-    return NextResponse.json({ error: 'Failed to send email. Please try again.' }, { status: 500 })
+    const message = typeof emailError === 'object' && emailError && 'message' in emailError
+      ? String((emailError as { message?: string }).message)
+      : 'Failed to send email. Please try again.'
+
+    console.error('Admin OTP email send failed:', message)
+
+    const friendlyError = message.includes('verified') || message.includes('domain') || message.includes('from')
+      ? 'Email delivery failed because the sender address is not verified in Resend. Please configure a verified sender or try again with a verified address.'
+      : 'Failed to send email. Please try again.'
+
+    return NextResponse.json({ error: friendlyError }, { status: 500 })
   }
 
   // Store the hash + metadata in a short-lived httpOnly cookie

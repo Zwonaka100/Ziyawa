@@ -15,6 +15,28 @@ const supabaseAdmin = createAdminClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+async function logScanEvent(payload: {
+  eventId?: string | null
+  ticketId?: string | null
+  accessPassId?: string | null
+  scannerUserId: string
+  scanInput?: string | null
+  result: 'valid' | 'already_checked_in' | 'wrong_event' | 'not_found' | 'not_authorized' | 'too_early' | 'event_ended' | 'self_checkin_blocked' | 'error'
+  message?: string
+}) {
+  await supabaseAdmin
+    .from('checkin_scan_logs')
+    .insert({
+      event_id: payload.eventId || null,
+      ticket_id: payload.ticketId || null,
+      access_pass_id: payload.accessPassId || null,
+      scanner_user_id: payload.scannerUserId,
+      scan_input: payload.scanInput || null,
+      result: payload.result,
+      message: payload.message || null,
+    })
+}
+
 function resolveScannedInput(value: string | null | undefined) {
   const raw = String(value || '').trim();
 
@@ -148,6 +170,12 @@ export async function POST(request: NextRequest) {
       const { data: pass, error: passError } = await passQuery.single();
 
       if (passError || !pass) {
+        await logScanEvent({
+          scannerUserId: user.id,
+          scanInput: String(ticketCode || ticketId || ''),
+          result: 'not_found',
+          message: 'Ticket or access pass not found',
+        })
         return NextResponse.json(
           {
             success: false,
@@ -174,6 +202,15 @@ export async function POST(request: NextRequest) {
 
     // Verify event matches if provided
     if (eventId && entryEventId !== eventId) {
+      await logScanEvent({
+        eventId: entryEventId,
+        ticketId: sourceTable === 'tickets' ? entryId : null,
+        accessPassId: sourceTable === 'event_access_passes' ? entryId : null,
+        scannerUserId: user.id,
+        scanInput: String(ticketCode || ticketId || ''),
+        result: 'wrong_event',
+        message: 'Entry scanned for the wrong event',
+      })
       return NextResponse.json(
         { 
           success: false,
@@ -190,6 +227,15 @@ export async function POST(request: NextRequest) {
     const isTicketOwner = sourceTable === 'tickets' && entryUserId === user.id;
 
     if (!isOrganizer && !isTeamMember && !isTicketOwner) {
+      await logScanEvent({
+        eventId: entryEventId,
+        ticketId: sourceTable === 'tickets' ? entryId : null,
+        accessPassId: sourceTable === 'event_access_passes' ? entryId : null,
+        scannerUserId: user.id,
+        scanInput: String(ticketCode || ticketId || ''),
+        result: 'not_authorized',
+        message: 'User is not authorized for this event check-in',
+      })
       return NextResponse.json(
         { error: 'Not authorized to check in entries for this event' },
         { status: 403 }
@@ -197,6 +243,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (selfCheckIn && !isTicketOwner) {
+      await logScanEvent({
+        eventId: entryEventId,
+        ticketId: sourceTable === 'tickets' ? entryId : null,
+        accessPassId: sourceTable === 'event_access_passes' ? entryId : null,
+        scannerUserId: user.id,
+        scanInput: String(ticketCode || ticketId || ''),
+        result: 'self_checkin_blocked',
+        message: 'Self check-in attempted by non-ticket owner',
+      })
       return NextResponse.json(
         { error: 'Only the ticket holder can self check-in' },
         { status: 403 }
@@ -204,6 +259,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (entryCheckedIn) {
+      await logScanEvent({
+        eventId: entryEventId,
+        ticketId: sourceTable === 'tickets' ? entryId : null,
+        accessPassId: sourceTable === 'event_access_passes' ? entryId : null,
+        scannerUserId: user.id,
+        scanInput: String(ticketCode || ticketId || ''),
+        result: 'already_checked_in',
+        message: 'Entry already checked in',
+      })
       return NextResponse.json({
         success: false,
         alreadyCheckedIn: true,
@@ -227,6 +291,15 @@ export async function POST(request: NextRequest) {
     const daysDiff = Math.floor((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
     if (selfCheckIn && daysDiff !== 0) {
+      await logScanEvent({
+        eventId: entryEventId,
+        ticketId: sourceTable === 'tickets' ? entryId : null,
+        accessPassId: sourceTable === 'event_access_passes' ? entryId : null,
+        scannerUserId: user.id,
+        scanInput: String(ticketCode || ticketId || ''),
+        result: 'too_early',
+        message: 'Self check-in attempted outside event day',
+      })
       return NextResponse.json({
         success: false,
         error: 'Not available yet',
@@ -235,6 +308,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (daysDiff > 1) {
+      await logScanEvent({
+        eventId: entryEventId,
+        ticketId: sourceTable === 'tickets' ? entryId : null,
+        accessPassId: sourceTable === 'event_access_passes' ? entryId : null,
+        scannerUserId: user.id,
+        scanInput: String(ticketCode || ticketId || ''),
+        result: 'too_early',
+        message: 'Check-in attempted too early',
+      })
       return NextResponse.json({
         success: false,
         error: 'Too early',
@@ -243,6 +325,15 @@ export async function POST(request: NextRequest) {
     }
 
     if (daysDiff < -1) {
+      await logScanEvent({
+        eventId: entryEventId,
+        ticketId: sourceTable === 'tickets' ? entryId : null,
+        accessPassId: sourceTable === 'event_access_passes' ? entryId : null,
+        scannerUserId: user.id,
+        scanInput: String(ticketCode || ticketId || ''),
+        result: 'event_ended',
+        message: 'Check-in attempted after event ended',
+      })
       return NextResponse.json({
         success: false,
         error: 'Event ended',
@@ -272,6 +363,15 @@ export async function POST(request: NextRequest) {
 
     if (updateError) {
       console.error('Check-in update error:', updateError);
+      await logScanEvent({
+        eventId: entryEventId,
+        ticketId: sourceTable === 'tickets' ? entryId : null,
+        accessPassId: sourceTable === 'event_access_passes' ? entryId : null,
+        scannerUserId: user.id,
+        scanInput: String(ticketCode || ticketId || ''),
+        result: 'error',
+        message: 'Failed to persist check-in update',
+      })
       return NextResponse.json(
         { error: 'Failed to check in ticket' },
         { status: 500 }
@@ -300,6 +400,16 @@ export async function POST(request: NextRequest) {
       .from('event_access_passes')
       .select('*', { count: 'exact', head: true })
       .eq('event_id', entryEventId);
+
+    await logScanEvent({
+      eventId: entryEventId,
+      ticketId: sourceTable === 'tickets' ? entryId : null,
+      accessPassId: sourceTable === 'event_access_passes' ? entryId : null,
+      scannerUserId: user.id,
+      scanInput: String(ticketCode || ticketId || ''),
+      result: 'valid',
+      message: selfCheckIn ? 'Self check-in completed' : 'Door check-in completed',
+    })
     
     return NextResponse.json({
       success: true,
@@ -319,6 +429,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Check-in error:', error);
+    // scan logging deliberately best-effort at this point to avoid masking primary error
     return NextResponse.json(
       { error: 'Check-in failed' },
       { status: 500 }

@@ -17,11 +17,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ArrowLeft, Loader2, Music, MapPin } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, formatDate } from '@/lib/helpers'
 import { PROVINCES } from '@/lib/constants'
 import { toast } from 'sonner'
 import type { Event, Artist, Profile } from '@/types/database'
+import { useEffect } from 'react'
 
 interface ArtistWithProfile extends Artist {
   profiles: Pick<Profile, 'id' | 'full_name' | 'avatar_url'>
@@ -31,9 +31,10 @@ interface BookArtistFormProps {
   event: Event
   artists: ArtistWithProfile[]
   bookedArtistIds: string[]
+  preselectedArtistId?: string
 }
 
-export function BookArtistForm({ event, artists, bookedArtistIds }: BookArtistFormProps) {
+export function BookArtistForm({ event, artists, bookedArtistIds, preselectedArtistId }: BookArtistFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [selectedArtistId, setSelectedArtistId] = useState('')
@@ -42,6 +43,12 @@ export function BookArtistForm({ event, artists, bookedArtistIds }: BookArtistFo
 
   const selectedArtist = artists.find(a => a.id === selectedArtistId)
   const availableArtists = artists.filter(a => !bookedArtistIds.includes(a.id))
+
+  useEffect(() => {
+    if (preselectedArtistId && availableArtists.some((artist) => artist.id === preselectedArtistId)) {
+      setSelectedArtistId(preselectedArtistId)
+    }
+  }, [preselectedArtistId, availableArtists])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -54,49 +61,33 @@ export function BookArtistForm({ event, artists, bookedArtistIds }: BookArtistFo
     setLoading(true)
 
     try {
-      const supabase = createClient()
+      const response = await fetch('/api/bookings/artist-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: event.id,
+          artistId: selectedArtistId,
+          offeredAmount: parseFloat(offeredAmount) || selectedArtist?.base_price || 0,
+          notes,
+        }),
+      })
 
-      const { data: newBooking, error } = await supabase
-        .from('bookings')
-        .insert({
-          event_id: event.id,
-          artist_id: selectedArtistId,
-          organizer_id: event.organizer_id,
-          offered_amount: parseFloat(offeredAmount) || selectedArtist?.base_price || 0,
-          organizer_notes: notes || null,
-          status: 'pending',
-        })
-        .select('id')
-        .single()
+      const data = await response.json()
 
-      if (error) throw error
-
-      toast.success('Booking request sent! The artist will be notified.')
-
-      // Auto-open conversation linked to this booking
-      try {
-        const convoRes = await fetch('/api/conversations/start', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            recipientId: selectedArtist!.profiles.id,
-            contextType: 'booking',
-            contextId: newBooking.id,
-          }),
-        })
-        const convoData = await convoRes.json()
-        if (convoData.conversationId) {
-          router.push(`/messages?chat=${convoData.conversationId}`)
-          return
-        }
-      } catch {
-        // fallback to dashboard if chat fails
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send booking request')
       }
-      router.push('/dashboard/organizer')
-      
+
+      toast.success(data.message || 'Booking request sent! The artist will be notified.')
+
+      if (data.conversationId) {
+        router.push(`/messages?chat=${data.conversationId}`)
+      } else {
+        router.push(`/dashboard/organizer/events/${event.id}/bookings`)
+      }
     } catch (error) {
       console.error('Error creating booking:', error)
-      toast.error('Failed to send booking request. Please try again.')
+      toast.error(error instanceof Error ? error.message : 'Failed to send booking request. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -145,6 +136,9 @@ export function BookArtistForm({ event, artists, bookedArtistIds }: BookArtistFo
                   )}
                 </SelectContent>
               </Select>
+              {preselectedArtistId && selectedArtistId === preselectedArtistId && (
+                <p className="text-xs text-muted-foreground mt-1">Artist selected from public profile.</p>
+              )}
             </div>
 
             {/* Selected Artist Preview */}

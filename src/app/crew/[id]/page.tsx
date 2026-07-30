@@ -417,18 +417,12 @@ export default function ProviderProfilePage() {
 
                     {!isOwnProfile && (
                       <div className="pt-2 border-t space-y-2">
-                        {profile ? (
-                          <Link href={`/dashboard/organizer/book-crew/${provider.id}?mode=work`}>
-                            <Button className="w-full">
-                              <Calendar className="h-4 w-4 mr-2" />
-                              Hire for Event Work
-                            </Button>
-                          </Link>
-                        ) : (
-                          <Link href="/auth/signin">
-                            <Button className="w-full">Sign In to Hire</Button>
-                          </Link>
-                        )}
+                        <Link href={`/dashboard/organizer/book-crew/${provider.id}?mode=work`}>
+                          <Button className="w-full" disabled={!provider.is_available}>
+                            <Calendar className="h-4 w-4 mr-2" />
+                            {provider.is_available ? 'Hire for Event Work' : 'Not Available'}
+                          </Button>
+                        </Link>
                       </div>
                     )}
                   </CardContent>
@@ -487,18 +481,12 @@ export default function ProviderProfilePage() {
                           )}
                           {!isOwnProfile && (
                             <CardContent className="pt-0">
-                              {profile ? (
-                                <Link href={`/dashboard/organizer/book-crew/${provider.id}?mode=services`}>
-                                  <Button size="sm" className="w-full">
-                                    <Calendar className="h-3 w-3 mr-2" />
-                                    Book this Service
-                                  </Button>
-                                </Link>
-                              ) : (
-                                <Link href="/auth/signin">
-                                  <Button size="sm" variant="outline" className="w-full">Sign In to Book</Button>
-                                </Link>
-                              )}
+                              <Link href={`/dashboard/organizer/book-crew/${provider.id}?mode=services`}>
+                                <Button size="sm" className="w-full" disabled={!provider.is_available}>
+                                  <Calendar className="h-3 w-3 mr-2" />
+                                  {provider.is_available ? 'Book this Service' : 'Not Available'}
+                                </Button>
+                              </Link>
                             </CardContent>
                           )}
                         </Card>
@@ -646,42 +634,25 @@ export default function ProviderProfilePage() {
               <CardContent className="py-6">
                 <div className="text-center space-y-3">
                   <h3 className="font-semibold mb-2">Work with {provider.business_name}</h3>
-                  {profile ? (
-                    <>
-                      {offersWork && offersServices && (
-                        <p className="text-sm text-muted-foreground mb-4">
-                          Choose whether you want to book services or hire for event work.
-                        </p>
-                      )}
-                      {offersWork && (
-                        <Link href={`/dashboard/organizer/book-crew/${provider.id}?mode=work`}>
-                          <Button className="w-full" variant={offersServices ? 'outline' : 'default'}>
-                            <Calendar className="h-4 w-4 mr-2" />
-                            Hire for Event Work
-                          </Button>
-                        </Link>
-                      )}
-                      {offersServices && (
-                        <Link href={`/dashboard/organizer/book-crew/${provider.id}?mode=services`}>
-                          <Button className="w-full">
-                            <Calendar className="h-4 w-4 mr-2" />
-                            Book Services
-                          </Button>
-                        </Link>
-                      )}
-                      <p className="text-xs text-muted-foreground text-center pt-1">
-                        Chat becomes available after you send a booking request.
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-muted-foreground text-sm mb-4">
-                        Sign in to hire or book {provider.business_name}
-                      </p>
-                      <Link href="/auth/signin">
-                        <Button className="w-full">Sign In to Book</Button>
-                      </Link>
-                    </>
+                  {offersWork && (
+                    <Link href={`/dashboard/organizer/book-crew/${provider.id}?mode=work`}>
+                      <Button
+                        className="w-full"
+                        variant={offersServices ? 'outline' : 'default'}
+                        disabled={!provider.is_available}
+                      >
+                        <Calendar className="h-4 w-4 mr-2" />
+                        {provider.is_available ? 'Hire for Event Work' : 'Not Available'}
+                      </Button>
+                    </Link>
+                  )}
+                  {offersServices && (
+                    <Link href={`/dashboard/organizer/book-crew/${provider.id}?mode=services`}>
+                      <Button className="w-full" disabled={!provider.is_available}>
+                        <Calendar className="h-4 w-4 mr-2" />
+                        {provider.is_available ? 'Book Services' : 'Not Available'}
+                      </Button>
+                    </Link>
                   )}
                 </div>
               </CardContent>

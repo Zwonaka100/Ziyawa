@@ -257,6 +257,8 @@ interface TrackRecordCardProps {
   totalReviews: number;
   memberSince: string;
   isVerified?: boolean;
+  showFinancials?: boolean;
+  showMemberSince?: boolean;
   className?: string;
 }
 
@@ -271,6 +273,8 @@ export function TrackRecordCard({
   totalReviews,
   memberSince,
   isVerified,
+  showFinancials = true,
+  showMemberSince = true,
   className,
 }: TrackRecordCardProps) {
   const completionRate = totalBookings > 0 
@@ -350,14 +354,14 @@ export function TrackRecordCard({
         </div>
 
         {/* Money earned/paid */}
-        {(type === 'artist' || type === 'provider') && totalEarned !== undefined && (
+        {showFinancials && (type === 'artist' || type === 'provider') && totalEarned !== undefined && (
           <div className="flex justify-between items-center py-2 border-b border-neutral-100">
             <span className="text-neutral-600">Earned via Ziyawa</span>
             <span className="font-semibold text-neutral-900">{formatCurrency(totalEarned)}</span>
           </div>
         )}
 
-        {type === 'organizer' && totalPaid !== undefined && (
+        {showFinancials && type === 'organizer' && totalPaid !== undefined && (
           <div className="flex justify-between items-center py-2 border-b border-neutral-100">
             <span className="text-neutral-600">Paid to Artists</span>
             <span className="font-semibold text-neutral-900">{formatCurrency(totalPaid)}</span>
@@ -365,10 +369,12 @@ export function TrackRecordCard({
         )}
 
         {/* Member since */}
-        <div className="flex justify-between items-center py-2">
-          <span className="text-neutral-600">Member Since</span>
-          <span className="font-semibold text-neutral-900">{formatDate(memberSince)}</span>
-        </div>
+        {showMemberSince && (
+          <div className="flex justify-between items-center py-2">
+            <span className="text-neutral-600">Member Since</span>
+            <span className="font-semibold text-neutral-900">{formatDate(memberSince)}</span>
+          </div>
+        )}
       </div>
 
       {/* Trust message */}

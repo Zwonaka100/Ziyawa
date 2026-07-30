@@ -37,9 +37,7 @@ export function AuthForm({ onSuccess: _onSuccess, defaultMode = 'signin' }: Auth
   const supabase = createClient()
 
   const getRedirectUrl = () => {
-    const baseUrl = typeof window !== 'undefined' 
-      ? window.location.origin 
-      : SITE_URL
+    const baseUrl = SITE_URL.replace(/\/$/, '')
     return `${baseUrl}/auth/callback`
   }
 

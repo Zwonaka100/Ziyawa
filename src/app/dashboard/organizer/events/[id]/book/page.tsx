@@ -6,6 +6,9 @@ interface BookArtistPageProps {
   params: Promise<{
     id: string
   }>
+  searchParams: Promise<{
+    artist?: string
+  }>
 }
 
 export const metadata = {
@@ -13,8 +16,9 @@ export const metadata = {
   description: 'Book an artist for your event',
 }
 
-export default async function BookArtistPage({ params }: BookArtistPageProps) {
+export default async function BookArtistPage({ params, searchParams }: BookArtistPageProps) {
   const { id: eventId } = await params
+  const { artist: preselectedArtistId } = await searchParams
   const supabase = await createClient()
 
   // Check authentication
@@ -38,6 +42,10 @@ export default async function BookArtistPage({ params }: BookArtistPageProps) {
   const today = new Date().toISOString().split('T')[0]
   if (event.event_date < today) {
     redirect(`/dashboard/organizer/events/${eventId}/manage`)
+  }
+
+  if (!event.is_published) {
+    redirect(`/dashboard/organizer/events/${eventId}/edit`)
   }
 
   // Fetch available artists
@@ -68,6 +76,7 @@ export default async function BookArtistPage({ params }: BookArtistPageProps) {
         event={event} 
         artists={artists || []} 
         bookedArtistIds={bookedArtistIds}
+        preselectedArtistId={preselectedArtistId}
       />
     </div>
   )
