@@ -38,12 +38,10 @@ export async function POST(
       return NextResponse.json({ error: 'No valid counter-offer found to accept' }, { status: 400 })
     }
 
-    const now = new Date().toISOString()
     const { error: updateError } = await supabase
       .from('bookings')
       .update({
         state: 'accepted',
-        accepted_at: now,
       })
       .eq('id', booking.id)
 

@@ -5,40 +5,6 @@ import { sendBookingResponseEmail } from '@/lib/email'
 
 type ProviderBookingAction = 'accept' | 'decline' | 'counter'
 
-async function updateProviderBookingWithSchemaFallback(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  bookingId: string,
-  updates: Record<string, unknown>
-) {
-  const { error } = await supabase
-    .from('provider_bookings')
-    .update(updates)
-    .eq('id', bookingId)
-
-  if (!error) return null
-
-  const message = String(error.message || '').toLowerCase()
-  const missingTimestampColumn =
-    message.includes('accepted_at') ||
-    message.includes('declined_at') ||
-    (message.includes('column') && (message.includes('accepted') || message.includes('declined')))
-
-  if (!missingTimestampColumn) {
-    return error
-  }
-
-  const fallbackUpdates = { ...updates }
-  delete fallbackUpdates.accepted_at
-  delete fallbackUpdates.declined_at
-
-  const { error: fallbackError } = await supabase
-    .from('provider_bookings')
-    .update(fallbackUpdates)
-    .eq('id', bookingId)
-
-  return fallbackError || null
-}
-
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -94,18 +60,15 @@ export async function POST(
       return NextResponse.json({ error: 'Please provide a valid counter amount' }, { status: 400 })
     }
 
-    const now = new Date().toISOString()
     const updates: Record<string, unknown> = {}
 
     if (action === 'accept') {
       updates.state = 'accepted'
-      updates.accepted_at = now
       updates.provider_notes = notes || 'Booking accepted!'
     }
 
     if (action === 'decline') {
       updates.state = 'declined'
-      updates.declined_at = now
       updates.provider_notes = notes || 'Booking declined.'
     }
 
@@ -115,7 +78,10 @@ export async function POST(
       updates.provider_notes = notes || `Counter-offer: R${counterAmount.toFixed(2)}`
     }
 
-    const updateError = await updateProviderBookingWithSchemaFallback(supabase, booking.id, updates)
+    const { error: updateError } = await supabase
+      .from('provider_bookings')
+      .update(updates)
+      .eq('id', booking.id)
 
     if (updateError) {
       return NextResponse.json({ error: 'Failed to update provider booking' }, { status: 500 })

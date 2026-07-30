@@ -56,33 +56,50 @@ async function ArtistsContent({
 }) {
   const supabase = await createClient()
 
-  // Build query for available artists
-  let query = supabase
-    .from('artists')
-    .select(`
-      *,
-      profiles:profile_id (
-        id,
-        full_name,
-        email,
-        avatar_url
-      )
-    `)
-    .eq('is_public', true)
-    .eq('is_available', true)
-    .order('stage_name', { ascending: true })
+  const selectClause = `
+    *,
+    profiles:profile_id (
+      id,
+      full_name,
+      email,
+      avatar_url
+    )
+  `
 
-  // Apply genre filter
-  if (genre && genre !== 'all') {
-    query = query.eq('genre', genre)
+  const applyFilters = <T,>(queryBuilder: T) => {
+    // Keep this loosely typed to support both primary and fallback Supabase builders.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let scoped = queryBuilder as any
+    if (genre && genre !== 'all') scoped = scoped.eq('genre', genre)
+    if (location && location !== 'all') scoped = scoped.eq('location', location)
+    return scoped
   }
 
-  // Apply location filter
-  if (location && location !== 'all') {
-    query = query.eq('location', location)
-  }
+  const primaryQuery = applyFilters(
+    supabase
+      .from('artists')
+      .select(selectClause)
+      .eq('is_public', true)
+      .eq('is_available', true)
+      .order('stage_name', { ascending: true })
+  )
 
-  const { data: artists, error } = await query
+  let { data: artists, error } = await primaryQuery
+
+  // Graceful fallback when migration adding artists.is_public hasn't run yet.
+  if (error && String(error.message || '').toLowerCase().includes('is_public')) {
+    const fallbackQuery = applyFilters(
+      supabase
+        .from('artists')
+        .select(selectClause)
+        .eq('is_available', true)
+        .order('stage_name', { ascending: true })
+    )
+
+    const fallback = await fallbackQuery
+    artists = fallback.data
+    error = fallback.error
+  }
 
   if (error) {
     console.error('Error fetching artists:', error)

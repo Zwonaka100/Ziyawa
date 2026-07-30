@@ -128,12 +128,34 @@ export default function ArtistSetupPage() {
         management_contact: formData.management_contact.trim() || null,
       }
 
+      const legacyArtistData = {
+        profile_id: profile.id,
+        stage_name: formData.stage_name.trim(),
+        bio: formData.bio.trim() || null,
+        genre: formData.genre,
+        base_price: parseFloat(formData.base_price) || 0,
+        location: formData.location,
+        is_available: formData.is_available !== 'false',
+        advance_notice_days: parseInt(formData.advance_notice_days) || 3,
+        years_active: formData.years_active ? parseInt(formData.years_active) : null,
+        record_label: formData.record_label.trim() || null,
+        management_contact: formData.management_contact.trim() || null,
+      }
+
       if (isEditing && artistId) {
         // Update existing artist profile
-        const { error } = await supabase
+        let { error } = await supabase
           .from('artists')
           .update(artistData)
           .eq('id', artistId)
+
+        if (error && String(error.message || '').toLowerCase().includes('is_public')) {
+          const fallback = await supabase
+            .from('artists')
+            .update(legacyArtistData)
+            .eq('id', artistId)
+          error = fallback.error
+        }
 
         if (error) throw error
         toast.success('Artist profile updated!')
@@ -153,9 +175,16 @@ export default function ArtistSetupPage() {
         }
 
         // Create new artist profile
-        const { error: artistError } = await supabase
+        let { error: artistError } = await supabase
           .from('artists')
           .insert(artistData)
+
+        if (artistError && String(artistError.message || '').toLowerCase().includes('is_public')) {
+          const fallback = await supabase
+            .from('artists')
+            .insert(legacyArtistData)
+          artistError = fallback.error
+        }
 
         if (artistError) throw artistError
 

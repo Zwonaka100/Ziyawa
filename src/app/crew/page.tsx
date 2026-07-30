@@ -76,7 +76,7 @@ export default function CrewPage() {
     setLoading(true)
     try {
       const supabase = createClient()
-      
+
       let query = supabase
         .from('v_public_providers')
         .select('*')
@@ -95,9 +95,39 @@ export default function CrewPage() {
       const { data, error } = await query
 
       if (error) {
-        console.error('Error fetching providers:', error)
-        // If view doesn't exist yet (migration not run), show empty
-        setProviders([])
+        const message = String(error.message || '').toLowerCase()
+        const viewOrVisibilityMissing =
+          message.includes('v_public_providers') ||
+          message.includes('is_public') ||
+          message.includes('does not exist')
+
+        if (!viewOrVisibilityMissing) {
+          console.error('Error fetching providers:', error)
+          setProviders([])
+        } else {
+          // Migration-safe fallback: query providers directly if public view/column is not available.
+          let fallbackQuery = supabase
+            .from('providers')
+            .select('*')
+            .eq('is_available', true)
+            .order('completed_bookings', { ascending: false })
+
+          if (selectedCategory !== 'all') {
+            fallbackQuery = fallbackQuery.eq('primary_category', selectedCategory)
+          }
+
+          if (selectedProvince !== 'all') {
+            fallbackQuery = fallbackQuery.eq('location', selectedProvince)
+          }
+
+          const { data: fallbackData, error: fallbackError } = await fallbackQuery
+          if (fallbackError) {
+            console.error('Error fetching providers fallback:', fallbackError)
+            setProviders([])
+          } else {
+            setProviders((fallbackData || []) as PublicProvider[])
+          }
+        }
       } else {
         const baseProviders = data || []
         if (baseProviders.length === 0) {
