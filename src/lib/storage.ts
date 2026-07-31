@@ -43,9 +43,35 @@ export interface FileValidation {
   allowedTypes: string[]
 }
 
+const FALLBACK_ALLOWED_EXTENSIONS = [
+  'jpg',
+  'jpeg',
+  'png',
+  'webp',
+  'gif',
+  'heic',
+  'heif',
+  'avif',
+  'mp4',
+  'webm',
+  'mov',
+  'mp3',
+  'wav',
+]
+
 const IMAGE_VALIDATION: FileValidation = {
   maxSize: 10 * 1024 * 1024, // 10MB
-  allowedTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+  // Include common mobile formats like HEIC/HEIF so iPhone photos upload reliably.
+  allowedTypes: [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp',
+    'image/gif',
+    'image/heic',
+    'image/heif',
+    'image/avif'
+  ]
 }
 
 const VIDEO_VALIDATION: FileValidation = {
@@ -79,7 +105,12 @@ export function validateFile(
   }
 
   // Check file type
-  if (!validation.allowedTypes.includes(file.type)) {
+  const fileType = (file.type || '').toLowerCase()
+  const extension = file.name.split('.').pop()?.toLowerCase() || ''
+  const hasAllowedMimeType = Boolean(fileType) && validation.allowedTypes.includes(fileType)
+  const hasAllowedExtension = FALLBACK_ALLOWED_EXTENSIONS.includes(extension)
+
+  if (!hasAllowedMimeType && !hasAllowedExtension) {
     return { 
       valid: false, 
       error: `Invalid file type. Allowed: ${validation.allowedTypes.join(', ')}` 

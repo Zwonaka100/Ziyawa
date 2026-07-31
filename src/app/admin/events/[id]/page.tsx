@@ -16,6 +16,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
+import { uploadEventFile, type UploadResult } from '@/lib/storage'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -57,6 +58,7 @@ import {
   Pencil,
   Printer,
   Lock,
+  Upload,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { formatCurrency } from '@/lib/helpers'
@@ -146,6 +148,7 @@ export default function AdminEventDetailPage() {
   const [reports, setReports] = useState<Array<{ id: string; reason: string; status: string; created_at: string; description?: string | null }>>([])
   const [loading, setLoading] = useState(true)
   const [savingChanges, setSavingChanges] = useState(false)
+  const [uploadingCover, setUploadingCover] = useState(false)
   const [publishLoading, setPublishLoading] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState({
@@ -157,6 +160,7 @@ export default function AdminEventDetailPage() {
     event_date: '',
     start_time: '',
     end_time: '',
+    cover_image: '',
     ticket_price: 0,
     capacity: 0,
   })
@@ -199,6 +203,7 @@ export default function AdminEventDetailPage() {
         event_date: data.event_date || '',
         start_time: data.start_time || '',
         end_time: data.end_time || '',
+        cover_image: data.cover_image || '',
         ticket_price: Number(data.ticket_price || 0),
         capacity: Number(data.capacity || 0),
       })
@@ -251,23 +256,28 @@ export default function AdminEventDetailPage() {
     setSavingChanges(true)
 
     try {
-      const { error } = await supabase
-        .from('events')
-        .update({
-          title: editForm.title.trim(),
-          description: editForm.description.trim(),
-          venue: editForm.venue.trim(),
-          location: editForm.location.trim(),
-          address: editForm.address.trim(),
+      const response = await fetch(`/api/admin/events/${eventId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editForm.title,
+          description: editForm.description,
+          venue: editForm.venue,
+          location: editForm.location,
+          address: editForm.address,
           event_date: editForm.event_date,
           start_time: editForm.start_time,
           end_time: editForm.end_time,
+          cover_image: editForm.cover_image,
           ticket_price: Number(editForm.ticket_price),
           capacity: Number(editForm.capacity),
-        })
-        .eq('id', eventId)
+        }),
+      })
 
-      if (error) throw error
+      const payload = await response.json().catch(() => ({})) as { error?: string }
+      if (!response.ok) {
+        throw new Error(payload.error || 'Failed to update event')
+      }
 
       toast.success('Event updated successfully')
       setEditOpen(false)
@@ -280,26 +290,35 @@ export default function AdminEventDetailPage() {
     }
   }
 
+  const handleAdminCoverUpload = async (file: File) => {
+    setUploadingCover(true)
+
+    try {
+      const result: UploadResult = await uploadEventFile(file, eventId, 'poster')
+
+      if (!result.success || !result.url) {
+        toast.error(result.error || 'Failed to upload cover image')
+        return
+      }
+
+      setEditForm((prev) => ({ ...prev, cover_image: result.url || '' }))
+      setEvent((prev) => (prev ? { ...prev, cover_image: result.url || '' } : prev))
+      toast.success('Cover uploaded. Save changes to apply it to the event.')
+    } catch (error) {
+      console.error('Admin cover upload error:', error)
+      toast.error('Failed to upload cover image')
+    } finally {
+      setUploadingCover(false)
+    }
+  }
+
   const handleAction = async () => {
     if (!event) return
 
     setProcessing(true)
 
     try {
-      const { data: { user: admin } } = await supabase.auth.getUser()
-      
-      let updates: Record<string, unknown> = {}
-
       switch (actionType) {
-        case 'approve':
-          updates = { state: 'published', is_approved: true, is_published: true }
-          break
-        case 'reject':
-          updates = { state: 'draft', is_approved: false, is_published: false }
-          break
-        case 'suspend':
-          updates = { state: 'locked', is_published: false }
-          break
         case 'delete':
           {
             const response = await fetch(`/api/admin/events/${eventId}/publish`, {
@@ -324,42 +343,22 @@ export default function AdminEventDetailPage() {
             router.push('/admin/events')
           }
           return
+        case 'approve':
+        case 'reject':
+        case 'suspend': {
+          const response = await fetch(`/api/admin/events/${eventId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ adminAction: actionType, notes: actionNotes }),
+          })
+
+          const payload = await response.json().catch(() => ({})) as { error?: string }
+          if (!response.ok) {
+            throw new Error(payload.error || `Failed to ${actionType} event`)
+          }
+          break
+        }
       }
-
-      // Update event
-      const { error } = await supabase
-        .from('events')
-        .update(updates)
-        .eq('id', eventId)
-
-      if (error) throw error
-
-      // Audit log
-      await supabase.from('admin_audit_logs').insert({
-        admin_id: admin?.id,
-        action: `event_${actionType}`,
-        action_type: actionType === 'approve' ? 'event_approve' : actionType === 'reject' ? 'event_reject' : actionType === 'suspend' ? 'event_edit' : 'event_delete',
-        target_type: 'event',
-        target_id: eventId,
-        details: {
-          event_title: event.title,
-          organizer_email: event.organizer?.email,
-          notes: actionNotes,
-        },
-      })
-
-      // Notify organizer
-      await supabase.from('notifications').insert({
-        user_id: event.organizer_id,
-        type: 'event_updated',
-        title: actionType === 'approve' 
-          ? 'Event Approved!' 
-          : actionType === 'reject' 
-            ? 'Event Rejected' 
-            : 'Event Suspended',
-        message: actionNotes || `Your event "${event.title}" has been ${actionType}ed by our moderation team.`,
-        link: `/dashboard/organizer/events/${eventId}/manage`,
-      })
 
       toast.success(`Event ${actionType}ed successfully`)
       setActionOpen(false)
@@ -418,12 +417,16 @@ export default function AdminEventDetailPage() {
     setPublishLoading(true)
 
     try {
-      const { error } = await supabase
-        .from('events')
-        .update({ state: 'locked' })
-        .eq('id', eventId)
+      const response = await fetch(`/api/admin/events/${eventId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminAction: 'lock' }),
+      })
 
-      if (error) throw error
+      const payload = await response.json().catch(() => ({})) as { error?: string }
+      if (!response.ok) {
+        throw new Error(payload.error || 'Failed to lock event')
+      }
 
       toast.success('Event locked')
       void fetchEvent()
@@ -932,6 +935,60 @@ export default function AdminEventDetailPage() {
           </DialogHeader>
 
           <div className="grid gap-4 md:grid-cols-2 mt-4">
+            <div className="md:col-span-2 space-y-2">
+              <Label>Cover Image</Label>
+              <div className="rounded-lg border p-3 space-y-3">
+                {editForm.cover_image ? (
+                  <div className="relative w-full h-40 rounded-md overflow-hidden border">
+                    <Image src={editForm.cover_image} alt="Event cover preview" fill className="object-cover" />
+                  </div>
+                ) : (
+                  <div className="w-full h-28 rounded-md border border-dashed flex items-center justify-center text-sm text-muted-foreground">
+                    No cover image selected
+                  </div>
+                )}
+
+                <Input
+                  id="edit-cover-image"
+                  placeholder="Paste cover image URL"
+                  value={editForm.cover_image}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, cover_image: e.target.value }))}
+                />
+
+                <div>
+                  <input
+                    id="admin-cover-upload"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        void handleAdminCoverUpload(file)
+                        e.currentTarget.value = ''
+                      }
+                    }}
+                  />
+                  <label htmlFor="admin-cover-upload">
+                    <Button type="button" variant="outline" className="w-full" disabled={uploadingCover} asChild>
+                      <span>
+                        {uploadingCover ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4 mr-2" />
+                            Upload New Cover
+                          </>
+                        )}
+                      </span>
+                    </Button>
+                  </label>
+                </div>
+              </div>
+            </div>
             <div className="md:col-span-2 space-y-2">
               <Label htmlFor="edit-title">Title</Label>
               <Input id="edit-title" value={editForm.title} onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value }))} />
