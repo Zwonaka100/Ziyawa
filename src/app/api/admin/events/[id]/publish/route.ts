@@ -11,6 +11,47 @@ const supabaseAdmin = createServiceClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+const OPTIONAL_EVENT_COLUMNS = [
+  'is_approved',
+  'updated_at',
+  'cancelled_at',
+  'cancellation_reason',
+] as const
+
+async function updateEventWithFallback(eventId: string, updates: Record<string, unknown>) {
+  const tryUpdate = async (payload: Record<string, unknown>) => {
+    const { error } = await supabaseAdmin
+      .from('events')
+      .update(payload)
+      .eq('id', eventId)
+    return error
+  }
+
+  let payload = { ...updates }
+  let error = await tryUpdate(payload)
+
+  if (!error) {
+    return { error: null, payload }
+  }
+
+  for (const column of OPTIONAL_EVENT_COLUMNS) {
+    if (!(column in payload)) continue
+
+    const message = String(error.message || '').toLowerCase()
+    if (!message.includes(column.toLowerCase())) continue
+
+    const { [column]: _, ...nextPayload } = payload
+    payload = nextPayload
+    error = await tryUpdate(payload)
+
+    if (!error) {
+      return { error: null, payload }
+    }
+  }
+
+  return { error, payload }
+}
+
 async function runSideEffect(label: string, fn: () => Promise<void>) {
   try {
     await fn()
@@ -70,14 +111,11 @@ export async function POST(
         return NextResponse.json({ error: `This event is ${event.state} and cannot be published.` }, { status: 400 })
       }
 
-      const { error: publishError } = await supabaseAdmin
-        .from('events')
-        .update({
-          state: 'published',
-          is_published: true,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', eventId)
+      const { error: publishError } = await updateEventWithFallback(eventId, {
+        state: 'published',
+        is_published: true,
+        updated_at: new Date().toISOString(),
+      })
 
       if (publishError) {
         return NextResponse.json({ error: publishError.message || 'Failed to publish event.' }, { status: 500 })
@@ -163,16 +201,13 @@ export async function POST(
           : 'Cancelled by admin moderation.')
       const now = new Date().toISOString()
 
-      const { error: cancelError } = await supabaseAdmin
-        .from('events')
-        .update({
-          state: 'cancelled',
-          is_published: false,
-          cancelled_at: now,
-          cancellation_reason: cancellationReason,
-          updated_at: now,
-        })
-        .eq('id', eventId)
+      const { error: cancelError } = await updateEventWithFallback(eventId, {
+        state: 'cancelled',
+        is_published: false,
+        cancelled_at: now,
+        cancellation_reason: cancellationReason,
+        updated_at: now,
+      })
 
       if (cancelError) {
         return NextResponse.json({ error: 'Failed to cancel event' }, { status: 500 })
@@ -329,14 +364,11 @@ export async function POST(
       })
     }
 
-    const { error: unpublishError } = await supabaseAdmin
-      .from('events')
-      .update({
-        state: 'draft',
-        is_published: false,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', eventId)
+    const { error: unpublishError } = await updateEventWithFallback(eventId, {
+      state: 'draft',
+      is_published: false,
+      updated_at: new Date().toISOString(),
+    })
 
     if (unpublishError) {
       return NextResponse.json({ error: unpublishError.message || 'Failed to unpublish event.' }, { status: 500 })
