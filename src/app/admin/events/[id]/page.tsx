@@ -928,7 +928,7 @@ export default function AdminEventDetailPage() {
       </Tabs>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Event</DialogTitle>
             <DialogDescription>Update the core event details for this listing.</DialogDescription>
@@ -939,8 +939,8 @@ export default function AdminEventDetailPage() {
               <Label>Cover Image</Label>
               <div className="rounded-lg border p-3 space-y-3">
                 {editForm.cover_image ? (
-                  <div className="relative w-full h-40 rounded-md overflow-hidden border">
-                    <Image src={editForm.cover_image} alt="Event cover preview" fill className="object-cover" />
+                  <div className="relative w-full h-56 md:h-72 rounded-md overflow-hidden border bg-muted/30">
+                    <Image src={editForm.cover_image} alt="Event cover preview" fill className="object-contain" />
                   </div>
                 ) : (
                   <div className="w-full h-28 rounded-md border border-dashed flex items-center justify-center text-sm text-muted-foreground">
