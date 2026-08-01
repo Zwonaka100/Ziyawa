@@ -37,6 +37,7 @@ import {
   CircleDollarSign,
   ShieldAlert,
   CheckCheck,
+  XCircle,
 } from 'lucide-react'
 
 interface EventSummary {
@@ -146,6 +147,7 @@ export default function OrganizerEventManagePage() {
   const [checkingInId, setCheckingInId] = useState<string | null>(null)
   const [resendingId, setResendingId] = useState<string | null>(null)
   const [completingEvent, setCompletingEvent] = useState(false)
+  const [cancellingEvent, setCancellingEvent] = useState(false)
   const [passForm, setPassForm] = useState({
     fullName: '',
     email: '',
@@ -545,6 +547,31 @@ export default function OrganizerEventManagePage() {
     toast.success(`${exportRows.length} attendee rows exported`)
   }
 
+  const handleCancelEvent = async () => {
+    const reason = window.prompt('Why are you cancelling this event? Attendees and artists will be notified.')
+    if (reason === null) return
+    const confirmed = window.confirm(
+      'Cancel this event? All sold tickets will be queued for refund and all parties will be notified. This cannot be undone.'
+    )
+    if (!confirmed) return
+    try {
+      setCancellingEvent(true)
+      const response = await fetch(`/api/events/${eventId}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Failed to cancel event')
+      toast.success('Event cancelled. Refunds have been queued for processing.')
+      await loadAttendees()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to cancel event')
+    } finally {
+      setCancellingEvent(false)
+    }
+  }
+
   const handleCompleteEvent = async () => {
     const confirmed = window.confirm('Mark this event as completed? This will start the payout release process once hold rules are satisfied.')
     if (!confirmed) return
@@ -647,6 +674,12 @@ export default function OrganizerEventManagePage() {
             <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
+          {eventStatus.label !== 'Past event' && (
+            <Button variant="outline" className="text-red-600 border-red-300 hover:bg-red-50" onClick={handleCancelEvent} disabled={cancellingEvent}>
+              {cancellingEvent ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <XCircle className="h-4 w-4 mr-2" />}
+              Cancel Event
+            </Button>
+          )}
           {(eventStatus.label === 'Live today' || eventStatus.label === 'Past event') && (
             <Button onClick={handleCompleteEvent} disabled={completingEvent}>
               {completingEvent ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCheck className="h-4 w-4 mr-2" />}

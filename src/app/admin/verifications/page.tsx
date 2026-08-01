@@ -56,12 +56,16 @@ interface VerificationRow {
   rep_id_front_url: string | null
   rep_id_back_url: string | null
   profiles: {
+    id: string
     full_name: string | null
     email: string
     avatar_url: string | null
     is_organizer: boolean
     is_artist: boolean
     is_provider: boolean
+    is_verified: boolean
+    verified_at: string | null
+    verified_entity_type: string | null
   }
 }
 
@@ -96,7 +100,7 @@ export default function AdminVerificationsPage() {
           rejection_reason, id_type, id_number, doc_front_url, doc_back_url,
           business_name, registration_number, company_reg_cert_url,
           rep_id_number, rep_id_front_url, rep_id_back_url,
-          profiles!inner (full_name, email, avatar_url, is_organizer, is_artist, is_provider)
+          profiles!inner (id, full_name, email, avatar_url, is_organizer, is_artist, is_provider, is_verified, verified_at, verified_entity_type)
         `)
         .order('submitted_at', { ascending: false })
 

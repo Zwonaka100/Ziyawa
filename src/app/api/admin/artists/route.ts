@@ -14,22 +14,17 @@ type ArtistRow = {
   genre: string
   location: string
   base_price: number
-  is_available: boolean
-  is_public: boolean
-  total_bookings: number
-  average_rating: number
+  is_available?: boolean
+  is_public?: boolean
+  total_bookings?: number
+  average_rating?: number
   created_at: string
-  profiles: {
+  profile?: {
     full_name: string | null
     email: string
-    is_suspended: boolean
-    is_banned: boolean
-  } | {
-    full_name: string | null
-    email: string
-    is_suspended: boolean
-    is_banned: boolean
-  }[] | null
+    is_suspended?: boolean
+    is_banned?: boolean
+  } | null
 }
 
 async function assertAdmin() {
@@ -67,7 +62,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabaseAdmin
       .from('artists')
-      .select('id, profile_id, stage_name, genre, location, base_price, is_available, is_public, total_bookings, average_rating, created_at, profiles:profile_id(full_name, email, is_suspended, is_banned)')
+      .select('id, profile_id, stage_name, genre, location, base_price, is_available, is_public, total_bookings, average_rating, created_at')
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -75,6 +70,24 @@ export async function GET(request: NextRequest) {
     }
 
     let rows: ArtistRow[] = (data || []) as ArtistRow[]
+
+    if (rows.length > 0) {
+      const profileIds = rows.map((row) => row.profile_id).filter(Boolean)
+      if (profileIds.length > 0) {
+        const { data: profilesData, error: profilesError } = await supabaseAdmin
+          .from('profiles')
+          .select('id, full_name, email, is_suspended, is_banned')
+          .in('id', profileIds)
+
+        if (!profilesError && profilesData) {
+          const profileMap = new Map(profilesData.map((profile) => [profile.id, profile]))
+          rows = rows.map((row) => ({
+            ...row,
+            profile: profileMap.get(row.profile_id) || null,
+          }))
+        }
+      }
+    }
 
     if (availability === 'available') {
       rows = rows.filter((row) => row.is_available)
@@ -89,13 +102,6 @@ export async function GET(request: NextRequest) {
     }
 
     const normalized = rows
-      .map((row) => {
-        const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
-        return {
-          ...row,
-          profile,
-        }
-      })
       .filter((row) => {
         if (!query) return true
         const haystack = [

@@ -83,6 +83,19 @@ export default function AdminSupportPage() {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({})
+
+  const fetchStatusCounts = useCallback(async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('support_tickets')
+      .select('status')
+    if (data) {
+      const counts: Record<string, number> = {}
+      data.forEach(({ status }) => { counts[status] = (counts[status] || 0) + 1 })
+      setStatusCounts(counts)
+    }
+  }, [])
 
   const fetchTickets = useCallback(async () => {
     const supabase = createClient()
@@ -130,7 +143,8 @@ export default function AdminSupportPage() {
     // This fetch refreshes support data when the active filters change.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchTickets()
-  }, [fetchTickets])
+    void fetchStatusCounts()
+  }, [fetchTickets, fetchStatusCounts])
 
   const handleUpdateStatus = async (ticketId: string, status: string) => {
     const supabase = createClient()
@@ -198,8 +212,7 @@ export default function AdminSupportPage() {
             <CardContent className="p-4">
               <p className="text-sm text-muted-foreground capitalize">{status.replace('_', ' ')}</p>
               <p className="text-2xl font-bold">
-                {/* Show counts from fetched data */}
-                -
+                {statusCounts[status] ?? 0}
               </p>
             </CardContent>
           </Card>

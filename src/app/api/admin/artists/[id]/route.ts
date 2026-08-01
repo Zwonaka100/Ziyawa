@@ -7,6 +7,41 @@ const supabaseAdmin = createServiceClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+async function runSideEffect(label: string, fn: () => Promise<void>) {
+  try {
+    await fn()
+  } catch (error) {
+    console.error(`Admin artists side effect failed (${label}):`, error)
+  }
+}
+
+async function getActiveBookingsCount(artistId: string) {
+  const activeStates = ['pending', 'accepted', 'confirmed', 'disputed']
+
+  const withState = await supabaseAdmin
+    .from('bookings')
+    .select('id', { count: 'exact', head: true })
+    .eq('artist_id', artistId)
+    .in('state', activeStates)
+
+  if (!withState.error) {
+    return { count: withState.count || 0, error: null }
+  }
+
+  // Legacy schema fallback where booking column may still be named `status`.
+  const withStatus = await supabaseAdmin
+    .from('bookings')
+    .select('id', { count: 'exact', head: true })
+    .eq('artist_id', artistId)
+    .in('status', activeStates)
+
+  if (!withStatus.error) {
+    return { count: withStatus.count || 0, error: null }
+  }
+
+  return { count: 0, error: withStatus.error || withState.error }
+}
+
 async function assertAdmin() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -63,16 +98,18 @@ export async function PATCH(
       return NextResponse.json({ error: 'Failed to update artist profile' }, { status: 500 })
     }
 
-    await supabaseAdmin
-      .from('admin_audit_logs')
-      .insert({
-        admin_id: access.userId,
-        action: 'admin_artist_profile_update',
-        action_type: 'user_edit',
-        target_type: 'artist_profile',
-        target_id: id,
-        details: updates,
-      })
+    await runSideEffect('artist update audit log', async () => {
+      await supabaseAdmin
+        .from('admin_audit_logs')
+        .insert({
+          admin_id: access.userId,
+          action: 'admin_artist_profile_update',
+          action_type: 'user_edit',
+          target_type: 'artist_profile',
+          target_id: id,
+          details: updates,
+        })
+    })
 
     return NextResponse.json({ success: true, artist: data })
   } catch (error) {
@@ -91,19 +128,30 @@ export async function DELETE(
 
     const { id } = await params
 
-    const { count: activeBookingsCount, error: activeBookingsError } = await supabaseAdmin
-      .from('bookings')
-      .select('id', { count: 'exact', head: true })
-      .eq('artist_id', id)
-      .in('state', ['pending', 'accepted', 'confirmed', 'disputed'])
+    const { count: activeBookingsCount, error: activeBookingsError } = await getActiveBookingsCount(id)
 
     if (activeBookingsError) {
       return NextResponse.json({ error: 'Failed to validate artist bookings' }, { status: 500 })
     }
 
     if ((activeBookingsCount || 0) > 0) {
+      await runSideEffect('artist delete blocked by active bookings audit log', async () => {
+        await supabaseAdmin
+          .from('admin_audit_logs')
+          .insert({
+            admin_id: access.userId,
+            action: 'admin_artist_profile_delete_blocked',
+            action_type: 'user_edit',
+            target_type: 'artist_profile',
+            target_id: id,
+            details: { reason: 'active_bookings', activeBookingsCount },
+          })
+      })
+
       return NextResponse.json(
-        { error: 'Cannot remove artist profile with active bookings. Hide the profile instead.' },
+        {
+          error: 'Cannot remove artist profile while the artist has active bookings. Resolve or cancel those bookings first.',
+        },
         { status: 409 }
       )
     }
@@ -117,18 +165,25 @@ export async function DELETE(
       return NextResponse.json({ error: 'Failed to remove artist profile' }, { status: 500 })
     }
 
-    await supabaseAdmin
-      .from('admin_audit_logs')
-      .insert({
-        admin_id: access.userId,
-        action: 'admin_artist_profile_delete',
-        action_type: 'user_edit',
-        target_type: 'artist_profile',
-        target_id: id,
-        details: { mode: 'hard_delete' },
-      })
+    await runSideEffect('artist delete audit log', async () => {
+      await supabaseAdmin
+        .from('admin_audit_logs')
+        .insert({
+          admin_id: access.userId,
+          action: 'admin_artist_profile_delete',
+          action_type: 'user_edit',
+          target_type: 'artist_profile',
+          target_id: id,
+          details: { mode: 'hard_delete' },
+        })
+    })
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({
+      success: true,
+      removed: true,
+      mode: 'hard_delete',
+      message: 'Artist profile removed. Their account remains active and they can create a new profile later.',
+    })
   } catch (error) {
     console.error('Admin artist delete error:', error)
     return NextResponse.json({ error: 'Failed to remove artist profile' }, { status: 500 })

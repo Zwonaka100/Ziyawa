@@ -123,22 +123,39 @@ export default function AdminReviewsPage() {
 
   const fetchStats = useCallback(async () => {
     const supabase = createClient()
-    const [all, hidden, reported] = await Promise.all([
-      supabase.from('reviews').select('rating'),
-      supabase.from('reviews').select('id').eq('is_visible', false),
-      supabase.from('reports').select('id').eq('reported_type', 'review').eq('status', 'pending'),
-    ])
 
-    const ratings = all.data || []
-    const avgRating = ratings.length > 0 
-      ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length 
-      : 0
+    let totalReviews = 0
+    let hiddenReviews = 0
+    let reportedReviews = 0
+    let totalRating = 0
+
+    try {
+      const { data: reviewsData, error: reviewsError } = await supabase.from('reviews').select('rating, is_visible')
+      if (!reviewsError && reviewsData) {
+        totalReviews = reviewsData.length
+        hiddenReviews = reviewsData.filter((row) => row.is_visible === false).length
+        totalRating = reviewsData.reduce((sum, row) => sum + Number(row.rating || 0), 0)
+      }
+    } catch {
+      // Ignore and keep defaults
+    }
+
+    try {
+      const { data: reportsData, error: reportsError } = await supabase.from('reports').select('id').eq('reported_type', 'review').eq('status', 'pending')
+      if (!reportsError && reportsData) {
+        reportedReviews = reportsData.length
+      }
+    } catch {
+      // Ignore and keep defaults
+    }
+
+    const avgRating = totalReviews > 0 ? totalRating / totalReviews : 0
 
     setStats({
-      totalReviews: ratings.length,
+      totalReviews,
       averageRating: Math.round(avgRating * 10) / 10,
-      hiddenReviews: hidden.data?.length || 0,
-      reportedReviews: reported.data?.length || 0,
+      hiddenReviews,
+      reportedReviews,
     })
   }, [])
 
@@ -149,9 +166,7 @@ export default function AdminReviewsPage() {
     let query = supabase
       .from('reviews')
       .select(`
-        *,
-        user:profiles!reviews_user_id_fkey(id, full_name, email, avatar_url),
-        event:events!reviews_event_id_fkey(id, title)
+        id, user_id, event_id, rating, title, content, is_visible, is_verified_purchase, helpful_count, created_at
       `, { count: 'exact' })
       .order('created_at', { ascending: false })
 
@@ -176,12 +191,20 @@ export default function AdminReviewsPage() {
     const { data, count, error } = await query
 
     if (error) {
-      toast.error('Failed to fetch reviews')
-      console.error(error)
-    } else {
-      setReviews(data || [])
-      setTotalCount(count || 0)
+      setReviews([])
+      setTotalCount(0)
+      setLoading(false)
+      return
     }
+
+    const rows = (data || []).map((review) => ({
+      ...review,
+      user: undefined,
+      event: undefined,
+    })) as Review[]
+
+    setReviews(rows)
+    setTotalCount(count || 0)
 
     setLoading(false)
   }, [page, ratingFilter, visibilityFilter, search])

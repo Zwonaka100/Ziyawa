@@ -195,11 +195,7 @@ export function emailWrapper(content: string): string {
       <div class="footer">
         <p>© ${new Date().getFullYear()} Ziyawa. All rights reserved.</p>
         <p>South Africa's Premier Events Marketplace</p>
-        <div class="social-links">
-          <a href="#">Facebook</a>
-          <a href="#">Twitter</a>
-          <a href="#">Instagram</a>
-        </div>
+
         <p style="margin-top: 15px; font-size: 11px;">
           You're receiving this email because you have an account on Ziyawa.
           <br>

@@ -255,7 +255,15 @@ export default function AuditLogsPage() {
                         </span>
                       </div>
                     </div>
-                    <Button variant="ghost" size="icon">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="View full details"
+                      onClick={() => {
+                        const detail = Object.entries(log.details || {}).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join('\n')
+                        alert(`Action: ${log.action}\nEntity: ${log.entity_type} ${log.entity_id || ''}\nBy: ${log.admin?.full_name || log.admin?.email || 'System'}\n\n${detail || '(no details)'}`)
+                      }}
+                    >
                       <Eye className="h-4 w-4" />
                     </Button>
                   </div>

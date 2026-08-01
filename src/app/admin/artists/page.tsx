@@ -133,20 +133,29 @@ export default function AdminArtistsPage() {
 
   const handleDelete = async (artist: ArtistAdminRow) => {
     const confirmed = window.confirm(
-      `Remove ${artist.stage_name}'s artist profile? This will permanently remove their artist listing.`
+      `Remove ${artist.stage_name}'s artist profile? This removes their public artist profile and they can create a new one later. It does not deactivate their account.`
     )
 
     if (!confirmed) return
 
     try {
       const response = await fetch(`/api/admin/artists/${artist.id}`, { method: 'DELETE' })
-      const payload = await response.json()
+      const payload = await response.json() as {
+        error?: string
+        removed?: boolean
+        mode?: 'hard_delete' | 'soft_takedown'
+        message?: string
+      }
 
       if (!response.ok) {
         throw new Error(payload.error || 'Failed to remove artist profile')
       }
 
-      toast.success('Artist profile removed')
+      if (payload.message) {
+        toast.success(payload.message)
+      } else {
+        toast.success('Artist profile removed')
+      }
       await fetchArtists()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to remove artist profile')

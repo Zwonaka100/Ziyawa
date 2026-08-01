@@ -120,21 +120,31 @@ export function Footer() {
               <li>{contactEmail}</li>
               <li>South Africa</li>
             </ul>
-            {/* Social Icons */}
-            <div className="flex items-center gap-3 pt-2">
-              <a href="#" aria-label="Instagram" className="text-muted-foreground hover:text-primary transition-colors">
-                <InstagramIcon className="h-5 w-5" />
-              </a>
-              <a href="#" aria-label="Facebook" className="text-muted-foreground hover:text-primary transition-colors">
-                <FacebookIcon className="h-5 w-5" />
-              </a>
-              <a href="#" aria-label="X (Twitter)" className="text-muted-foreground hover:text-primary transition-colors">
-                <XIcon className="h-5 w-5" />
-              </a>
-              <a href="#" aria-label="LinkedIn" className="text-muted-foreground hover:text-primary transition-colors">
-                <LinkedInIcon className="h-5 w-5" />
-              </a>
-            </div>
+            {/* Social Icons — links shown only when env vars are set */}
+            {(process.env.NEXT_PUBLIC_INSTAGRAM_URL || process.env.NEXT_PUBLIC_FACEBOOK_URL || process.env.NEXT_PUBLIC_TWITTER_URL || process.env.NEXT_PUBLIC_LINKEDIN_URL) && (
+              <div className="flex items-center gap-3 pt-2">
+                {process.env.NEXT_PUBLIC_INSTAGRAM_URL && (
+                  <a href={process.env.NEXT_PUBLIC_INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="text-muted-foreground hover:text-primary transition-colors">
+                    <InstagramIcon className="h-5 w-5" />
+                  </a>
+                )}
+                {process.env.NEXT_PUBLIC_FACEBOOK_URL && (
+                  <a href={process.env.NEXT_PUBLIC_FACEBOOK_URL} target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="text-muted-foreground hover:text-primary transition-colors">
+                    <FacebookIcon className="h-5 w-5" />
+                  </a>
+                )}
+                {process.env.NEXT_PUBLIC_TWITTER_URL && (
+                  <a href={process.env.NEXT_PUBLIC_TWITTER_URL} target="_blank" rel="noopener noreferrer" aria-label="X (Twitter)" className="text-muted-foreground hover:text-primary transition-colors">
+                    <XIcon className="h-5 w-5" />
+                  </a>
+                )}
+                {process.env.NEXT_PUBLIC_LINKEDIN_URL && (
+                  <a href={process.env.NEXT_PUBLIC_LINKEDIN_URL} target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="text-muted-foreground hover:text-primary transition-colors">
+                    <LinkedInIcon className="h-5 w-5" />
+                  </a>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
