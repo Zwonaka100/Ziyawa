@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('id, is_verified, is_artist, is_organizer, is_provider')
+      .select('id, is_verified, verified_at, verified_entity_type, is_artist, is_organizer, is_provider')
       .eq('id', user.id)
       .single()
 
@@ -75,6 +75,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Front document photo is required' }, { status: 400 })
       }
 
+      const normalizedDocFront = typeof doc_front_url === 'string' ? doc_front_url : ''
+      const normalizedDocBack = typeof doc_back_url === 'string' ? doc_back_url : null
+
       // Basic SA ID format validation (13 digits)
       if (id_type === 'sa_id' && !/^\d{13}$/.test(id_number.trim())) {
         return NextResponse.json({ error: 'SA ID number must be 13 digits' }, { status: 400 })
@@ -84,8 +87,8 @@ export async function POST(request: NextRequest) {
         ...insertData,
         id_type,
         id_number: id_number.trim(),
-        doc_front_url,
-        doc_back_url: doc_back_url || null,
+        doc_front_url: normalizedDocFront,
+        doc_back_url: normalizedDocBack || null,
       }
     } else {
       // Business
@@ -100,6 +103,10 @@ export async function POST(request: NextRequest) {
       if (!company_reg_cert_url) {
         return NextResponse.json({ error: 'CIPC registration certificate upload is required' }, { status: 400 })
       }
+
+      const normalizedRegCert = typeof company_reg_cert_url === 'string' ? company_reg_cert_url : ''
+      const normalizedRepFront = typeof rep_id_front_url === 'string' ? rep_id_front_url : ''
+      const normalizedRepBack = typeof rep_id_back_url === 'string' ? rep_id_back_url : null
       if (!rep_id_number?.trim()) {
         return NextResponse.json({ error: 'Representative ID number is required' }, { status: 400 })
       }
@@ -111,10 +118,10 @@ export async function POST(request: NextRequest) {
         ...insertData,
         business_name: business_name.trim(),
         registration_number: registration_number.trim(),
-        company_reg_cert_url,
+        company_reg_cert_url: normalizedRegCert,
         rep_id_number: rep_id_number.trim(),
-        rep_id_front_url,
-        rep_id_back_url: rep_id_back_url || null,
+        rep_id_front_url: normalizedRepFront,
+        rep_id_back_url: normalizedRepBack || null,
       }
     }
 
@@ -159,6 +166,12 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('is_verified, verified_at, verified_entity_type')
+      .eq('id', user.id)
+      .single()
+
     const { data: requests, error } = await supabase
       .from('verification_requests')
       .select('id, entity_type, status, submitted_at, reviewed_at, rejection_reason, id_type, business_name')
@@ -166,11 +179,18 @@ export async function GET() {
       .order('submitted_at', { ascending: false })
       .limit(5)
 
-    if (error) {
+    if (error || profileError) {
       return NextResponse.json({ error: 'Failed to fetch verification status' }, { status: 500 })
     }
 
-    return NextResponse.json({ requests: requests ?? [] })
+    return NextResponse.json({
+      requests: requests ?? [],
+      profile: profile ? {
+        is_verified: Boolean(profile.is_verified),
+        verified_at: profile.verified_at,
+        verified_entity_type: profile.verified_entity_type,
+      } : null,
+    })
   } catch (error) {
     console.error('Verification fetch error:', error)
     return NextResponse.json({ error: 'Failed to fetch verification status' }, { status: 500 })

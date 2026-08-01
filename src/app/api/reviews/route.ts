@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
     // Check if event exists and has ended
     const { data: event, error: eventError } = await supabase
       .from('events')
-      .select('id, title, end_date, organizer_id')
+      .select('id, title, event_date, organizer_id')
       .eq('id', eventId)
       .single();
 
@@ -165,10 +165,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if event has ended (optional - you might want to allow reviews before)
-    const eventEndDate = new Date(event.end_date);
+    // Check if event has ended using the live event_date field
+    const eventEndDate = event.event_date ? new Date(`${event.event_date}T23:59:59`) : null;
     const now = new Date();
-    if (eventEndDate > now) {
+    if (eventEndDate && eventEndDate > now) {
       return NextResponse.json(
         { error: 'You can only review events that have ended' },
         { status: 400 }
@@ -190,16 +190,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user attended the event (has a ticket)
+    // Check if user attended the event by looking for a ticket row in the live schema.
     const { data: ticket } = await supabase
       .from('tickets')
       .select('id')
       .eq('event_id', eventId)
       .eq('user_id', user.id)
-      .in('status', ['confirmed', 'checked_in'])
-      .single();
+      .maybeSingle();
 
-    const isVerifiedAttendee = !!ticket;
+    const isVerifiedAttendee = Boolean(ticket);
 
     // Create the review
     const { data: review, error: reviewError } = await supabase

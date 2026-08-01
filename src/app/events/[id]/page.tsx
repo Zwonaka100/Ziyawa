@@ -179,14 +179,14 @@ export default async function EventPage({ params }: EventPageProps) {
       .select('id')
       .eq('event_id', id)
       .eq('user_id', user.id)
-      .in('status', ['confirmed', 'checked_in'])
-      .single()
-    
-    hasTicket = !!ticket
+      .maybeSingle()
+
+    hasTicket = Boolean(ticket)
   }
 
-  // Check if event has ended
-  const eventEnded = new Date(event.end_date || event.event_date) < new Date()
+  // Check if event has ended using the event date that exists in the live schema
+  const eventDateValue = event.event_date ? new Date(`${event.event_date}T23:59:59`) : null
+  const eventEnded = eventDateValue ? eventDateValue < new Date() : false
 
   // JSON-LD structured data for event
   const jsonLd = {

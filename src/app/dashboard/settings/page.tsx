@@ -92,6 +92,7 @@ function SettingsPageInner() {
 
   // Verification tab state
   const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>([])
+  const [verificationProfileState, setVerificationProfileState] = useState<{ is_verified: boolean; verified_at: string | null; verified_entity_type: string | null } | null>(null)
   const [loadingVerification, setLoadingVerification] = useState(true)
   const [entityType, setEntityType] = useState<'individual' | 'business'>('individual')
   const [idType, setIdType] = useState<'sa_id' | 'passport'>('sa_id')
@@ -139,6 +140,7 @@ function SettingsPageInner() {
       if (res.ok) {
         const data = await res.json()
         setVerificationRequests(data.requests ?? [])
+        setVerificationProfileState(data.profile ?? null)
       }
     } catch {
       // silent
@@ -201,12 +203,13 @@ function SettingsPageInner() {
       const path = `avatars/${user.id}.${ext}`
       const { error: uploadError } = await supabase.storage
         .from('media')
-        .upload(path, file, { upsert: true })
+        .upload(path, file, { upsert: true, contentType: file.type })
       if (uploadError) throw uploadError
       const { data: urlData } = supabase.storage.from('media').getPublicUrl(path)
+      const avatarUrl = urlData.publicUrl || `https://qkqdhwrneqfmbiwdsthw.supabase.co/storage/v1/object/public/media/${encodeURIComponent(path)}`
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ avatar_url: urlData.publicUrl })
+        .update({ avatar_url: avatarUrl })
         .eq('id', profile.id)
       if (updateError) throw updateError
       await refreshProfile()
@@ -254,9 +257,11 @@ function SettingsPageInner() {
       const path = `verification/${user.id}/${docKey}-${Date.now()}.${ext}`
       const { error: uploadError } = await supabase.storage
         .from('verification-documents')
-        .upload(path, file, { upsert: true })
+        .upload(path, file, { upsert: true, contentType: file.type })
       if (uploadError) throw uploadError
-      setter(path)
+      const { data: urlData } = supabase.storage.from('verification-documents').getPublicUrl(path)
+      const documentUrl = urlData.publicUrl || `https://qkqdhwrneqfmbiwdsthw.supabase.co/storage/v1/object/public/verification-documents/${encodeURIComponent(path)}`
+      setter(documentUrl)
       toast.success('Document uploaded')
     } catch {
       toast.error('Failed to upload document')
@@ -358,7 +363,7 @@ function SettingsPageInner() {
 
   const latestRequest = verificationRequests[0] ?? null
   const hasPending = latestRequest?.status === 'pending'
-  const isVerified = profile.is_verified
+  const isVerified = Boolean(verificationProfileState?.is_verified ?? profile.is_verified)
   const mfaEnabled = mfaFactors.length > 0
 
   const needsVerification = profile.is_artist || profile.is_organizer || (profile as { is_provider?: boolean }).is_provider
