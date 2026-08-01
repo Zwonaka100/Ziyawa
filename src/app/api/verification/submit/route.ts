@@ -166,7 +166,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: profile, error: profileError } = await supabase
+    const { data: profileData, error: profileError } = await supabase
       .from('profiles')
       .select('is_verified, verified_at, verified_entity_type')
       .eq('id', user.id)
@@ -185,10 +185,10 @@ export async function GET() {
 
     return NextResponse.json({
       requests: requests ?? [],
-      profile: profile ? {
-        is_verified: Boolean(profile.is_verified),
-        verified_at: profile.verified_at,
-        verified_entity_type: profile.verified_entity_type,
+      profile: profileData ? {
+        is_verified: Boolean(profileData.is_verified),
+        verified_at: profileData.verified_at,
+        verified_entity_type: profileData.verified_entity_type,
       } : null,
     })
   } catch (error) {

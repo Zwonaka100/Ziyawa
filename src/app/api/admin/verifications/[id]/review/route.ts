@@ -41,20 +41,21 @@ export async function POST(
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
     }
 
-    const body = await request.json()
+    const body = await request.json().catch(() => ({})) as { action?: string; rejection_reason?: string }
     const { action, rejection_reason } = body
+    const rejectionText = typeof rejection_reason === 'string' ? rejection_reason.trim() : ''
 
     if (!action || !['approve', 'reject'].includes(action)) {
       return NextResponse.json({ error: 'action must be approve or reject' }, { status: 400 })
     }
-    if (action === 'reject' && !rejection_reason?.trim()) {
+    if (action === 'reject' && !rejectionText) {
       return NextResponse.json({ error: 'rejection_reason is required when rejecting' }, { status: 400 })
     }
 
     // Fetch the request
     const { data: verificationRequest, error: fetchError } = await supabaseAdmin
       .from('verification_requests')
-      .select('id, profile_id, entity_type, status')
+      .select('id, profile_id, entity_type, status, submitted_at')
       .eq('id', requestId)
       .single()
 
@@ -71,8 +72,7 @@ export async function POST(
     const now = new Date().toISOString()
 
     if (action === 'approve') {
-      // Update the request
-      await supabaseAdmin
+      const { error: requestUpdateError } = await supabaseAdmin
         .from('verification_requests')
         .update({
           status: 'approved',
@@ -81,8 +81,11 @@ export async function POST(
         })
         .eq('id', requestId)
 
-      // Mark the profile as verified
-      await supabaseAdmin
+      if (requestUpdateError) {
+        throw requestUpdateError
+      }
+
+      const { error: profileUpdateError } = await supabaseAdmin
         .from('profiles')
         .update({
           is_verified: true,
@@ -91,7 +94,10 @@ export async function POST(
         })
         .eq('id', verificationRequest.profile_id)
 
-      // Notify the user
+      if (profileUpdateError) {
+        throw profileUpdateError
+      }
+
       await createNotification({
         userId: verificationRequest.profile_id,
         type: 'profile_verified',
@@ -114,7 +120,7 @@ export async function POST(
         status: 'rejected',
         reviewed_at: now,
         reviewed_by: user.id,
-        rejection_reason: rejection_reason.trim(),
+        rejection_reason: rejectionText,
       })
       .eq('id', requestId)
 
@@ -123,7 +129,7 @@ export async function POST(
       userId: verificationRequest.profile_id,
       type: 'profile_verified',
       title: 'Verification unsuccessful',
-      message: `Your verification was not approved. Reason: ${rejection_reason.trim()}. Please resubmit with the correct documents.`,
+      message: `Your verification was not approved. Reason: ${rejectionText}. Please resubmit with the correct documents.`,
       link: '/dashboard/settings?tab=verification',
       sendEmail: true,
     })
