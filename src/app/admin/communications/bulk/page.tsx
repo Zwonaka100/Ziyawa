@@ -1,14 +1,21 @@
 'use client'
 
+/**
+ * ADMIN BULK EMAIL PAGE - ENHANCED
+ * Multi-select users with filters, batch sending, and proper tracking
+ */
+
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
@@ -16,62 +23,176 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ArrowLeft, Send, Loader2, Users } from 'lucide-react'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { ArrowLeft, Send, Loader2, Users, Search, Filter, User, CheckSquare, Square } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
+
+interface UserProfile {
+  id: string
+  email: string
+  full_name: string | null
+  avatar_url: string | null
+  is_organizer: boolean
+  is_artist: boolean
+  is_provider: boolean
+  created_at: string
+}
+
+interface Template {
+  id: string
+  name: string
+  subject: string
+  body: string
+}
 
 export default function BulkEmailPage() {
   const router = useRouter()
   const [sending, setSending] = useState(false)
-  const [recipientCount, setRecipientCount] = useState(0)
+  const [users, setUsers] = useState<UserProfile[]>([])
+  const [templates, setTemplates] = useState<Template[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [roleFilter, setRoleFilter] = useState('all')
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set())
+  const [loading, setLoading] = useState(true)
   
   const [formData, setFormData] = useState({
     subject: '',
     body: '',
-    audience: 'all', // all, organizers, artists, vendors
-    testMode: true, // Send to admin first to test
+    fromEmail: 'info', // support, info, accounts, noreply
+    testMode: true,
   })
 
-  const fetchRecipientCount = useCallback(async () => {
+  useEffect(() => {
+    void fetchTemplates()
+    void fetchUsers()
+  }, [])
+
+  const fetchTemplates = async () => {
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('email_templates')
+      .select('id, name, subject, body')
+      .order('name')
+    
+    setTemplates(data || [])
+  }
+
+  const fetchUsers = useCallback(async () => {
+    setLoading(true)
     const supabase = createClient()
     
-    let query = supabase.from('profiles').select('id', { count: 'exact', head: true })
-    
-    if (formData.audience === 'organizers') {
+    let query = supabase
+      .from('profiles')
+      .select('id, email, full_name, avatar_url, is_organizer, is_artist, is_provider, created_at')
+      .order('created_at', { ascending: false })
+
+    // Role filter
+    if (roleFilter === 'organizers') {
       query = query.eq('is_organizer', true)
-    } else if (formData.audience === 'artists') {
-      // Would need to join with artists table
+    } else if (roleFilter === 'artists') {
+      query = query.eq('is_artist', true)
+    } else if (roleFilter === 'providers') {
+      query = query.eq('is_provider', true)
+    } else if (roleFilter === 'groovists') {
+      query = query.eq('is_organizer', false).eq('is_artist', false).eq('is_provider', false)
     }
-    
-    const { count } = await query
-    setRecipientCount(count || 0)
-  }, [formData.audience])
+
+    // Search filter
+    if (searchQuery.trim()) {
+      query = query.or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`)
+    }
+
+    const { data } = await query.limit(500)
+    setUsers(data || [])
+    setLoading(false)
+  }, [searchQuery, roleFilter])
 
   useEffect(() => {
-    void fetchRecipientCount()
-  }, [fetchRecipientCount])
+    void fetchUsers()
+  }, [fetchUsers])
+
+  const handleTemplateSelect = (templateId: string) => {
+    const template = templates.find(t => t.id === templateId)
+    if (template) {
+      setFormData({
+        ...formData,
+        subject: template.subject,
+        body: template.body,
+      })
+    }
+  }
+
+  const toggleUser = (userId: string) => {
+    const newSelected = new Set(selectedUserIds)
+    if (newSelected.has(userId)) {
+      newSelected.delete(userId)
+    } else {
+      newSelected.add(userId)
+    }
+    setSelectedUserIds(newSelected)
+  }
+
+  const toggleAll = () => {
+    if (selectedUserIds.size === users.length) {
+      setSelectedUserIds(new Set())
+    } else {
+      setSelectedUserIds(new Set(users.map(u => u.id)))
+    }
+  }
+
+  const selectByRole = (role: 'organizers' | 'artists' | 'providers' | 'groovists') => {
+    const filtered = users.filter(u => {
+      if (role === 'organizers') return u.is_organizer
+      if (role === 'artists') return u.is_artist
+      if (role === 'providers') return u.is_provider
+      if (role === 'groovists') return !u.is_organizer && !u.is_artist && !u.is_provider
+      return false
+    })
+    setSelectedUserIds(new Set(filtered.map(u => u.id)))
+  }
 
   const handleSend = async () => {
+    if (selectedUserIds.size === 0) {
+      toast.error('Please select at least one recipient')
+      return
+    }
+
     if (!formData.subject.trim() || !formData.body.trim()) {
       toast.error('Please fill in subject and message')
       return
     }
 
-    if (!confirm(`Are you sure you want to send this email to ${formData.testMode ? 'yourself (test)' : recipientCount + ' users'}?`)) {
+    const recipientCount = formData.testMode ? 1 : selectedUserIds.size
+    if (!confirm(`Send this email to ${formData.testMode ? 'yourself (test mode)' : recipientCount + ' users'}?`)) {
       return
     }
 
     setSending(true)
 
     try {
+      const selectedUsers = users.filter(u => selectedUserIds.has(u.id))
+      
       const response = await fetch('/api/admin/bulk-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subject: formData.subject,
           body: formData.body,
-          audience: formData.audience,
+          fromEmail: formData.fromEmail,
           testMode: formData.testMode,
+          recipients: selectedUsers.map(u => ({
+            id: u.id,
+            email: u.email,
+            name: u.full_name,
+          })),
         }),
       })
 
@@ -80,7 +201,7 @@ export default function BulkEmailPage() {
       }
 
       const result = await response.json()
-      toast.success(`Emails sent successfully to ${result.count} recipients`)
+      toast.success(`Emails sent successfully to ${result.count} recipient(s)`)
       
       if (!formData.testMode) {
         router.push('/admin/communications')
@@ -92,8 +213,17 @@ export default function BulkEmailPage() {
     }
   }
 
+  const getUserRoles = (user: UserProfile) => {
+    const roles = []
+    if (user.is_organizer) roles.push('Organizer')
+    if (user.is_artist) roles.push('Artist')
+    if (user.is_provider) roles.push('Crew')
+    if (roles.length === 0) roles.push('Groovist')
+    return roles
+  }
+
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Link href="/admin/communications">
           <Button variant="ghost" size="sm">
@@ -107,90 +237,245 @@ export default function BulkEmailPage() {
         </div>
       </div>
 
-      <Card>
-        <CardContent className="p-6 space-y-6">
-          {/* Audience */}
-          <div className="space-y-2">
-            <Label>Audience</Label>
-            <Select 
-              value={formData.audience} 
-              onValueChange={(v) => setFormData({ ...formData, audience: v })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Users</SelectItem>
-                <SelectItem value="organizers">Organizers Only</SelectItem>
-                <SelectItem value="artists">Artists Only</SelectItem>
-                <SelectItem value="vendors">Vendors Only</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-muted-foreground flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              {recipientCount} recipients
-            </p>
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* User Selection */}
+        <Card>
+          <CardContent className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">Select Recipients</h3>
+              <Badge variant="secondary">
+                <Users className="h-3 w-3 mr-1" />
+                {selectedUserIds.size} selected
+              </Badge>
+            </div>
 
-          {/* Subject */}
-          <div className="space-y-2">
-            <Label htmlFor="subject">Subject</Label>
-            <Input
-              id="subject"
-              value={formData.subject}
-              onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-              placeholder="Email subject..."
-            />
-          </div>
+            {/* Quick Select */}
+            <div className="flex gap-2 flex-wrap">
+              <Button size="sm" variant="outline" onClick={toggleAll}>
+                {selectedUserIds.size === users.length ? <Square className="h-3 w-3 mr-1" /> : <CheckSquare className="h-3 w-3 mr-1" />}
+                All ({users.length})
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => selectByRole('organizers')}>
+                Organizers
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => selectByRole('artists')}>
+                Artists
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => selectByRole('providers')}>
+                Crew
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => selectByRole('groovists')}>
+                Groovists
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setSelectedUserIds(new Set())}>
+                Clear
+              </Button>
+            </div>
 
-          {/* Body */}
-          <div className="space-y-2">
-            <Label htmlFor="body">Message</Label>
-            <Textarea
-              id="body"
-              value={formData.body}
-              onChange={(e) => setFormData({ ...formData, body: e.target.value })}
-              placeholder="Write your message..."
-              rows={10}
-            />
-            <p className="text-xs text-muted-foreground">
-              Available variables: {"{{name}}"} - recipient&apos;s name
-            </p>
-          </div>
+            {/* Filters */}
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search users..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger className="w-[140px]">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Users</SelectItem>
+                  <SelectItem value="groovists">Groovists</SelectItem>
+                  <SelectItem value="organizers">Organizers</SelectItem>
+                  <SelectItem value="artists">Artists</SelectItem>
+                  <SelectItem value="providers">Crew</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          {/* Test Mode */}
-          <div className="flex items-center gap-2 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <Checkbox
-              id="testMode"
-              checked={formData.testMode}
-              onCheckedChange={(checked) => setFormData({ ...formData, testMode: checked as boolean })}
-            />
-            <Label htmlFor="testMode" className="font-normal">
-              Test mode - Send to myself first before sending to all recipients
-            </Label>
-          </div>
+            {/* User List */}
+            <div className="border rounded-lg max-h-[500px] overflow-y-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={selectedUserIds.size === users.length && users.length > 0}
+                        onCheckedChange={toggleAll}
+                      />
+                    </TableHead>
+                    <TableHead>User</TableHead>
+                    <TableHead>Roles</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                        Loading users...
+                      </TableCell>
+                    </TableRow>
+                  ) : users.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                        No users found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    users.map((user) => (
+                      <TableRow 
+                        key={user.id} 
+                        className="cursor-pointer hover:bg-neutral-50"
+                        onClick={() => toggleUser(user.id)}
+                      >
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedUserIds.has(user.id)}
+                            onCheckedChange={() => toggleUser(user.id)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {user.avatar_url ? (
+                              <Image 
+                                src={user.avatar_url} 
+                                alt={user.full_name || 'User'} 
+                                width={32} 
+                                height={32} 
+                                className="rounded-full"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center">
+                                <User className="h-4 w-4 text-neutral-600" />
+                              </div>
+                            )}
+                            <div>
+                              <p className="font-medium text-sm">{user.full_name || 'No name'}</p>
+                              <p className="text-xs text-muted-foreground">{user.email}</p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1 flex-wrap">
+                            {getUserRoles(user).map(role => (
+                              <Badge key={role} variant="secondary" className="text-xs">{role}</Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Actions */}
-          <div className="flex justify-end gap-3">
-            <Link href="/admin/communications">
-              <Button variant="outline">Cancel</Button>
-            </Link>
-            <Button onClick={handleSend} disabled={sending}>
-              {sending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  {formData.testMode ? 'Send Test' : `Send to ${recipientCount} Users`}
-                </>
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+        {/* Email Compose */}
+        <Card>
+          <CardContent className="p-6 space-y-4">
+            <h3 className="font-semibold">Compose Email</h3>
+
+            {/* Template */}
+            {templates.length > 0 && (
+              <div className="space-y-2">
+                <Label>Load Template (Optional)</Label>
+                <Select onValueChange={handleTemplateSelect}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a template..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.map((template) => (
+                      <SelectItem key={template.id} value={template.id}>
+                        {template.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* From Email */}
+            <div className="space-y-2">
+              <Label>From</Label>
+              <Select value={formData.fromEmail} onValueChange={(v) => setFormData({ ...formData, fromEmail: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="support">Ziyawa Support &lt;support@zande.io&gt;</SelectItem>
+                  <SelectItem value="info">Ziyawa Info &lt;info@zande.io&gt;</SelectItem>
+                  <SelectItem value="accounts">Ziyawa Accounts &lt;accounts@zande.io&gt;</SelectItem>
+                  <SelectItem value="noreply">Ziyawa &lt;noreply@zande.io&gt;</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Subject */}
+            <div className="space-y-2">
+              <Label htmlFor="subject">Subject</Label>
+              <Input
+                id="subject"
+                value={formData.subject}
+                onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                placeholder="Email subject..."
+              />
+            </div>
+
+            {/* Body */}
+            <div className="space-y-2">
+              <Label htmlFor="body">Message</Label>
+              <Textarea
+                id="body"
+                value={formData.body}
+                onChange={(e) => setFormData({ ...formData, body: e.target.value })}
+                placeholder="Write your message..."
+                rows={10}
+              />
+              <p className="text-xs text-muted-foreground">
+                Variables: {"{{name}}"} = recipient's first name
+              </p>
+            </div>
+
+            {/* Test Mode */}
+            <div className="flex items-center gap-2 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <Checkbox
+                id="testMode"
+                checked={formData.testMode}
+                onCheckedChange={(checked) => setFormData({ ...formData, testMode: checked as boolean })}
+              />
+              <Label htmlFor="testMode" className="font-normal cursor-pointer">
+                Test mode - Send to myself first
+              </Label>
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-3 pt-4">
+              <Link href="/admin/communications">
+                <Button variant="outline">Cancel</Button>
+              </Link>
+              <Button onClick={handleSend} disabled={sending || selectedUserIds.size === 0}>
+                {sending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    {formData.testMode ? 'Send Test' : `Send to ${selectedUserIds.size} Users`}
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

@@ -3,8 +3,25 @@ import { createClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email'
 import { emailWrapper } from '@/lib/email-templates'
 
-const INFO_FROM_EMAIL = process.env.INFO_FROM_EMAIL || 'Ziyawa <info@zande.io>'
-const INFO_REPLY_TO = process.env.INFO_EMAIL || process.env.SUPPORT_EMAIL || 'support@zande.io'
+// Email configuration for @zande.io addresses
+const EMAIL_CONFIG = {
+  support: {
+    from: 'Ziyawa Support <support@zande.io>',
+    replyTo: 'support@zande.io',
+  },
+  info: {
+    from: 'Ziyawa <info@zande.io>',
+    replyTo: 'info@zande.io',
+  },
+  accounts: {
+    from: 'Ziyawa Accounts <accounts@zande.io>',
+    replyTo: 'accounts@zande.io',
+  },
+  noreply: {
+    from: 'Ziyawa <noreply@zande.io>',
+    replyTo: 'support@zande.io',
+  },
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,13 +48,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
-    const { subject, body, audience, testMode } = await request.json()
+    const { subject, body, fromEmail = 'info', testMode, recipients } = await request.json()
+
+    // Get email config
+    const emailConfig = EMAIL_CONFIG[fromEmail as keyof typeof EMAIL_CONFIG] || EMAIL_CONFIG.info
 
     // If test mode, only send to the admin
     if (testMode) {
       const emailResult = await sendEmail({
-        from: INFO_FROM_EMAIL,
-        replyTo: INFO_REPLY_TO,
+        from: emailConfig.from,
+        replyTo: emailConfig.replyTo,
         to: profile.email,
         subject: `[TEST] ${subject}`,
         html: emailWrapper(`
@@ -49,7 +69,7 @@ export async function POST(request: NextRequest) {
           <div class="message-box">
             ${body.replace(/\{\{name\}\}/g, 'Test User').replace(/\n/g, '<br>')}
           </div>
-          <p style="font-size: 14px; color: #6b7280;">Replies go to ${INFO_REPLY_TO}.</p>
+          <p style="font-size: 14px; color: #6b7280;">Replies go to ${emailConfig.replyTo}.</p>
         `),
         tags: [{ name: 'category', value: 'admin-bulk-test' }],
       })
@@ -59,35 +79,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, count: 1 })
     }
 
-    // Get recipients based on audience
-    let query = supabase.from('profiles').select('id, email, full_name')
-    
-    if (audience === 'organizers') {
-      query = query.eq('is_organizer', true)
-    }
-    // Add more audience filters as needed
-
-    const { data: recipients } = await query
-
-    if (!recipients || recipients.length === 0) {
-      return NextResponse.json({ error: 'No recipients found' }, { status: 400 })
+    // Validate recipients
+    if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
+      return NextResponse.json({ error: 'No recipients provided' }, { status: 400 })
     }
 
     // Send emails in batches (Resend has rate limits)
     const BATCH_SIZE = 50
     let sentCount = 0
+    const failedEmails: string[] = []
 
     for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
       const batch = recipients.slice(i, i + BATCH_SIZE)
       
       for (const recipient of batch) {
-        const firstName = recipient.full_name?.split(' ')[0] || 'there'
+        const firstName = recipient.name?.split(' ')[0] || 'there'
         const personalizedBody = body.replace(/\{\{name\}\}/g, firstName)
 
         try {
           const emailResult = await sendEmail({
-            from: INFO_FROM_EMAIL,
-            replyTo: INFO_REPLY_TO,
+            from: emailConfig.from,
+            replyTo: emailConfig.replyTo,
             to: recipient.email,
             subject,
             html: emailWrapper(`
@@ -95,16 +107,19 @@ export async function POST(request: NextRequest) {
               <div class="message-box">
                 ${personalizedBody.replace(/\n/g, '<br>')}
               </div>
-              <p style="font-size: 14px; color: #6b7280;">This email was sent from Ziyawa communications. Replies go to ${INFO_REPLY_TO}.</p>
+              <p style="font-size: 14px; color: #6b7280;">This email was sent from Ziyawa. Replies go to ${emailConfig.replyTo}.</p>
             `),
             tags: [{ name: 'category', value: 'admin-bulk' }],
           })
 
-          if (!emailResult.success) {
-            throw new Error(emailResult.error || 'Failed to send bulk email')
+          if (emailResult.success) {
+            sentCount++
+          } else {
+            failedEmails.push(recipient.email)
+            console.error(`Failed to send to ${recipient.email}:`, emailResult.error)
           }
-          sentCount++
         } catch (e) {
+          failedEmails.push(recipient.email)
           console.error(`Failed to send to ${recipient.email}:`, e)
         }
       }
@@ -118,8 +133,8 @@ export async function POST(request: NextRequest) {
     // Log the bulk email
     await supabase.from('email_logs').insert({
       sender_id: user.id,
-      recipient_ids: recipients.map(r => r.id),
-      recipient_emails: recipients.map(r => r.email),
+      recipient_ids: recipients.map((r: { id: string }) => r.id),
+      recipient_emails: recipients.map((r: { email: string }) => r.email),
       subject,
       body,
       email_type: 'bulk',
@@ -129,12 +144,12 @@ export async function POST(request: NextRequest) {
     // Log admin action
     await supabase.from('admin_audit_logs').insert({
       admin_id: user.id,
-      action: `Sent bulk email to ${sentCount} ${audience} users`,
+      action: `Sent bulk email to ${sentCount} users`,
       action_type: 'bulk_email_send',
-      details: { subject, audience, count: sentCount },
+      details: { subject, from: fromEmail, total: recipients.length, sent: sentCount, failed: failedEmails.length },
     })
 
-    return NextResponse.json({ success: true, count: sentCount })
+    return NextResponse.json({ success: true, count: sentCount, failed: failedEmails.length })
   } catch (error) {
     console.error('Error sending bulk email:', error)
     return NextResponse.json({ error: 'Failed to send emails' }, { status: 500 })
