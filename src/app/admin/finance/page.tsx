@@ -22,23 +22,24 @@ export default async function AdminFinancePage() {
   // Fetch financial stats
   const [
     { data: transactions },
-    { data: wallets },
+    { data: profiles },
   ] = await Promise.all([
-    supabase.from('transactions').select('amount, type, status').limit(1000),
-    supabase.from('wallets').select('balance, pending_balance'),
+    supabase.from('transactions').select('amount, type, state, platform_fee').limit(10000),
+    supabase.from('profiles').select('wallet_balance, held_balance, pending_payout_balance'),
   ])
 
   // Calculate totals
-  const totalRevenue = transactions?.filter(t => t.type === 'ticket_sale' && t.status === 'completed')
+  const totalRevenue = transactions?.filter(t => t.type === 'ticket_purchase' && ['settled', 'released'].includes(t.state || ''))
     .reduce((sum, t) => sum + (t.amount || 0), 0) || 0
   
-  const totalPayouts = transactions?.filter(t => t.type === 'payout' && t.status === 'completed')
+  const totalPayouts = transactions?.filter(t => t.type === 'payout' && ['settled', 'released'].includes(t.state || ''))
     .reduce((sum, t) => sum + (t.amount || 0), 0) || 0
 
-  const pendingPayouts = wallets?.reduce((sum, w) => sum + (w.pending_balance || 0), 0) || 0
+  const pendingPayouts = profiles?.reduce((sum, p) => sum + Number(p.pending_payout_balance || 0), 0) || 0
 
-  // Platform commission (10%)
-  const platformEarnings = totalRevenue * 0.10
+  // Platform commission from actual fees collected
+  const platformEarnings = transactions?.filter(t => ['settled', 'released'].includes(t.state || ''))
+    .reduce((sum, t) => sum + (t.platform_fee || 0), 0) || 0
 
   const stats = [
     { 
