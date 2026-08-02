@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
         amount: amountCents,
         reference,
         callback_url: callbackUrl,
-        channels: ['card', 'bank', 'bank_transfer', 'eft', 'ussd'],
+        channels: ['card', 'qr', 'eft', 'ussd', 'apple_pay'],
         metadata: {
           type: 'booking_payment',
           booking_id: bookingId,
@@ -248,7 +248,7 @@ export async function POST(request: NextRequest) {
       amount: amountCents,
       reference,
       callback_url: callbackUrl,
-      channels: ['card', 'bank', 'bank_transfer', 'eft', 'ussd'],
+      channels: ['card', 'qr', 'eft', 'ussd', 'apple_pay'],
       metadata: {
         type: 'booking_payment',
         booking_id: bookingId,

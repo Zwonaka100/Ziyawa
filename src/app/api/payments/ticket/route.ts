@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
       amount: totalAmount,
       reference,
       callback_url: `${appUrl}/payments/callback?type=ticket`,
-      channels: ['card', 'bank', 'bank_transfer', 'eft', 'ussd'],
+      channels: ['card', 'qr', 'eft', 'ussd', 'apple_pay'],
       metadata: {
         transaction_id: transaction.id,
         event_id: eventId,

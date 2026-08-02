@@ -209,7 +209,7 @@ export async function initializePayment(params: {
   reference: string;
   callback_url?: string;
   metadata?: Record<string, unknown>;
-  channels?: ('card' | 'bank' | 'ussd' | 'qr' | 'mobile_money' | 'bank_transfer' | 'eft')[];
+  channels?: ('card' | 'qr' | 'ussd' | 'eft' | 'apple_pay')[];
 }): Promise<PaystackInitializeResponse> {
   return paystackRequest<PaystackInitializeResponse>('/transaction/initialize', {
     method: 'POST',
@@ -219,7 +219,7 @@ export async function initializePayment(params: {
       reference: params.reference,
       callback_url: params.callback_url,
       metadata: params.metadata,
-      channels: params.channels || ['card', 'bank_transfer', 'eft'],
+      channels: params.channels || ['card', 'qr', 'eft', 'ussd', 'apple_pay'],
       currency: 'ZAR',
     }),
   });
