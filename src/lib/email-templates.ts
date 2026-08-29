@@ -616,6 +616,46 @@ export function eventFollowUpEmail(data: {
   return emailWrapper(content);
 }
 
+export function organizerWhatWentDownEmail(data: {
+  recipientName: string;
+  eventName: string;
+  eventDate: string;
+  uploadUrl: string;
+}): string {
+  const content = `
+    <h1>Show everyone what went down 🔥</h1>
+    <p>Hi ${data.recipientName},</p>
+    <p><strong>${data.eventName}</strong> happened on ${data.eventDate}. Share the highlights so attendees can relive it and new fans can see the vibe.</p>
+
+    <div class="highlight-box">
+      <div class="detail-row">
+        <span class="detail-label">Recap limit</span>
+        <span class="detail-value">Up to 5 items total</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Image size</span>
+        <span class="detail-value">Max 10MB each</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Video size</span>
+        <span class="detail-value">Max 5MB each</span>
+      </div>
+    </div>
+
+    <div style="background-color: #f3f4f6; border-radius: 8px; padding: 16px; margin: 20px 0; color: #374151;">
+      If files are too large, paste social media links instead (YouTube, TikTok, Instagram Reels, Facebook, or direct links).
+    </div>
+
+    <p style="text-align: center;">
+      <a href="${data.uploadUrl}" class="button">
+        Add What Went Down
+      </a>
+    </p>
+  `;
+
+  return emailWrapper(content);
+}
+
 export function eventPublishedEmail(data: {
   recipientName: string;
   eventName: string;
