@@ -47,20 +47,20 @@ export default function RefundsPage() {
           </p>
           <p className="mt-2">
             If an organizer has enabled refunds for their event, you may request a refund
-            by contacting the organizer through the Platform or by emailing support@zande.io.
+            by contacting the organizer through the Platform or by emailing support@ziyawa.com.
           </p>
 
           <h3 className="font-medium mt-3 mb-1">2.3 Event Date or Venue Changes</h3>
           <p>
             If an organizer materially changes an event (e.g., significant date or venue
             change), you may request a refund within 7 days of the change notification.
-            Contact support@zande.io with your ticket details.
+            Contact support@ziyawa.com with your ticket details.
           </p>
 
           <h3 className="font-medium mt-3 mb-1">2.4 Duplicate or Erroneous Purchases</h3>
           <p>
             If you were charged multiple times for the same ticket due to a technical error,
-            contact support@zande.io with proof of duplicate charges. Duplicate charges will
+            contact support@ziyawa.com with proof of duplicate charges. Duplicate charges will
             be refunded in full.
           </p>
         </section>
@@ -140,7 +140,7 @@ export default function RefundsPage() {
           <ol className="list-decimal pl-5 mt-2 space-y-2">
             <li>
               <strong>Open a dispute:</strong> Use the dispute feature on the relevant booking
-              or transaction, or email support@zande.io with your account details, transaction
+              or transaction, or email support@ziyawa.com with your account details, transaction
               reference, and reason for dispute.
             </li>
             <li>
@@ -201,7 +201,7 @@ export default function RefundsPage() {
           <p>For refund requests, disputes, or questions about this policy:</p>
           <ul className="list-none mt-2 space-y-1">
             <li><strong>Zande Technologies (Pty) Ltd</strong></li>
-            <li>Email: support@zande.io</li>
+            <li>Email: support@ziyawa.com</li>
             <li>South Africa</li>
           </ul>
         </section>

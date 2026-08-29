@@ -15,6 +15,7 @@ import { adjustProfileBalanceBuckets } from '@/lib/payments/escrow';
 import { createNotification } from '@/lib/notifications';
 import { sendBookingPaymentConfirmedEmail, sendPayoutStatusEmail, sendTicketAssignedEmail, sendTicketPurchasedEmail } from '@/lib/email';
 import { captureServerError, logOpsEvent } from '@/lib/monitoring';
+import { SITE_URL } from '@/lib/constants';
 
 // Use service role for webhooks (no user context)
 const supabase = createClient(
@@ -532,7 +533,7 @@ async function processBookingPayment(
           eventLocation: (eventRecord?.venue as string | null) || 'Venue to be confirmed',
           amount: formattedAmount,
           bookingRoleLabel: bookingType === 'vendor' ? 'service' : 'artist',
-          actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/${bookingType === 'vendor' ? 'dashboard/provider' : 'dashboard/artist'}`,
+          actionUrl: `${SITE_URL}/${bookingType === 'vendor' ? 'dashboard/provider' : 'dashboard/artist'}`,
         })
       }
     }
@@ -625,7 +626,7 @@ async function handleTransferSuccess(data: { reference: string }) {
         recipientName: profile.full_name || 'there',
         amount: formatZarFromCents((transaction.amount as number) || 0),
         status: 'completed',
-        actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/wallet`,
+        actionUrl: `${SITE_URL}/wallet`,
       })
     }
   }
@@ -698,7 +699,7 @@ async function handleTransferFailed(data: { reference: string; reason: string })
         recipientName: profile.full_name || 'there',
         amount: formatZarFromCents((transaction.amount as number) || 0),
         status: 'failed',
-        actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/wallet`,
+        actionUrl: `${SITE_URL}/wallet`,
       })
     }
   }
@@ -775,7 +776,7 @@ async function handleTransferReversed(data: { reference: string }) {
         recipientName: profile.full_name || 'there',
         amount: formatZarFromCents((transaction.amount as number) || 0),
         status: 'reversed',
-        actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/wallet`,
+        actionUrl: `${SITE_URL}/wallet`,
       })
     }
   }

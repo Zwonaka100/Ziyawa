@@ -4,6 +4,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createBulkNotifications } from '@/lib/notifications'
 import { sendCriticalEventChangeEmail } from '@/lib/email'
 import { getEventEmailAudience } from '@/lib/event-email-audience'
+import { SITE_URL } from '@/lib/constants'
 
 const supabaseAdmin = createServiceClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -56,7 +57,7 @@ export async function POST(
 
     const audience = await getEventEmailAudience(id)
     const recipients = [...audience.attendees, ...audience.artists, ...audience.providers, ...audience.crew]
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'
+    const appUrl = SITE_URL
     const eventDate = new Date(event.event_date).toLocaleDateString('en-ZA', {
       weekday: 'short',
       day: 'numeric',

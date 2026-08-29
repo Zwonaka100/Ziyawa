@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { SITE_URL } from '@/lib/constants'
-import { sendEmail } from '@/lib/email'
+import { sendEmail, sendOrganizerWhatWentDownEmail } from '@/lib/email'
 import { eventFollowUpEmail, eventReminderEmail } from '@/lib/email-templates'
 import { createBulkNotifications, type CreateNotificationParams } from '@/lib/notifications'
 
@@ -10,8 +10,8 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-const INFO_FROM_EMAIL = process.env.INFO_FROM_EMAIL || 'Ziyawa <info@zande.io>'
-const INFO_REPLY_TO = process.env.INFO_EMAIL || process.env.SUPPORT_EMAIL || 'support@zande.io'
+const INFO_FROM_EMAIL = process.env.INFO_FROM_EMAIL || 'Ziyawa <info@ziyawa.com>'
+const INFO_REPLY_TO = process.env.INFO_EMAIL || process.env.SUPPORT_EMAIL || 'support@ziyawa.com'
 
 function startOfDay(date: Date) {
   const value = new Date(date)
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
 
     const { data: events, error: eventError } = await supabaseAdmin
       .from('events')
-      .select('id, title, event_date, start_time, venue, is_published')
+      .select('id, title, event_date, start_time, venue, is_published, organizer_id')
       .gte('event_date', yesterday.toISOString().slice(0, 10))
       .lte('event_date', tomorrow.toISOString().slice(0, 10))
       .eq('is_published', true)
@@ -199,6 +199,23 @@ export async function GET(request: NextRequest) {
 
       if (notifications.length > 0) {
         await createBulkNotifications(notifications)
+      }
+
+      if (mode === 'follow_up' && event.organizer_id) {
+        const { data: organizerProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('id, email, full_name')
+          .eq('id', event.organizer_id)
+          .maybeSingle()
+
+        if (organizerProfile?.email) {
+          await sendOrganizerWhatWentDownEmail(organizerProfile.email, {
+            recipientName: organizerProfile.full_name || 'there',
+            eventName: event.title,
+            eventDate: formattedEventDate,
+            eventId: event.id,
+          })
+        }
       }
 
       await supabaseAdmin.from('email_logs').insert({

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createNotification } from '@/lib/notifications'
 import { sendProviderBookingRequestEmail } from '@/lib/email'
+import { SITE_URL } from '@/lib/constants'
 
 export async function POST(request: NextRequest) {
   try {
@@ -201,7 +202,7 @@ export async function POST(request: NextRequest) {
             amount: `R${offeredAmount.toFixed(2)}`,
             quantity,
             notes: notes || undefined,
-            actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/dashboard/provider`,
+            actionUrl: `${SITE_URL}/dashboard/provider`,
           })
         }
       } catch (emailError) {

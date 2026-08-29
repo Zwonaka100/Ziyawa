@@ -33,7 +33,7 @@ export default function PrivacyPage() {
           <ul className="list-none space-y-1">
             <li><strong>Responsible Party:</strong> Zande Technologies (Pty) Ltd</li>
             <li><strong>Information Regulator Ref:</strong> 2025-066656</li>
-            <li><strong>Email:</strong> info@zande.io</li>
+            <li><strong>Email:</strong> info@ziyawa.com</li>
             <li><strong>Location:</strong> South Africa</li>
           </ul>
           <p className="mt-2">
@@ -141,7 +141,7 @@ export default function PrivacyPage() {
             <li><strong>Complain:</strong> Lodge a complaint with the Information Regulator if you believe your rights have been violated.</li>
           </ul>
           <p className="mt-2">
-            To exercise any of these rights, contact us at <strong>info@zande.io</strong>.
+            To exercise any of these rights, contact us at <strong>info@ziyawa.com</strong>.
             We will respond within 30 days as required by POPIA.
           </p>
         </section>
@@ -160,7 +160,7 @@ export default function PrivacyPage() {
           </ul>
           <p className="mt-2">
             Despite these measures, no method of transmission or storage is 100% secure.
-            If you discover a security vulnerability, please report it to support@zande.io
+            If you discover a security vulnerability, please report it to support@ziyawa.com
             immediately.
           </p>
         </section>
@@ -187,7 +187,7 @@ export default function PrivacyPage() {
             collect personal information from children. If we become aware that a child under
             18 has provided us with personal information, we will take steps to delete it.
             If you believe we have collected information from a child, please contact us at
-            info@zande.io.
+            info@ziyawa.com.
           </p>
         </section>
 
@@ -206,8 +206,8 @@ export default function PrivacyPage() {
           <p>For privacy-related queries, data subject requests, or complaints:</p>
           <ul className="list-none mt-2 space-y-1">
             <li><strong>Zande Technologies (Pty) Ltd</strong></li>
-            <li>Information Officer Email: info@zande.io</li>
-            <li>Support: support@zande.io</li>
+            <li>Information Officer Email: info@ziyawa.com</li>
+            <li>Support: support@ziyawa.com</li>
             <li>Information Regulator Ref: 2025-066656</li>
           </ul>
           <p className="mt-3">

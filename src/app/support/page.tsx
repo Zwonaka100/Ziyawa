@@ -84,7 +84,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
 }
 
 function SupportPageContent() {
-  const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'support@zande.io'
+  const supportEmail = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'support@ziyawa.com'
   const { user, profile: _profile, loading: authLoading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()

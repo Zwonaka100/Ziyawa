@@ -2458,7 +2458,7 @@ All must be set in `.env.local` (local dev) and Vercel project settings (product
 | `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` | Yes | Client | Paystack public key |
 | `RESEND_API_KEY` | Yes | Server only | Resend email service |
 | `CRON_SECRET` | Yes | Cron routes | Protects `/api/cron/*` endpoints |
-| `NEXT_PUBLIC_APP_URL` | Yes | Client + Server | e.g. `https://ziyawa.vercel.app` |
+| `NEXT_PUBLIC_APP_URL` | Yes | Client + Server | e.g. `https://www.ziyawa.com` |
 | `PAYOUT_HOLD_HOURS` | Optional | Escrow service | Default: 48 |
 | `BOOKING_PAYOUT_HOLD_HOURS` | Optional | Escrow service | Default: 24 |
 | `MANUAL_REVIEW_THRESHOLD_RANDS` | Optional | Escrow service | Default: 5000 |

@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { PLATFORM_CONFIG } from '@/lib/constants'
 import { ZiyawaLogo } from '@/components/brand/ziyawa-logo'
 
-const contactEmail = process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'info@zande.io'
+const contactEmail = process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'info@ziyawa.com'
 
 function InstagramIcon({ className }: { className?: string }) {
   return (

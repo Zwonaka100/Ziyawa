@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createNotification } from '@/lib/notifications'
 import { sendBookingResponseEmail } from '@/lib/email'
+import { SITE_URL } from '@/lib/constants'
 
 type ArtistBookingAction = 'accept' | 'decline' | 'counter'
 
@@ -186,7 +187,7 @@ export async function POST(
           responseType: action === 'counter' ? 'countered' : action === 'accept' ? 'accepted' : 'declined',
           amount: action === 'counter' ? `R${counterAmount.toFixed(2)}` : undefined,
           note: notes || undefined,
-          actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/dashboard/organizer/events/${booking.event_id}/bookings`,
+          actionUrl: `${SITE_URL}/dashboard/organizer/events/${booking.event_id}/bookings`,
         })
       }
     } catch (emailError) {

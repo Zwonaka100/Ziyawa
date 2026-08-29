@@ -74,8 +74,8 @@ function parseSettingValue<K extends keyof PlatformSettings>(key: K, value: stri
 const defaultSettings: PlatformSettings = {
   platform_name: 'Ziyawa',
   platform_description: 'South African Events Marketplace',
-  contact_email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'info@zande.io',
-  support_email: process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'support@zande.io',
+  contact_email: process.env.NEXT_PUBLIC_CONTACT_EMAIL || 'info@ziyawa.com',
+  support_email: process.env.NEXT_PUBLIC_SUPPORT_EMAIL || 'support@ziyawa.com',
   platform_fee_percentage: 10,
   minimum_payout_amount: 100,
   payout_processing_days: 7,

@@ -47,7 +47,7 @@ For any dispute or refund request:
 Run from the project root:
 
 ```bash
-$env:SMOKE_BASE_URL="https://ziyawa.vercel.app"
+$env:SMOKE_BASE_URL="https://www.ziyawa.com"
 npm run test:smoke
 ```
 

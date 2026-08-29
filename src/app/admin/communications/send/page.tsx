@@ -377,10 +377,10 @@ export default function SendEmailPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="support">Ziyawa Support &lt;support@zande.io&gt;</SelectItem>
-                  <SelectItem value="info">Ziyawa Info &lt;info@zande.io&gt;</SelectItem>
-                  <SelectItem value="accounts">Ziyawa Accounts &lt;accounts@zande.io&gt;</SelectItem>
-                  <SelectItem value="noreply">Ziyawa &lt;noreply@zande.io&gt;</SelectItem>
+                  <SelectItem value="support">Ziyawa Support &lt;support@ziyawa.com&gt;</SelectItem>
+                  <SelectItem value="info">Ziyawa Info &lt;info@ziyawa.com&gt;</SelectItem>
+                  <SelectItem value="accounts">Ziyawa Accounts &lt;accounts@ziyawa.com&gt;</SelectItem>
+                  <SelectItem value="noreply">Ziyawa &lt;noreply@ziyawa.com&gt;</SelectItem>
                 </SelectContent>
               </Select>
             </div>

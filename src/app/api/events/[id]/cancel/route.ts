@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createBulkNotifications, createNotification } from '@/lib/notifications'
 import { sendEventCancelledEmail } from '@/lib/email'
 import { getEventEmailAudience } from '@/lib/event-email-audience'
+import { SITE_URL } from '@/lib/constants'
 
 const supabaseAdmin = createServiceClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -139,7 +140,7 @@ export async function POST(
         reason,
         roleLabel: 'attendee' as const,
         actionLabel: 'Open My Tickets',
-        actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/dashboard/tickets`,
+        actionUrl: `${SITE_URL}/dashboard/tickets`,
       })),
       ...audience.artists.map((recipient) => sendEventCancelledEmail(recipient.email, {
         recipientName: recipient.name.split(' ')[0] || recipient.name,
@@ -148,7 +149,7 @@ export async function POST(
         reason,
         roleLabel: 'artist' as const,
         actionLabel: 'Open Artist Dashboard',
-        actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/dashboard/artist`,
+        actionUrl: `${SITE_URL}/dashboard/artist`,
       })),
       ...audience.providers.map((recipient) => sendEventCancelledEmail(recipient.email, {
         recipientName: recipient.name.split(' ')[0] || recipient.name,
@@ -157,7 +158,7 @@ export async function POST(
         reason,
         roleLabel: 'provider' as const,
         actionLabel: 'Open Crew Dashboard',
-        actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/dashboard/provider`,
+        actionUrl: `${SITE_URL}/dashboard/provider`,
       })),
       ...audience.crew.map((recipient) => sendEventCancelledEmail(recipient.email, {
         recipientName: recipient.name.split(' ')[0] || recipient.name,
@@ -166,7 +167,7 @@ export async function POST(
         reason,
         roleLabel: 'crew' as const,
         actionLabel: 'Open Crew Dashboard',
-        actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/dashboard/event-work`,
+        actionUrl: `${SITE_URL}/dashboard/event-work`,
       })),
     ]
 

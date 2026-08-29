@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createTransferRecipient, initiateTransfer, generatePaymentReference } from '@/lib/paystack';
-import { calculateWithdrawalFee, PLATFORM_FEES } from '@/lib/constants';
+import { calculateWithdrawalFee, PLATFORM_FEES, SITE_URL } from '@/lib/constants';
 import { adjustProfileBalanceBuckets } from '@/lib/payments/escrow';
 import { createNotification } from '@/lib/notifications';
 import { sendPayoutStatusEmail } from '@/lib/email';
@@ -255,7 +255,7 @@ export async function POST(request: NextRequest) {
         amount: `R${amountInRands.toFixed(2)}`,
         status: 'initiated',
         bankAccount: `account ending ${String(accountNumber).slice(-4)}`,
-        actionUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ziyawa.com'}/wallet`,
+        actionUrl: `${SITE_URL}/wallet`,
       })
     }
 

@@ -11,7 +11,7 @@ const supabaseAdmin = createAdminClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-const INFO_FROM_EMAIL = process.env.INFO_FROM_EMAIL || 'Ziyawa <info@zande.io>'
+const INFO_FROM_EMAIL = process.env.INFO_FROM_EMAIL || 'Ziyawa <info@ziyawa.com>'
 const TEAM_PAYOUT_FEE_PERCENT = Number(process.env.EVENT_TEAM_PAYOUT_FEE_PERCENT || '5')
 
 function roundMoney(value: number) {

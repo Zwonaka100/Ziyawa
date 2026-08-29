@@ -282,11 +282,11 @@ export default function AboutPage() {
             <div className="space-y-3 text-muted-foreground">
               <div className="flex items-center gap-3">
                 <Mail className="h-4 w-4 text-neutral-500" />
-                <span>General inquiries: <a href="mailto:info@zande.io" className="text-primary hover:underline font-medium">info@zande.io</a></span>
+                <span>General inquiries: <a href="mailto:info@ziyawa.com" className="text-primary hover:underline font-medium">info@ziyawa.com</a></span>
               </div>
               <div className="flex items-center gap-3">
                 <Mail className="h-4 w-4 text-neutral-500" />
-                <span>Support: <a href="mailto:support@zande.io" className="text-primary hover:underline font-medium">support@zande.io</a></span>
+                <span>Support: <a href="mailto:support@ziyawa.com" className="text-primary hover:underline font-medium">support@ziyawa.com</a></span>
               </div>
               <p className="text-sm pt-2">
                 You can also reach us through the{' '}

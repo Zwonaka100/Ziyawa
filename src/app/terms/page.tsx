@@ -295,7 +295,7 @@ export default function TermsPage() {
           <p className="mt-2">
             For disputes between you and Ziyawa (the company), South African law applies.
             You agree to first attempt to resolve any dispute informally by contacting us
-            at <strong>support@zande.io</strong>. If informal resolution fails, disputes
+            at <strong>support@ziyawa.com</strong>. If informal resolution fails, disputes
             shall be submitted to arbitration under the Arbitration Act 42 of 1965, or you
             may approach the relevant consumer tribunal or court.
           </p>
@@ -337,7 +337,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-lg font-semibold mb-3">19. Termination</h2>
           <p>
-            You may close your account at any time by contacting support@zande.io. Any
+            You may close your account at any time by contacting support@ziyawa.com. Any
             pending transactions or held funds will be processed before closure where
             possible.
           </p>
@@ -375,7 +375,7 @@ export default function TermsPage() {
           <ul className="list-none mt-2 space-y-1">
             <li><strong>Zande Technologies (Pty) Ltd</strong></li>
             <li>Registration No. K2025834311</li>
-            <li>Email: support@zande.io</li>
+            <li>Email: support@ziyawa.com</li>
             <li>Information Regulator Ref: 2025-066656</li>
             <li>South Africa</li>
           </ul>

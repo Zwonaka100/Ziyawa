@@ -3,23 +3,23 @@ import { createClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email'
 import { emailWrapper } from '@/lib/email-templates'
 
-// Email configuration for @zande.io addresses
+// Email configuration for @ziyawa.com addresses
 const EMAIL_CONFIG = {
   support: {
-    from: 'Ziyawa Support <support@zande.io>',
-    replyTo: 'support@zande.io',
+    from: 'Ziyawa Support <support@ziyawa.com>',
+    replyTo: 'support@ziyawa.com',
   },
   info: {
-    from: 'Ziyawa <info@zande.io>',
-    replyTo: 'info@zande.io',
+    from: 'Ziyawa <info@ziyawa.com>',
+    replyTo: 'info@ziyawa.com',
   },
   accounts: {
-    from: 'Ziyawa Accounts <accounts@zande.io>',
-    replyTo: 'accounts@zande.io',
+    from: 'Ziyawa Accounts <accounts@ziyawa.com>',
+    replyTo: 'accounts@ziyawa.com',
   },
   noreply: {
-    from: 'Ziyawa <noreply@zande.io>',
-    replyTo: 'support@zande.io',
+    from: 'Ziyawa <noreply@ziyawa.com>',
+    replyTo: 'support@ziyawa.com',
   },
 }
 

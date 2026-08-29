@@ -12,8 +12,8 @@ const supabaseAdmin = createAdminClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-const INFO_FROM_EMAIL = process.env.INFO_FROM_EMAIL || 'Ziyawa <info@zande.io>'
-const INFO_REPLY_TO = process.env.INFO_EMAIL || process.env.SUPPORT_EMAIL || 'support@zande.io'
+const INFO_FROM_EMAIL = process.env.INFO_FROM_EMAIL || 'Ziyawa <info@ziyawa.com>'
+const INFO_REPLY_TO = process.env.INFO_EMAIL || process.env.SUPPORT_EMAIL || 'support@ziyawa.com'
 
 type AudienceFilter = 'all' | 'paid' | 'guest_list' | 'checked_in' | 'not_checked_in'
 type CampaignType = 'event_update' | 'event_reminder' | 'review_request'

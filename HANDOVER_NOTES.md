@@ -36,7 +36,7 @@ This document lists all temporary configurations that need to be updated when ha
 **Steps for client:**
 1. Complete Paystack business verification
 2. Get live API keys from dashboard
-3. Set up webhook URL: `https://ziyawa.vercel.app/api/webhooks/paystack`
+3. Set up webhook URL: `https://www.ziyawa.com/api/webhooks/paystack`
 4. Update `.env.local` with live keys
 
 ---
@@ -58,8 +58,8 @@ Current setup uses the development Supabase project. For production:
 - Enable email confirmations in Auth settings
 - Set up proper RLS policies review
 - Configure custom SMTP for auth emails
-- Set Site URL to `https://ziyawa.vercel.app`
-- Add `https://ziyawa.vercel.app/auth/callback` to redirect URLs
+- Set Site URL to `https://www.ziyawa.com`
+- Add `https://www.ziyawa.com/auth/callback` to redirect URLs
 
 ---
 
@@ -69,7 +69,7 @@ Current setup uses the development Supabase project. For production:
 
 | Current | Production |
 |---------|------------|
-| `NEXT_PUBLIC_APP_URL=http://localhost:3000` | `https://ziyawa.vercel.app` |
+| `NEXT_PUBLIC_APP_URL=http://localhost:3000` | `https://www.ziyawa.com` |
 
 ---
 
@@ -77,7 +77,7 @@ Current setup uses the development Supabase project. For production:
 
 | Item | Notes |
 |------|-------|
-| Domain | Currently using `ziyawa.vercel.app` (can add custom domain later) |
+| Domain | `www.ziyawa.com` (primary), with `ziyawa.com`, `ziyawa.co.za`, `www.ziyawa.co.za`, and `ziyawa.vercel.app` all redirecting to it |
 | Hosting | Deploy to Vercel (recommended) |
 | SSL | Automatic with Vercel |
 

@@ -146,12 +146,12 @@ Copy and paste each template below into the corresponding section.
 
 ### Site URL
 Go to **Authentication → URL Configuration**:
-- **Site URL:** `https://ziyawa.vercel.app`
+- **Site URL:** `https://www.ziyawa.com`
 
 ### Redirect URLs
 Add these to the allowed redirect URLs:
 - `http://localhost:3000/auth/callback`
-- `https://ziyawa.vercel.app/auth/callback`
+- `https://www.ziyawa.com/auth/callback`
 
 ### Blocked Keywords Note
 Supabase free tier blocks words like: "password", "reset", "secure", "credentials", "access". 

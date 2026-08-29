@@ -10,8 +10,8 @@ import { SITE_URL } from './constants';
 
 // Email configuration
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const FROM_EMAIL = process.env.FROM_EMAIL || 'Ziyawa <noreply@zande.io>';
-const DEFAULT_REPLY_TO = process.env.REPLY_TO_EMAIL || process.env.SUPPORT_EMAIL || 'support@zande.io';
+const FROM_EMAIL = process.env.FROM_EMAIL || 'Ziyawa <noreply@ziyawa.com>';
+const DEFAULT_REPLY_TO = process.env.REPLY_TO_EMAIL || process.env.SUPPORT_EMAIL || 'support@ziyawa.com';
 const RESEND_API_URL = 'https://api.resend.com/emails';
 
 interface SendEmailParams {
@@ -239,6 +239,25 @@ export async function sendEventReminderEmail(
   });
 }
 
+export async function sendOrganizerWhatWentDownEmail(
+  to: string,
+  data: {
+    recipientName: string;
+    eventName: string;
+    eventDate: string;
+    eventId: string;
+  }
+): Promise<SendEmailResult> {
+  const uploadUrl = `${SITE_URL}/dashboard/organizer/events/${data.eventId}/what-went-down`;
+
+  return sendEmail({
+    to,
+    subject: `Share what went down at ${data.eventName}`,
+    html: EmailTemplates.organizerWhatWentDownEmail({ ...data, uploadUrl }),
+    tags: [{ name: 'category', value: 'organizer-recap' }],
+  });
+}
+
 export async function sendEventPublishedEmail(
   to: string,
   data: {
@@ -254,7 +273,7 @@ export async function sendEventPublishedEmail(
 
   return sendEmail({
     to,
-    from: 'Ziyawa <noreply@zande.io>',
+    from: FROM_EMAIL,
     subject: `Your event is now live: ${data.eventName}`,
     html: EmailTemplates.eventPublishedEmail({
       ...data,

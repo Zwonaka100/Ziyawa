@@ -11,7 +11,7 @@ function getFromAddress() {
   if (configured) return configured
 
   if (process.env.NODE_ENV === 'production') {
-    return 'noreply@zande.io'
+    return 'noreply@ziyawa.com'
   }
 
   return 'onboarding@resend.dev'

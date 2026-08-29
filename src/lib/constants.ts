@@ -3,7 +3,7 @@
  * Based on Phase 0 Foundational Design
  */
 
-const DEFAULT_SITE_URL = 'https://ziyawa.com'
+const DEFAULT_SITE_URL = 'https://www.ziyawa.com'
 
 export const SITE_URL =
   process.env.NEXT_PUBLIC_APP_URL ||
