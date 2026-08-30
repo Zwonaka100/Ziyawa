@@ -58,6 +58,8 @@ const PROVINCE_LABELS: Record<string, string> = {
   northern_cape: 'Northern Cape',
 };
 
+const TODAY_YYYY_MM_DD = new Date().toISOString().slice(0, 10);
+
 export function SearchResults({ className }: SearchResultsProps) {
   const searchParams = useSearchParams();
   const [events, setEvents] = useState<Event[]>([]);
@@ -212,7 +214,7 @@ function EventCard({ event }: { event: Event }) {
   const rating = event.event_rating_summaries?.[0];
   const ticketsLeft = event.capacity - event.tickets_sold;
   const isSoldOut = ticketsLeft <= 0;
-  const isLowStock = ticketsLeft > 0 && ticketsLeft <= 10;
+  const isPast = event.event_date < TODAY_YYYY_MM_DD;
 
   return (
     <Link href={`/events/${event.id}`}>
@@ -239,13 +241,11 @@ function EventCard({ event }: { event: Event }) {
             </span>
           </div>
 
-          {/* Stock Status */}
-          {(isSoldOut || isLowStock) && (
+          {/* Event Status */}
+          {(isSoldOut || isPast) && (
             <div className="absolute top-3 left-3">
-              <span className={`px-3 py-1 text-white text-xs font-medium rounded-full ${
-                isSoldOut ? 'bg-red-500' : 'bg-orange-500'
-              }`}>
-                {isSoldOut ? 'Sold Out' : `${ticketsLeft} left`}
+              <span className={`px-3 py-1 text-white text-xs font-medium rounded-full ${isPast ? 'bg-neutral-700' : 'bg-red-500'}`}>
+                {isPast ? 'Past Event' : 'Sold Out'}
               </span>
             </div>
           )}

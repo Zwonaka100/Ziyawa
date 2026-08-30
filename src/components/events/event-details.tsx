@@ -43,6 +43,7 @@ interface EventDetailsProps {
 }
 
 export function EventDetails({ event, bookings, media = [], organizerStats, ticketTiers = [] }: EventDetailsProps) {
+  const WHAT_WENT_DOWN_TAG = '[[WWD]]'
   const { user, profile } = useAuth()
   const router = useRouter()
   const [showPayment, setShowPayment] = useState(false)
@@ -56,9 +57,11 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
   const isSoldOut = ticketsRemaining <= 0
   const isPast = isEventPast(event.event_date)
 
-  // Separate media by type
-  const galleryImages = media.filter(m => m.media_type === 'image' && m.is_gallery)
-  const promoVideos = media.filter(m => m.media_type !== 'image')
+  // Prefer explicit post-event recap media for past events, then fall back to existing event media.
+  const recapMedia = media.filter((item) => (item.description || '').includes(WHAT_WENT_DOWN_TAG))
+  const mediaForDisplay = isPast && recapMedia.length > 0 ? recapMedia : media
+  const galleryImages = mediaForDisplay.filter(m => m.media_type === 'image' && m.is_gallery)
+  const promoVideos = mediaForDisplay.filter(m => m.media_type !== 'image')
   const fallbackTier = buildFallbackTier({
     id: event.id,
     ticket_price: Number(event.ticket_price || 0),
@@ -118,7 +121,7 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
             {/* Status Badge */}
             {isPast ? (
               <Badge className="absolute top-4 left-4" variant="secondary">
-                Event Ended
+                Past Event
               </Badge>
             ) : (
               <Badge className="absolute top-4 left-4" variant="secondary">
@@ -282,12 +285,22 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
             </Link>
           </div>
 
+          {/* What Went Down (Past Events) */}
+          {isPast && (galleryImages.length > 0 || promoVideos.length > 0) && (
+            <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+              <h2 className="text-xl font-semibold mb-2">What Went Down</h2>
+              <p className="text-sm text-muted-foreground">
+                Highlights from the organizer after the event.
+              </p>
+            </div>
+          )}
+
           {/* Event Gallery */}
           {galleryImages.length > 0 && (
             <div>
               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                 <ImageIcon className="h-5 w-5" />
-                Gallery
+                {isPast ? 'What Went Down Photos' : 'Gallery'}
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {galleryImages.slice(0, 6).map((item, index) => (
@@ -322,7 +335,7 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
             <div>
               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                 <Play className="h-5 w-5" />
-                Promo Videos
+                {isPast ? 'What Went Down Videos' : 'Promo Videos'}
               </h2>
               <div className="grid gap-4">
                 {promoVideos.slice(0, 2).map((video) => {
@@ -337,13 +350,15 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
                       rel="noopener noreferrer"
                       className="relative aspect-video rounded-lg overflow-hidden bg-neutral-100 group"
                     >
-                      {thumbnail && (
+                      {thumbnail ? (
                         <Image
                           src={thumbnail}
                           alt={video.title || 'Promo video'}
                           fill
                           className="object-cover"
                         />
+                      ) : (
+                        <div className="absolute inset-0 bg-gradient-to-br from-neutral-700 to-neutral-900" />
                       )}
                       <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
                         <div className="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center">
@@ -384,7 +399,6 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
 
               <div className="space-y-2">
                 {resolvedTicketTiers.map((tier) => {
-                  const remaining = Math.max(0, tier.quantity - tier.sold_count)
                   const isAvailable = isTierOnSale(tier)
                   const isSelected = selectedTier?.id === tier.id
 
@@ -405,7 +419,6 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
                         </div>
                         <div className="text-right">
                           <p className="font-semibold">{tier.price === 0 ? 'Free' : formatCurrency(tier.price)}</p>
-                          <p className="text-xs text-muted-foreground">{remaining} left</p>
                         </div>
                       </div>
                     </button>
@@ -443,31 +456,10 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
                     <span>{formatCurrency(liveOrderTotalCents / 100)}</span>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Only {selectedTierRemaining} left in {selectedTier?.name || 'this tier'}. Max 10 per order.
-                </p>
+                <p className="text-xs text-muted-foreground">Max 10 tickets per order.</p>
                 <p className="text-xs text-muted-foreground">
                   Buying for another groovist? You can assign each ticket holder at checkout.
                 </p>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Capacity</span>
-                  <span>{event.capacity}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Sold</span>
-                  <span>{event.tickets_sold}</span>
-                </div>
-                <div className="flex justify-between font-medium">
-                  <span>Available</span>
-                  <span className={ticketsRemaining <= 20 ? 'text-red-500' : ''}>
-                    {ticketsRemaining}
-                  </span>
-                </div>
               </div>
 
               <Separator />
@@ -478,7 +470,7 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
                 disabled={isSoldOut || isPast || !selectedTier || !isTierOnSale(selectedTier)}
                 onClick={handleBuyTicket}
               >
-                {isPast ? 'Event Ended' : isSoldOut ? 'Sold Out' : selectedTier ? `Buy ${selectedTier.name}` : 'Buy Ticket'}
+                {isPast ? 'Past Event' : isSoldOut ? 'Sold Out' : selectedTier ? `Buy ${selectedTier.name}` : 'Buy Ticket'}
               </Button>
 
               {!user && (

@@ -366,6 +366,14 @@ export function EventMediaManager({
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
+            {eventState === 'completed' && (
+              <Link href={`/dashboard/organizer/events/${eventId}/what-went-down`}>
+                <Button variant="outline" className="w-full sm:w-auto">
+                  <ImageIcon className="mr-2 h-4 w-4" />
+                  What Went Down
+                </Button>
+              </Link>
+            )}
             <Link href={`/dashboard/organizer/events/${eventId}/edit`}>
               <Button variant="outline" className="w-full sm:w-auto">
                 <Eye className="mr-2 h-4 w-4" />

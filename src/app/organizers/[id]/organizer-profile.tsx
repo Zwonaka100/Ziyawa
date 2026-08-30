@@ -9,7 +9,6 @@ import {
   Star, 
   CheckCircle, 
   Users,
-  Ticket,
   Clock,
   Shield
 } from 'lucide-react';
@@ -48,7 +47,6 @@ interface OrganizerProfileProps {
     venue: string | null;
     location: string;
     cover_image: string | null;
-    tickets_sold: number;
     ticket_price: number;
   }>;
   upcomingEvents: Array<{
@@ -81,9 +79,6 @@ export function OrganizerProfile({
   const paymentCompletionRate = profile.payment_completion_rate ?? 100;
   const organizerRating = profile.organizer_rating ?? 0;
   const totalOrganizerReviews = profile.total_organizer_reviews ?? reviews.length;
-
-  // Calculate total attendees
-  const totalAttendees = pastEvents.reduce((sum, e) => sum + e.tickets_sold, 0);
 
   // Transform social links for the shared component
   const transformedSocialLinks = socialLinks.map(link => ({
@@ -168,10 +163,6 @@ export function OrganizerProfile({
             <div>
               <p className="text-2xl font-bold text-neutral-900">{totalEventsHosted}</p>
               <p className="text-sm text-neutral-500">Events Hosted</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-neutral-900">{totalAttendees.toLocaleString()}</p>
-              <p className="text-sm text-neutral-500">Total Attendees</p>
             </div>
             <div>
               <p className="text-2xl font-bold text-neutral-900">{totalArtistsPaid}</p>
@@ -296,10 +287,6 @@ export function OrganizerProfile({
                             <MapPin className="h-4 w-4" />
                             {event.venue || event.location}
                           </div>
-                          <div className="flex items-center gap-1 text-sm text-green-600 mt-2">
-                            <Ticket className="h-4 w-4" />
-                            {event.tickets_sold.toLocaleString()} tickets sold
-                          </div>
                         </div>
                       </div>
                     ))}
@@ -355,10 +342,6 @@ export function OrganizerProfile({
                 <li className="flex items-center gap-2 text-neutral-600">
                   <Shield className="h-4 w-4 text-neutral-400" />
                   {paymentCompletionRate}% payment completion
-                </li>
-                <li className="flex items-center gap-2 text-neutral-600">
-                  <Users className="h-4 w-4 text-neutral-400" />
-                  {totalAttendees.toLocaleString()} total attendees
                 </li>
                 {profile.verified_at && (
                   <li className="flex items-center gap-2 text-green-600">

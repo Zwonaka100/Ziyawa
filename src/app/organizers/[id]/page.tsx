@@ -12,7 +12,7 @@ export default async function OrganizerPage({ params }: OrganizerPageProps) {
   const supabase = await createClient();
 
   // Fetch organizer profile
-  const { data: profile, error } = await supabase
+  const { data: profile, error: _error } = await supabase
     .from('profiles')
     .select(`
       id,
@@ -55,7 +55,6 @@ export default async function OrganizerPage({ params }: OrganizerPageProps) {
       venue,
       location,
       cover_image,
-      tickets_sold,
       ticket_price
     `)
     .eq('organizer_id', id)

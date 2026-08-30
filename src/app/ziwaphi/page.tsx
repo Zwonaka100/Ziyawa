@@ -4,7 +4,7 @@ import ZiwaphiClient from './ziwaphi-client';
 
 export const metadata = {
   title: 'Ziwaphi? | Find Events | Ziyawa',
-  description: 'Discover upcoming events across South Africa with Ziwaphi, your AI-powered event discovery assistant.',
+  description: 'Discover upcoming events and relive What Went Down with past sold events on Ziwaphi.',
 };
 
 export default function ZiwaphiPage() {
@@ -16,8 +16,8 @@ export default function ZiwaphiPage() {
           Ziwaphi?
         </h1>
         <p className="text-muted-foreground max-w-xl mx-auto">
-          Ask me anything about events in South Africa or use the filters below. 
-          I can help you find Amapiano sessions, festivals, concerts, and more!
+          Discover what is next and explore What Went Down from past sold events.
+          Use filters to switch between upcoming and past events.
         </p>
       </div>
 

@@ -2,8 +2,8 @@ import Link from 'next/link'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Calendar, MapPin, Clock, Users, Ticket } from 'lucide-react'
-import { formatCurrency, formatDate, formatTime, getDaysUntilEvent } from '@/lib/helpers'
+import { Calendar, MapPin, Clock, Ticket } from 'lucide-react'
+import { formatCurrency, formatDate, formatTime, getDaysUntilEvent, isEventPast } from '@/lib/helpers'
 import { PROVINCES } from '@/lib/constants'
 import type { Profile, SaProvince } from '@/types/database'
 
@@ -42,7 +42,7 @@ function EventCard({ event }: { event: EventWithOrganizer }) {
   const daysUntil = getDaysUntilEvent(event.event_date)
   const ticketsRemaining = event.capacity - event.tickets_sold
   const isSoldOut = ticketsRemaining <= 0
-  const isAlmostSoldOut = ticketsRemaining > 0 && ticketsRemaining <= 20
+  const isPast = isEventPast(event.event_date)
 
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
@@ -63,18 +63,13 @@ function EventCard({ event }: { event: EventWithOrganizer }) {
         
         {/* Days Until Badge */}
         <Badge className="absolute top-3 left-3" variant="secondary">
-          {daysUntil === 0 ? 'Today!' : daysUntil === 1 ? 'Tomorrow' : `In ${daysUntil} days`}
+          {isPast ? 'Past Event' : daysUntil === 0 ? 'Today!' : daysUntil === 1 ? 'Tomorrow' : `In ${daysUntil} days`}
         </Badge>
 
         {/* Sold Out Badge */}
         {isSoldOut && (
           <Badge className="absolute top-3 right-3" variant="destructive">
             Sold Out
-          </Badge>
-        )}
-        {isAlmostSoldOut && !isSoldOut && (
-          <Badge className="absolute top-3 right-3" variant="destructive">
-            Almost Sold Out
           </Badge>
         )}
       </div>
@@ -101,10 +96,6 @@ function EventCard({ event }: { event: EventWithOrganizer }) {
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            <span>{ticketsRemaining} tickets left</span>
-          </div>
         </div>
 
         {event.description && (
@@ -120,9 +111,9 @@ function EventCard({ event }: { event: EventWithOrganizer }) {
         </div>
         
         <Link href={`/events/${event.id}`}>
-          <Button size="sm" disabled={isSoldOut}>
+          <Button size="sm" disabled={isSoldOut || isPast}>
             <Ticket className="h-4 w-4 mr-1" />
-            {isSoldOut ? 'Sold Out' : 'Get Tickets'}
+            {isPast ? 'Past Event' : isSoldOut ? 'Sold Out' : 'Buy Tickets'}
           </Button>
         </Link>
       </CardFooter>
