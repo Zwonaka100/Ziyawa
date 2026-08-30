@@ -182,6 +182,9 @@ async function runCompletionReminders(
       replyTo: process.env.ACCOUNTS_EMAIL || 'accounts@ziyawa.com',
       to: organizer.email,
       subject,
+      campaignKey,
+      emailType: 'automated',
+      recipientIds: [organizer.id],
       html: organizerCompleteEventReminderEmail({
         recipientName: (organizer.full_name || 'there').split(' ')[0],
         eventName: event.title,
@@ -201,15 +204,6 @@ async function runCompletionReminders(
 
     if (result.success) {
       outcome.sent = true
-      await supabaseAdmin.from('email_logs').insert({
-        sender_id: null,
-        recipient_ids: [organizer.id],
-        recipient_emails: [organizer.email],
-        subject,
-        body: `${campaignKey}\ncompletion-reminder`,
-        email_type: 'automated',
-        status: 'sent',
-      })
     } else {
       outcome.skippedReason = 'send failed'
     }
@@ -316,6 +310,9 @@ async function runVerificationReminders(dryRun: boolean): Promise<VerificationRe
       replyTo: process.env.ACCOUNTS_EMAIL || 'accounts@ziyawa.com',
       to: profile.email,
       subject,
+      campaignKey: `verify-reminder-${profile.id}`,
+      emailType: 'automated',
+      recipientIds: [profile.id],
       html: verificationReminderEmail({
         recipientName: (profile.full_name || 'there').split(' ')[0],
         amountPending: formatMoneyExact(amountPendingRands),
@@ -329,15 +326,6 @@ async function runVerificationReminders(dryRun: boolean): Promise<VerificationRe
 
     if (result.success) {
       outcome.sent = true
-      await supabaseAdmin.from('email_logs').insert({
-        sender_id: null,
-        recipient_ids: [profile.id],
-        recipient_emails: [profile.email],
-        subject,
-        body: `verify-reminder-${profile.id}\nverification-reminder`,
-        email_type: 'automated',
-        status: 'sent',
-      })
     } else {
       outcome.skippedReason = 'send failed'
     }
@@ -462,8 +450,6 @@ export async function GET(request: NextRequest) {
       const formattedTime = formatEventTime(event.start_time)
 
       const notifications: CreateNotificationParams[] = []
-      const recipientEmails: string[] = []
-      const recipientIds: string[] = []
 
       for (const recipient of recipients.values()) {
         const firstName = recipient.name.split(' ')[0] || 'there'
@@ -492,6 +478,9 @@ export async function GET(request: NextRequest) {
               to: recipient.email,
               subject,
               html,
+              campaignKey,
+              emailType: 'automated',
+              recipientIds: recipient.userId ? [recipient.userId] : [],
               tags: [
                 { name: 'category', value: 'event-lifecycle' },
                 { name: 'mode', value: mode },
@@ -501,9 +490,7 @@ export async function GET(request: NextRequest) {
 
         if (result.success) {
           sentEmails += 1
-          recipientEmails.push(recipient.email)
           if (recipient.userId) {
-            recipientIds.push(recipient.userId)
             notifications.push({
               userId: recipient.userId,
               type: mode === 'reminder' ? 'event_reminder' : 'review_requested',
@@ -540,15 +527,10 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      await supabaseAdmin.from('email_logs').insert({
-        sender_id: null,
-        recipient_ids: recipientIds,
-        recipient_emails: recipientEmails,
-        subject,
-        body: `${campaignKey}\n${mode}`,
-        email_type: 'automated',
-        status: 'sent',
-      })
+      // No campaign row is written here any more: sendEmail records one audit
+      // row per recipient (carrying the same campaignKey), which both fixes the
+      // under-reporting and stops a dry run from writing a "sent" row that
+      // would suppress the real send the next day.
 
       processedEvents += 1
     }

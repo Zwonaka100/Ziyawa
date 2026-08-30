@@ -101,7 +101,7 @@ export default function AdminVerificationsPage() {
           rejection_reason, id_type, id_number, doc_front_url, doc_back_url,
           business_name, registration_number, company_reg_cert_url,
           rep_id_number, rep_id_front_url, rep_id_back_url,
-          profiles!inner (id, full_name, email, avatar_url, is_organizer, is_artist, is_provider, is_verified, verified_at, verified_entity_type)
+          profiles!verification_requests_profile_id_fkey!inner (id, full_name, email, avatar_url, is_organizer, is_artist, is_provider, is_verified, verified_at, verified_entity_type)
         `)
         .order('submitted_at', { ascending: false })
 
@@ -112,8 +112,12 @@ export default function AdminVerificationsPage() {
       const { data, error } = await q
       if (error) throw error
       setRows((data ?? []) as unknown as VerificationRow[])
-    } catch {
-      toast.error('Failed to load verification requests')
+    } catch (error) {
+      // Surface the cause — a bare catch here hid a PostgREST relationship
+      // error for a long time and made this look like a generic outage.
+      console.error('Failed to load verification requests:', error)
+      const message = error instanceof Error ? error.message : ''
+      toast.error(message ? `Failed to load verifications: ${message}` : 'Failed to load verification requests')
     } finally {
       setLoading(false)
     }

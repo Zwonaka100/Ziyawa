@@ -146,19 +146,14 @@ async function main() {
         to: organizer.email,
         subject,
         html,
+        // sendEmail records the audit row itself, including failures.
+        campaignKey: `settlement-apology-${event.id}-${todayKey}`,
+        emailType: 'individual',
+        recipientIds: [organizer.id],
         tags: [{ name: 'category', value: 'settlement-apology' }],
       })
 
       if (result.success) {
-        await supabase.from('email_logs').insert({
-          sender_id: null,
-          recipient_ids: [organizer.id],
-          recipient_emails: [organizer.email],
-          subject,
-          body: `settlement-apology-${event.id}-${todayKey}\nsettlement-apology`,
-          email_type: 'manual',
-          status: 'sent',
-        })
         console.log('  ✓ sent\n')
       } else {
         console.log(`  ✗ send failed: ${result.error}\n`)

@@ -5,6 +5,7 @@
  * Note: Set RESEND_API_KEY in environment variables
  */
 
+import { createClient as createAdminClient } from '@supabase/supabase-js';
 import * as EmailTemplates from './email-templates';
 import { SITE_URL } from './constants';
 
@@ -22,12 +23,70 @@ interface SendEmailParams {
   from?: string;
   replyTo?: string;
   tags?: { name: string; value: string }[];
+  /** Dedupe/grouping key written into the audit row so repeat sends can be detected. */
+  campaignKey?: string;
+  /**
+   * Audit classification. Constrained by email_logs_email_type_check to
+   * 'individual' | 'bulk' | 'automated'. Defaults to 'individual'.
+   */
+  emailType?: 'individual' | 'bulk' | 'automated';
+  /** Profile ids of the recipients, when known, for the audit row. */
+  recipientIds?: string[];
+  /** Set false to suppress the audit row (for callers that write their own). */
+  logToAudit?: boolean;
 }
 
 interface SendEmailResult {
   success: boolean;
   id?: string;
   error?: string;
+}
+
+/**
+ * Record every send attempt in email_logs.
+ *
+ * This lives inside sendEmail because it is the one choke point every email
+ * passes through. Logging at call sites meant whole categories went unrecorded
+ * — the organizer "what went down" prompt, for one — so the audit trail
+ * under-reported what actually reached users.
+ *
+ * Never throws: a logging failure must not turn a delivered email into an
+ * error, so problems are reported to the console and swallowed.
+ */
+async function recordEmailAudit(
+  params: SendEmailParams,
+  result: SendEmailResult
+): Promise<void> {
+  if (params.logToAudit === false) return;
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey) return;
+
+  try {
+    const supabaseAdmin = createAdminClient(supabaseUrl, serviceRoleKey);
+    const recipients = Array.isArray(params.to) ? params.to : [params.to];
+
+    // insert() resolves with an { error } object rather than throwing, so the
+    // result has to be inspected explicitly — a bare try/catch silently misses
+    // constraint violations here.
+    const { error } = await supabaseAdmin.from('email_logs').insert({
+      sender_id: null,
+      recipient_ids: params.recipientIds ?? [],
+      recipient_emails: recipients,
+      subject: params.subject,
+      body: params.campaignKey ? `${params.campaignKey}\n${params.subject}` : params.subject,
+      email_type: params.emailType || 'individual',
+      status: result.success ? 'sent' : 'failed',
+      error_message: result.success ? null : (result.error ?? 'Unknown error'),
+    });
+
+    if (error) {
+      console.error('Failed to record email audit row:', error.message, error.details ?? '');
+    }
+  } catch (error) {
+    console.error('Failed to record email audit row:', error);
+  }
 }
 
 /**
@@ -60,18 +119,24 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
     if (!response.ok) {
       const error = await response.json();
       console.error('Email send error:', error);
-      return { success: false, error: error.message || 'Failed to send email' };
+      const failure = { success: false, error: error.message || 'Failed to send email' };
+      await recordEmailAudit(params, failure);
+      return failure;
     }
 
     const result = await response.json();
-    return { success: true, id: result.id };
+    const success = { success: true, id: result.id };
+    await recordEmailAudit(params, success);
+    return success;
 
   } catch (error) {
     console.error('Email send exception:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to send email' 
+    const failure = {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to send email'
     };
+    await recordEmailAudit(params, failure);
+    return failure;
   }
 }
 
