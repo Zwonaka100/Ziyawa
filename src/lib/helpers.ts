@@ -17,6 +17,21 @@ export function formatCurrency(amount: number): string {
 }
 
 /**
+ * Money with cents always shown and a dot decimal separator (R40.50).
+ *
+ * Use this for settlement/payout amounts, where `formatCurrency` is misleading:
+ * it drops trailing cents and uses the en-ZA comma separator, rendering
+ * R40.50 as "R 40,5".
+ */
+export function formatMoneyExact(amount: number): string {
+  const value = Number(amount || 0)
+  const formatted = Math.abs(value)
+    .toFixed(2)
+    .replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  return `${value < 0 ? '-' : ''}R${formatted}`
+}
+
+/**
  * Format date for display
  */
 export function formatDate(date: string | Date): string {

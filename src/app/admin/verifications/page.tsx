@@ -30,6 +30,7 @@ import {
   Building2,
   RefreshCw,
   Eye,
+  FileText,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -371,12 +372,44 @@ function Detail({ label, value }: { label: string; value?: string | null }) {
 }
 
 function DocField({ label, path }: { label: string; path?: string | null }) {
-  // paths are storage paths — we create a signed URL link placeholder
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Documents live in a private bucket, so they can only be opened through a
+  // short-lived signed URL minted by the admin-only endpoint.
+  const handleOpen = async () => {
+    if (!path) return
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await fetch('/api/admin/verifications/document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.url) {
+        throw new Error(data.error || 'Could not open this document')
+      }
+      window.open(data.url, '_blank', 'noopener,noreferrer')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not open this document')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div>
       <p className="text-xs text-muted-foreground">{label}</p>
       {path ? (
-        <p className="font-mono text-xs break-all text-blue-600">{path}</p>
+        <>
+          <Button variant="outline" size="sm" onClick={handleOpen} disabled={loading} className="mt-1">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileText className="h-4 w-4 mr-2" />}
+            View document
+          </Button>
+          {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
+        </>
       ) : (
         <p className="text-muted-foreground">Not provided</p>
       )}

@@ -656,6 +656,108 @@ export function organizerWhatWentDownEmail(data: {
   return emailWrapper(content);
 }
 
+// Recurring nudge asking an organizer to mark a past event complete so their
+// funds can be settled. Sent on a decreasing cadence until they act.
+export function organizerCompleteEventReminderEmail(data: {
+  recipientName: string;
+  eventName: string;
+  eventDate: string;
+  amountPending: string;
+  manageUrl: string;
+  isVerified: boolean;
+  verifyUrl: string;
+}): string {
+  const content = `
+    <h1>One step left to get paid</h1>
+    <p>Hi ${data.recipientName},</p>
+    <p><strong>${data.eventName}</strong> took place on ${data.eventDate}, but it hasn't been marked as complete yet. We need you to confirm the event happened before we can settle your funds.</p>
+
+    <div class="highlight-box">
+      <div class="detail-row">
+        <span class="detail-label">Event</span>
+        <span class="detail-value">${data.eventName}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Date</span>
+        <span class="detail-value">${data.eventDate}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Awaiting settlement</span>
+        <span class="detail-value">${data.amountPending}</span>
+      </div>
+    </div>
+
+    <p style="text-align: center;">
+      <a href="${data.manageUrl}" class="button">
+        Mark event complete
+      </a>
+    </p>
+
+    ${data.isVerified ? '' : `
+    <div style="background-color: #fef3c7; border-radius: 8px; padding: 16px; margin: 20px 0; color: #92400e;">
+      <strong>Your account still needs to be verified.</strong> We can only settle funds to a verified account. Please
+      <a href="${data.verifyUrl}" style="color: #92400e;">verify your account</a> so we can pay out what you're owed.
+    </div>
+    `}
+  `;
+
+  return emailWrapper(content);
+}
+
+// One-off apology + call to action for organizers whose funds were left
+// sitting because nothing ever prompted them to complete their event.
+export function organizerSettlementApologyEmail(data: {
+  recipientName: string;
+  eventName: string;
+  eventDate: string;
+  amountPending: string;
+  manageUrl: string;
+  isVerified: boolean;
+  verifyUrl: string;
+}): string {
+  const content = `
+    <h1>Sorry — let's get your funds to you</h1>
+    <p>Hi ${data.recipientName},</p>
+    <p>We owe you an apology. Your funds from <strong>${data.eventName}</strong> (${data.eventDate}) should have reached you already. We've been fixing problems in our payout system, and your event was caught up in them.</p>
+    <p>Here's exactly where things stand and what we need from you:</p>
+
+    <div class="highlight-box">
+      <div class="detail-row">
+        <span class="detail-label">Awaiting settlement</span>
+        <span class="detail-value">${data.amountPending}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Event marked complete</span>
+        <span class="detail-value">Not yet</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Account verified</span>
+        <span class="detail-value">${data.isVerified ? 'Yes' : 'Not yet'}</span>
+      </div>
+    </div>
+
+    <p><strong>1. Mark your event as complete.</strong> This confirms the event went ahead, and starts the settlement of your funds.</p>
+    <p style="text-align: center;">
+      <a href="${data.manageUrl}" class="button">
+        Mark event complete
+      </a>
+    </p>
+
+    ${data.isVerified ? '' : `
+    <p><strong>2. Verify your account.</strong> We can only settle funds to a verified account — this protects you and everyone on Ziyawa.</p>
+    <p style="text-align: center;">
+      <a href="${data.verifyUrl}" class="button">
+        Verify my account
+      </a>
+    </p>
+    `}
+
+    <p>Thanks for your patience, and sorry again for the delay. If anything is unclear, just reply to this email and we'll sort it out.</p>
+  `;
+
+  return emailWrapper(content);
+}
+
 export function eventPublishedEmail(data: {
   recipientName: string;
   eventName: string;

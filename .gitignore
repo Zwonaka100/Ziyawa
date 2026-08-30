@@ -24,6 +24,9 @@
 .DS_Store
 *.pem
 
+# rendered email previews — contain real recipient names/addresses
+/scripts/out/
+
 # debug
 npm-debug.log*
 yarn-debug.log*

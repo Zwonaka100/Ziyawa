@@ -259,9 +259,9 @@ function SettingsPageInner() {
         .from('verification-documents')
         .upload(path, file, { upsert: true, contentType: file.type })
       if (uploadError) throw uploadError
-      const { data: urlData } = supabase.storage.from('verification-documents').getPublicUrl(path)
-      const documentUrl = urlData.publicUrl || `https://qkqdhwrneqfmbiwdsthw.supabase.co/storage/v1/object/public/verification-documents/${encodeURIComponent(path)}`
-      setter(documentUrl)
+      // Store the bare storage path. This bucket is private, so a public URL
+      // would never resolve — admins open these via a signed URL at review time.
+      setter(path)
       toast.success('Document uploaded')
     } catch {
       toast.error('Failed to upload document')
