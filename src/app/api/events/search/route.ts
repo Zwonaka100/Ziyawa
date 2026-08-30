@@ -17,10 +17,10 @@ export async function GET(request: NextRequest) {
     const priceMax = searchParams.get('priceMax') || '';
     const category = searchParams.get('category') || '';
     const isFree = searchParams.get('isFree') === 'true';
-    const sortBy = searchParams.get('sortBy') || 'date'; // date, price-low, price-high, popular
+    const sortBy = searchParams.get('sortBy') || 'latest'; // latest, date, price-low, price-high, popular
+    const timeframe = searchParams.get('timeframe') || 'all'; // all, upcoming, past
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
-    const effectiveDateFrom = dateFrom && dateFrom > today ? dateFrom : today;
 
     const offset = (page - 1) * limit;
 
@@ -39,8 +39,15 @@ export async function GET(request: NextRequest) {
           total_reviews
         )
       `, { count: 'exact' })
-      .eq('is_published', true)
-      .gte('event_date', effectiveDateFrom);
+      .eq('is_published', true);
+
+    if (timeframe === 'upcoming') {
+      dbQuery = dbQuery.gte('event_date', today);
+    } else if (timeframe === 'past') {
+      dbQuery = dbQuery.lt('event_date', today).gt('tickets_sold', 0);
+    } else {
+      dbQuery = dbQuery.or(`event_date.gte.${today},and(event_date.lt.${today},tickets_sold.gt.0)`);
+    }
 
     // Text search - search in title, description, venue
     if (query) {
@@ -53,6 +60,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Date filters
+    if (dateFrom) {
+      dbQuery = dbQuery.gte('event_date', dateFrom);
+    }
     if (dateTo) {
       dbQuery = dbQuery.lte('event_date', dateTo);
     }
@@ -76,6 +86,9 @@ export async function GET(request: NextRequest) {
 
     // Sorting
     switch (sortBy) {
+      case 'latest':
+        dbQuery = dbQuery.order('event_date', { ascending: false });
+        break;
       case 'price-low':
         dbQuery = dbQuery.order('ticket_price', { ascending: true });
         break;
@@ -86,6 +99,8 @@ export async function GET(request: NextRequest) {
         dbQuery = dbQuery.order('tickets_sold', { ascending: false });
         break;
       case 'date':
+        dbQuery = dbQuery.order('event_date', { ascending: true });
+        break;
       default:
         dbQuery = dbQuery.order('event_date', { ascending: true });
     }
@@ -101,8 +116,15 @@ export async function GET(request: NextRequest) {
       let fallbackQuery = supabase
         .from('events')
         .select('*', { count: 'exact' })
-        .eq('is_published', true)
-        .gte('event_date', effectiveDateFrom);
+        .eq('is_published', true);
+
+      if (timeframe === 'upcoming') {
+        fallbackQuery = fallbackQuery.gte('event_date', today);
+      } else if (timeframe === 'past') {
+        fallbackQuery = fallbackQuery.lt('event_date', today).gt('tickets_sold', 0);
+      } else {
+        fallbackQuery = fallbackQuery.or(`event_date.gte.${today},and(event_date.lt.${today},tickets_sold.gt.0)`);
+      }
 
       if (query) {
         fallbackQuery = fallbackQuery.or(`title.ilike.%${query}%,description.ilike.%${query}%,venue.ilike.%${query}%`);
@@ -110,11 +132,15 @@ export async function GET(request: NextRequest) {
       if (location && location !== 'all') {
         fallbackQuery = fallbackQuery.eq('location', location);
       }
+      if (dateFrom) {
+        fallbackQuery = fallbackQuery.gte('event_date', dateFrom);
+      }
       if (dateTo) {
         fallbackQuery = fallbackQuery.lte('event_date', dateTo);
       }
 
-      fallbackQuery = fallbackQuery.order('event_date', { ascending: true }).range(offset, offset + limit - 1);
+      const fallbackAscending = sortBy !== 'latest';
+      fallbackQuery = fallbackQuery.order('event_date', { ascending: fallbackAscending }).range(offset, offset + limit - 1);
       const { data: fallbackEvents, count: fallbackCount } = await fallbackQuery;
 
       return NextResponse.json({
@@ -131,7 +157,7 @@ export async function GET(request: NextRequest) {
       .from('events')
       .select('location')
       .eq('is_published', true)
-      .gte('event_date', today);
+      .or(`event_date.gte.${today},and(event_date.lt.${today},tickets_sold.gt.0)`);
 
     const uniqueLocations = [...new Set(locations?.map(e => e.location) || [])];
 
@@ -140,7 +166,7 @@ export async function GET(request: NextRequest) {
       .from('events')
       .select('ticket_price')
       .eq('is_published', true)
-      .gte('event_date', today)
+      .or(`event_date.gte.${today},and(event_date.lt.${today},tickets_sold.gt.0)`)
       .order('ticket_price', { ascending: true });
 
     const prices = priceRange?.map(e => e.ticket_price) || [];

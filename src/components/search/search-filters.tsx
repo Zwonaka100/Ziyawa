@@ -43,10 +43,17 @@ const SA_PROVINCES = [
 ];
 
 const SORT_OPTIONS = [
+  { value: 'latest', label: 'Latest First' },
   { value: 'date', label: 'Date (Soonest)' },
   { value: 'price-low', label: 'Price (Low to High)' },
   { value: 'price-high', label: 'Price (High to Low)' },
   { value: 'popular', label: 'Most Popular' },
+];
+
+const TIMEFRAME_OPTIONS = [
+  { value: 'all', label: 'All Events' },
+  { value: 'upcoming', label: 'Upcoming Events' },
+  { value: 'past', label: 'Past Events' },
 ];
 
 interface SearchFiltersProps {
@@ -58,6 +65,7 @@ interface SearchFiltersProps {
 export interface SearchFilters {
   q: string;
   location: string;
+  timeframe: string;
   dateFrom: string;
   dateTo: string;
   priceMin: string;
@@ -73,6 +81,7 @@ export function SearchFilters({ onSearch, className, compact = false }: SearchFi
   // Initialize from URL params
   const [query, setQuery] = useState(searchParams.get('q') || '');
   const [location, setLocation] = useState(searchParams.get('location') || '');
+  const [timeframe, setTimeframe] = useState(searchParams.get('timeframe') || 'all');
   const [dateFrom, setDateFrom] = useState<Date | undefined>(
     searchParams.get('dateFrom') ? new Date(searchParams.get('dateFrom')!) : undefined
   );
@@ -82,31 +91,43 @@ export function SearchFilters({ onSearch, className, compact = false }: SearchFi
   const [priceMin, setPriceMin] = useState(searchParams.get('priceMin') || '');
   const [priceMax, setPriceMax] = useState(searchParams.get('priceMax') || '');
   const [isFree, setIsFree] = useState(searchParams.get('isFree') === 'true');
-  const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'date');
+  const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'latest');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Build URL with filters
-  const buildSearchParams = () => {
+  const buildSearchParams = (overrides: Partial<SearchFilters> = {}) => {
+    const nextQuery = overrides.q ?? query;
+    const nextLocation = overrides.location ?? location;
+    const nextTimeframe = overrides.timeframe ?? timeframe;
+    const nextDateFrom = overrides.dateFrom ?? (dateFrom ? format(dateFrom, 'yyyy-MM-dd') : '');
+    const nextDateTo = overrides.dateTo ?? (dateTo ? format(dateTo, 'yyyy-MM-dd') : '');
+    const nextPriceMin = overrides.priceMin ?? priceMin;
+    const nextPriceMax = overrides.priceMax ?? priceMax;
+    const nextIsFree = overrides.isFree ?? isFree;
+    const nextSortBy = overrides.sortBy ?? sortBy;
+
     const params = new URLSearchParams();
-    if (query) params.set('q', query);
-    if (location) params.set('location', location);
-    if (dateFrom) params.set('dateFrom', format(dateFrom, 'yyyy-MM-dd'));
-    if (dateTo) params.set('dateTo', format(dateTo, 'yyyy-MM-dd'));
-    if (priceMin && !isFree) params.set('priceMin', priceMin);
-    if (priceMax && !isFree) params.set('priceMax', priceMax);
-    if (isFree) params.set('isFree', 'true');
-    if (sortBy && sortBy !== 'date') params.set('sortBy', sortBy);
+    if (nextQuery) params.set('q', nextQuery);
+    if (nextLocation) params.set('location', nextLocation);
+    if (nextTimeframe && nextTimeframe !== 'all') params.set('timeframe', nextTimeframe);
+    if (nextDateFrom) params.set('dateFrom', nextDateFrom);
+    if (nextDateTo) params.set('dateTo', nextDateTo);
+    if (nextPriceMin && !nextIsFree) params.set('priceMin', nextPriceMin);
+    if (nextPriceMax && !nextIsFree) params.set('priceMax', nextPriceMax);
+    if (nextIsFree) params.set('isFree', 'true');
+    if (nextSortBy && nextSortBy !== 'latest') params.set('sortBy', nextSortBy);
     return params.toString();
   };
 
-  const handleSearch = () => {
-    const params = buildSearchParams();
+  const handleSearch = (overrides: Partial<SearchFilters> = {}) => {
+    const params = buildSearchParams(overrides);
     router.push(`/ziwaphi${params ? '?' + params : ''}`);
     
     if (onSearch) {
       onSearch({
         q: query,
         location,
+        timeframe,
         dateFrom: dateFrom ? format(dateFrom, 'yyyy-MM-dd') : '',
         dateTo: dateTo ? format(dateTo, 'yyyy-MM-dd') : '',
         priceMin: isFree ? '' : priceMin,
@@ -120,16 +141,17 @@ export function SearchFilters({ onSearch, className, compact = false }: SearchFi
   const clearFilters = () => {
     setQuery('');
     setLocation('');
+    setTimeframe('all');
     setDateFrom(undefined);
     setDateTo(undefined);
     setPriceMin('');
     setPriceMax('');
     setIsFree(false);
-    setSortBy('date');
+    setSortBy('latest');
     router.push('/ziwaphi');
   };
 
-  const hasActiveFilters = query || location || dateFrom || dateTo || priceMin || priceMax || isFree || sortBy !== 'date';
+  const hasActiveFilters = query || location || timeframe !== 'all' || dateFrom || dateTo || priceMin || priceMax || isFree || sortBy !== 'latest';
 
   // Handle Enter key
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -151,7 +173,7 @@ export function SearchFilters({ onSearch, className, compact = false }: SearchFi
             className="pl-9"
           />
         </div>
-        <Button onClick={handleSearch} size="sm">
+        <Button onClick={() => handleSearch()} size="sm">
           Search
         </Button>
       </div>
@@ -188,7 +210,24 @@ export function SearchFilters({ onSearch, className, compact = false }: SearchFi
           </SelectContent>
         </Select>
 
-        <Button onClick={handleSearch} className="h-12 px-8">
+        <Select value={timeframe} onValueChange={(value) => {
+          setTimeframe(value);
+          handleSearch({ timeframe: value });
+        }}>
+          <SelectTrigger className="w-full sm:w-[180px] h-12">
+            <CalendarIcon className="h-4 w-4 mr-2" />
+            <SelectValue placeholder="All Events" />
+          </SelectTrigger>
+          <SelectContent>
+            {TIMEFRAME_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Button onClick={() => handleSearch()} className="h-12 px-8">
           <Search className="h-5 w-5 mr-2" />
           Search
         </Button>
@@ -345,6 +384,12 @@ export function SearchFilters({ onSearch, className, compact = false }: SearchFi
             <FilterTag 
               label={SA_PROVINCES.find(p => p.value === location)?.label || location} 
               onRemove={() => setLocation('')} 
+            />
+          )}
+          {timeframe !== 'all' && (
+            <FilterTag
+              label={TIMEFRAME_OPTIONS.find((option) => option.value === timeframe)?.label || timeframe}
+              onRemove={() => setTimeframe('all')}
             />
           )}
           {dateFrom && (
