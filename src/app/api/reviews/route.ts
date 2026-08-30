@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
     // Check if event exists and has ended
     const { data: event, error: eventError } = await supabase
       .from('events')
-      .select('id, title, event_date, organizer_id')
+      .select('id, title, event_date, organizer_id, state, completed_at')
       .eq('id', eventId)
       .single();
 
@@ -168,7 +168,8 @@ export async function POST(request: NextRequest) {
     // Check if event has ended using the live event_date field
     const eventEndDate = event.event_date ? new Date(`${event.event_date}T23:59:59`) : null;
     const now = new Date();
-    if (eventEndDate && eventEndDate > now) {
+    const eventMarkedCompleted = event.state === 'completed' || Boolean(event.completed_at);
+    if (!eventMarkedCompleted && eventEndDate && eventEndDate > now) {
       return NextResponse.json(
         { error: 'You can only review events that have ended' },
         { status: 400 }
@@ -176,12 +177,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already reviewed this event
-    const { data: existingReview } = await supabase
+    const { data: existingReview, error: existingReviewError } = await supabase
       .from('reviews')
       .select('id')
       .eq('event_id', eventId)
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
+
+    if (existingReviewError) {
+      console.error('Existing review check error:', existingReviewError)
+      return NextResponse.json(
+        { error: 'Unable to verify existing review status right now. Please try again.' },
+        { status: 500 }
+      );
+    }
 
     if (existingReview) {
       return NextResponse.json(
@@ -190,15 +199,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if user attended the event by looking for a ticket row in the live schema.
-    const { data: ticket } = await supabase
+    // Check if user attended the event by looking for at least one linked ticket.
+    const { data: tickets, error: ticketError } = await supabase
       .from('tickets')
       .select('id')
       .eq('event_id', eventId)
       .eq('user_id', user.id)
-      .maybeSingle();
+      .limit(1);
 
-    const isVerifiedAttendee = Boolean(ticket);
+    if (ticketError) {
+      console.error('Ticket lookup error during review submit:', ticketError)
+      return NextResponse.json(
+        { error: 'Unable to validate ticket ownership right now. Please try again.' },
+        { status: 500 }
+      );
+    }
+
+    const isVerifiedAttendee = Boolean(tickets?.length);
 
     // Create the review
     const { data: review, error: reviewError } = await supabase
@@ -212,29 +229,36 @@ export async function POST(request: NextRequest) {
         is_verified_attendee: isVerifiedAttendee,
         is_anonymous: isAnonymous || false
       })
-      .select(`
-        *,
-        profiles:user_id (
-          id,
-          full_name,
-          avatar_url
-        )
-      `)
+      .select('*')
       .single();
 
     if (reviewError) {
       console.error('Review creation error:', reviewError);
-      throw reviewError;
+      const duplicateReview = reviewError.code === '23505';
+      return NextResponse.json(
+        { error: duplicateReview ? 'You have already reviewed this event' : (reviewError.message || 'Failed to submit review') },
+        { status: duplicateReview ? 400 : 500 }
+      );
     }
+
+    // Fetch profile separately to avoid fragile embedded relationship errors on insert.
+    const { data: reviewerProfile } = await supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url')
+      .eq('id', user.id)
+      .maybeSingle();
 
     return NextResponse.json({
       message: 'Review submitted successfully',
-      review
+      review: {
+        ...review,
+        profiles: reviewerProfile || null,
+      }
     });
   } catch (error) {
     console.error('Error creating review:', error);
     return NextResponse.json(
-      { error: 'Failed to submit review' },
+      { error: error instanceof Error ? error.message : 'Failed to submit review' },
       { status: 500 }
     );
   }
