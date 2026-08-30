@@ -173,7 +173,8 @@ async function runCompletionReminders(
 
     const result = await sendEmail({
       from: ACCOUNTS_FROM_EMAIL,
-      replyTo: process.env.SUPPORT_EMAIL || 'support@ziyawa.com',
+      // Keep the reply-to on the same accounts alias this was sent from.
+      replyTo: process.env.ACCOUNTS_EMAIL || 'accounts@ziyawa.com',
       to: organizer.email,
       subject,
       html: organizerCompleteEventReminderEmail({

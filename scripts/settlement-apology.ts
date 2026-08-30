@@ -140,7 +140,9 @@ async function main() {
     if (shouldSend) {
       const result = await sendEmail({
         from: fromAddress,
-        replyTo: process.env.SUPPORT_EMAIL || 'support@ziyawa.com',
+        // Settlement mail invites a reply, so keep the reply-to on the same
+        // accounts alias it was sent from rather than diverting to support.
+        replyTo: process.env.ACCOUNTS_EMAIL || 'accounts@ziyawa.com',
         to: organizer.email,
         subject,
         html,
