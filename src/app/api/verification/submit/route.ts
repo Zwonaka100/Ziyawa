@@ -90,13 +90,18 @@ export async function POST(request: NextRequest) {
     }
 
     if (entity_type === 'individual') {
-      const { id_type, id_number, doc_front_url, doc_back_url } = body
+      const { id_type, id_number, doc_front_url, doc_back_url, legal_name } = body
 
       if (!id_type || !['sa_id', 'passport'].includes(id_type)) {
         return NextResponse.json({ error: 'id_type must be sa_id or passport' }, { status: 400 })
       }
       if (!id_number?.trim()) {
         return NextResponse.json({ error: 'ID number is required' }, { status: 400 })
+      }
+      // Required so there is something trustworthy to compare the bank account
+      // holder against — profiles.full_name is usually the email handle.
+      if (!legal_name?.trim()) {
+        return NextResponse.json({ error: 'Your full name as it appears on your ID is required' }, { status: 400 })
       }
       if (!doc_front_url) {
         return NextResponse.json({ error: 'Front document photo is required' }, { status: 400 })
@@ -114,6 +119,7 @@ export async function POST(request: NextRequest) {
         ...insertData,
         id_type,
         id_number: id_number.trim(),
+        legal_name: legal_name.trim(),
         doc_front_url: normalizedDocFront,
         doc_back_url: normalizedDocBack || null,
       }
@@ -144,6 +150,9 @@ export async function POST(request: NextRequest) {
       insertData = {
         ...insertData,
         business_name: business_name.trim(),
+        // The registered business name is the legal name for a company, so
+        // both paths populate legal_name and downstream code needs no branch.
+        legal_name: business_name.trim(),
         registration_number: registration_number.trim(),
         company_reg_cert_url: normalizedRegCert,
         rep_id_number: rep_id_number.trim(),

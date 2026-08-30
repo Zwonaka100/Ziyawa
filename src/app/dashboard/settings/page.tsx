@@ -97,6 +97,10 @@ function SettingsPageInner() {
   const [entityType, setEntityType] = useState<'individual' | 'business'>('individual')
   const [idType, setIdType] = useState<'sa_id' | 'passport'>('sa_id')
   const [idNumber, setIdNumber] = useState('')
+  // Full name exactly as printed on the ID. Without this there is nothing
+  // trustworthy to compare the bank account holder against — profiles.full_name
+  // is usually just the email handle from signup.
+  const [legalName, setLegalName] = useState('')
   const [businessName, setBusinessName] = useState('')
   const [regNumber, setRegNumber] = useState('')
   const [repIdNumber, setRepIdNumber] = useState('')
@@ -305,7 +309,13 @@ function SettingsPageInner() {
         account_holder: accountHolder.trim(),
       }
       if (entityType === 'individual') {
-        Object.assign(body, { id_type: idType, id_number: idNumber, doc_front_url: docFrontUrl, doc_back_url: docBackUrl })
+        Object.assign(body, {
+          id_type: idType,
+          id_number: idNumber,
+          legal_name: legalName.trim(),
+          doc_front_url: docFrontUrl,
+          doc_back_url: docBackUrl,
+        })
       } else {
         Object.assign(body, {
           business_name: businessName,
@@ -402,7 +412,7 @@ function SettingsPageInner() {
   const bankDetailsComplete = !!bankCode && !!accountNumber.trim() && !!accountHolder.trim()
 
   const identityComplete = entityType === 'individual'
-    ? !!idNumber && !!docFrontUrl
+    ? !!idNumber && !!legalName.trim() && !!docFrontUrl
     : !!businessName && !!regNumber && !!regCertUrl && !!repIdNumber && !!repFrontUrl
 
   const verificationComplete = identityComplete && bankDetailsComplete
@@ -687,6 +697,17 @@ function SettingsPageInner() {
                   {entityType === 'individual' ? (
                     <div className="space-y-4">
                       <div className="space-y-2">
+                        <Label>Full name (exactly as on your ID)</Label>
+                        <Input
+                          value={legalName}
+                          onChange={(e) => setLegalName(e.target.value)}
+                          placeholder="e.g. Thabo Michael Nkosi"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Include all names as printed on your ID — not a nickname or stage name. This must match your bank account and is how we confirm payouts reach you.
+                        </p>
+                      </div>
+                      <div className="space-y-2">
                         <Label>ID type</Label>
                         <Select value={idType} onValueChange={(v) => setIdType(v as 'sa_id' | 'passport')}>
                           <SelectTrigger>
@@ -725,8 +746,11 @@ function SettingsPageInner() {
                   ) : (
                     <div className="space-y-4">
                       <div className="space-y-2">
-                        <Label>Registered business name</Label>
+                        <Label>Registered business name (exactly as on your CIPC certificate)</Label>
                         <Input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Acme Events (Pty) Ltd" />
+                        <p className="text-xs text-muted-foreground">
+                          Use the registered name, not a trading name. This must match your bank account.
+                        </p>
                       </div>
                       <div className="space-y-2">
                         <Label>CIPC registration number</Label>

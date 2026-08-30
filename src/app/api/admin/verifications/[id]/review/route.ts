@@ -24,6 +24,7 @@ interface VerificationBankDetails {
   bank_name: string | null
   account_number: string | null
   account_holder: string | null
+  legal_name: string | null
 }
 
 /**
@@ -44,7 +45,7 @@ interface VerificationBankDetails {
 async function setUpPayoutAccount(
   request: VerificationBankDetails
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { profile_id, bank_code, bank_name, account_number, account_holder } = request
+  const { profile_id, bank_code, bank_name, account_number, account_holder, legal_name } = request
 
   if (!bank_code || !bank_name || !account_number || !account_holder) {
     return { ok: false, error: 'No bank details were submitted with this request' }
@@ -69,6 +70,7 @@ async function setUpPayoutAccount(
         bank_name,
         account_number,
         account_holder,
+        legal_name,
         paystack_recipient_code: recipient.data.recipient_code,
         recipient_error: null,
         verified_at: new Date().toISOString(),
@@ -91,6 +93,7 @@ async function setUpPayoutAccount(
         bank_name,
         account_number,
         account_holder,
+        legal_name,
         paystack_recipient_code: null,
         recipient_error: message,
       }, { onConflict: 'profile_id' })
@@ -137,7 +140,7 @@ export async function POST(
     // Fetch the request
     const { data: verificationRequest, error: fetchError } = await supabaseAdmin
       .from('verification_requests')
-      .select('id, profile_id, entity_type, status, submitted_at, bank_code, bank_name, account_number, account_holder')
+      .select('id, profile_id, entity_type, status, submitted_at, bank_code, bank_name, account_number, account_holder, legal_name')
       .eq('id', requestId)
       .single()
 

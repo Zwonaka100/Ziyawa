@@ -60,6 +60,7 @@ interface VerificationRow {
   bank_name: string | null
   account_number: string | null
   account_holder: string | null
+  legal_name: string | null
   profiles: {
     id: string
     full_name: string | null
@@ -75,6 +76,45 @@ interface VerificationRow {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Do the ID/registered name and the bank account holder plausibly refer to the
+ * same party?
+ *
+ * This is a hint for the admin, never a decision — Paystack cannot confirm South
+ * African account names, so a human still checks the ID document. It is
+ * deliberately tolerant, because banks routinely shorten names ("T M Nkosi") or
+ * drop middle names; a warning that fires on every legitimate account would be
+ * ignored, which is worse than no warning. For people it compares surname plus
+ * first initial; for businesses, whether either registered name contains the
+ * other once punctuation is stripped.
+ */
+function namesLookConsistent(
+  legalName: string | null,
+  accountHolder: string | null,
+  isBusiness: boolean
+): boolean {
+  const clean = (value: string | null) =>
+    (value || '').toLowerCase().replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim()
+
+  const legal = clean(legalName)
+  const holder = clean(accountHolder)
+
+  if (!legal || !holder) return false
+  if (legal === holder) return true
+
+  if (isBusiness) {
+    const a = legal.replace(/ /g, '')
+    const b = holder.replace(/ /g, '')
+    return a.includes(b) || b.includes(a)
+  }
+
+  const legalParts = legal.split(' ')
+  const holderParts = holder.split(' ')
+  const sameSurname = legalParts[legalParts.length - 1] === holderParts[holderParts.length - 1]
+  const sameFirstInitial = legalParts[0][0] === holderParts[0][0]
+  return sameSurname && sameFirstInitial
+}
 
 function StatusBadge({ status }: { status: string }) {
   if (status === 'approved') return <Badge className="bg-green-500 text-white"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>
@@ -105,7 +145,7 @@ export default function AdminVerificationsPage() {
           rejection_reason, id_type, id_number, doc_front_url, doc_back_url,
           business_name, registration_number, company_reg_cert_url,
           rep_id_number, rep_id_front_url, rep_id_back_url,
-          bank_code, bank_name, account_number, account_holder,
+          bank_code, bank_name, account_number, account_holder, legal_name,
           profiles!verification_requests_profile_id_fkey!inner (id, full_name, email, avatar_url, is_organizer, is_artist, is_provider, is_verified, verified_at, verified_entity_type)
         `)
         .order('submitted_at', { ascending: false })
@@ -349,17 +389,46 @@ export default function AdminVerificationsPage() {
                   <>
                     <Detail label="Bank" value={detailRow.bank_name} />
                     <Detail label="Account number" value={detailRow.account_number} />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Account holder (self-declared)</p>
-                      <p className="font-medium">{detailRow.account_holder || '—'}</p>
+                    {/* Show both names together — comparing them is the check. */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground">
+                          {detailRow.entity_type === 'business' ? 'Registered name' : 'Name on ID'}
+                        </p>
+                        <p className="font-medium">{detailRow.legal_name || '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Bank account holder</p>
+                        <p className="font-medium">{detailRow.account_holder || '—'}</p>
+                      </div>
                     </div>
-                    <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
-                      <p className="text-xs text-amber-800">
-                        <strong>Check this name against the ID document above before approving.</strong> South African
-                        banks can&apos;t confirm account names through Paystack, so this manual comparison is the only
-                        safeguard against paying the wrong person.
-                      </p>
-                    </div>
+
+                    {(() => {
+                      const looksConsistent = namesLookConsistent(
+                        detailRow.legal_name,
+                        detailRow.account_holder,
+                        detailRow.entity_type === 'business'
+                      )
+
+                      if (looksConsistent) {
+                        return (
+                          <div className="p-3 rounded-lg bg-green-50 border border-green-200">
+                            <p className="text-xs text-green-800">
+                              Names look consistent. Still confirm against the ID document above before approving.
+                            </p>
+                          </div>
+                        )
+                      }
+                      return (
+                        <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
+                          <p className="text-xs text-amber-800">
+                            <strong>These names don&apos;t obviously match — check the ID document carefully.</strong>{' '}
+                            Paystack cannot confirm South African account names, so this comparison is the only
+                            safeguard against paying the wrong person.
+                          </p>
+                        </div>
+                      )
+                    })()}
                   </>
                 ) : (
                   <p className="text-sm text-muted-foreground">

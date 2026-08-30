@@ -24,6 +24,13 @@ CREATE TABLE IF NOT EXISTS payout_accounts (
   -- accepts any well-formed account number without validating it.
   account_holder TEXT NOT NULL,
 
+  -- Legal name exactly as it appears on the ID document, or the registered
+  -- business name. This is the only trustworthy real name the platform holds —
+  -- profiles.full_name is mostly email handles taken from signup — and it is
+  -- what an admin compares the account holder against. Kept here rather than on
+  -- the world-readable profiles table.
+  legal_name TEXT,
+
   -- Set once the Paystack Transfer Recipient exists. Null means the details
   -- are stored but no recipient was created yet (e.g. Paystack was down at
   -- approval time), so payouts must not be attempted until it is retried.
@@ -89,7 +96,11 @@ ALTER TABLE verification_requests
   ADD COLUMN IF NOT EXISTS bank_code TEXT,
   ADD COLUMN IF NOT EXISTS bank_name TEXT,
   ADD COLUMN IF NOT EXISTS account_number TEXT,
-  ADD COLUMN IF NOT EXISTS account_holder TEXT;
+  ADD COLUMN IF NOT EXISTS account_holder TEXT,
+  ADD COLUMN IF NOT EXISTS legal_name TEXT;
+
+COMMENT ON COLUMN verification_requests.legal_name IS
+  'Full name exactly as on the ID document (individual), or the registered business name. Previously never captured for individuals, leaving nothing to check the bank account holder against.';
 
 COMMENT ON COLUMN verification_requests.account_holder IS
   'Self-declared account holder name. Not machine-verifiable in South Africa; an admin compares it against the ID document at review time.';
