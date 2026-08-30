@@ -66,16 +66,18 @@ interface EventMediaManagerProps {
   eventId: string;
   eventTitle: string;
   eventState: string;
+  isPastEvent?: boolean;
   coverImage?: string | null;
   initialMedia: EventMedia[];
 }
 
-export function EventMediaManager({ 
-  eventId, 
+export function EventMediaManager({
+  eventId,
   eventTitle,
   eventState,
+  isPastEvent = false,
   coverImage: initialCoverImage,
-  initialMedia 
+  initialMedia
 }: EventMediaManagerProps) {
   const [media, setMedia] = useState<EventMedia[]>(initialMedia);
   const [coverImage, setCoverImage] = useState(initialCoverImage || '');
@@ -366,7 +368,7 @@ export function EventMediaManager({
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            {eventState === 'completed' && (
+            {(eventState === 'completed' || isPastEvent) && (
               <Link href={`/dashboard/organizer/events/${eventId}/what-went-down`}>
                 <Button variant="outline" className="w-full sm:w-auto">
                   <ImageIcon className="mr-2 h-4 w-4" />

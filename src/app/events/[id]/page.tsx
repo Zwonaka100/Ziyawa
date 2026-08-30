@@ -239,12 +239,14 @@ export default async function EventPage({ params }: EventPageProps) {
       />
       
       {/* Reviews Section */}
-      <div className="max-w-4xl mx-auto mt-12">
+      <div id="reviews" className="max-w-4xl mx-auto mt-12 scroll-mt-24">
         <EventReviewsSection
           eventId={id}
           eventTitle={event.title}
           organizerId={event.organizer_id}
-          canReview={hasTicket && eventEnded}
+          isLoggedIn={Boolean(user)}
+          hasTicket={hasTicket}
+          eventEnded={eventEnded}
         />
       </div>
     </div>

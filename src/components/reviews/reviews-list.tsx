@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, PenLine } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 interface Profile {
   id: string;
@@ -49,7 +50,14 @@ interface ReviewsListProps {
   currentUserId?: string;
   isOrganizer?: boolean;
   canReview?: boolean; // User has attended and event has ended
+  reviewBlockedReason?: string | null; // Why the write-review button is hidden, when canReview is false
 }
+
+const REVIEW_BLOCKED_MESSAGES: Record<string, string> = {
+  signin: 'Sign in with the account you used to get your ticket to write a review.',
+  not_ended: "Reviews open once the event has ended — check back after it's done.",
+  no_ticket: 'Only attendees with a ticket for this event can write a review.',
+};
 
 export function ReviewsList({
   eventId,
@@ -57,6 +65,7 @@ export function ReviewsList({
   currentUserId,
   isOrganizer,
   canReview,
+  reviewBlockedReason,
 }: ReviewsListProps) {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [ratingSummary, setRatingSummary] = useState<RatingSummary | null>(null);
@@ -162,6 +171,25 @@ export function ReviewsList({
           <PenLine className="h-4 w-4" />
           Write a Review
         </Button>
+      )}
+
+      {/* Why the write-review button isn't available */}
+      {!canReview && !hasReviewed && !isOrganizer && reviewBlockedReason && (
+        <p className="text-sm text-muted-foreground">
+          {REVIEW_BLOCKED_MESSAGES[reviewBlockedReason] || null}
+          {reviewBlockedReason === 'signin' && (
+            <>
+              {' '}
+              <Link href="/auth/signin" className="underline underline-offset-2 hover:text-foreground">
+                Sign in
+              </Link>
+            </>
+          )}
+        </p>
+      )}
+
+      {hasReviewed && !isOrganizer && (
+        <p className="text-sm text-muted-foreground">You&apos;ve already reviewed this event. Thanks for the feedback!</p>
       )}
 
       {/* Review Form Dialog */}
