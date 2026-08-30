@@ -65,16 +65,23 @@ export default async function HomePage() {
           <TypewriterHero />
           <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
             <Link href="/ziwaphi">
-              <Button size="lg" className="w-full sm:w-auto">
+              <Button size="lg" className="w-full sm:w-auto bg-white text-black hover:bg-neutral-200">
                 <Calendar className="mr-2 h-5 w-5" />
                 Find Events
               </Button>
             </Link>
-            {canBrowseArtists && (
+            {canBrowseArtists ? (
               <Link href="/artists">
                 <Button size="lg" className="w-full sm:w-auto bg-transparent border-2 border-white text-white hover:bg-white hover:text-black">
                   <Music className="mr-2 h-5 w-5" />
                   Browse Artists
+                </Button>
+              </Link>
+            ) : (
+              <Link href={user ? '/dashboard/settings' : '/for/organizers'}>
+                <Button size="lg" className="w-full sm:w-auto bg-transparent border-2 border-white text-white hover:bg-white hover:text-black">
+                  <Calendar className="mr-2 h-5 w-5" />
+                  Host an Event
                 </Button>
               </Link>
             )}
