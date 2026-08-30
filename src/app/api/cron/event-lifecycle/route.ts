@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { SITE_URL } from '@/lib/constants'
 import { sendEmail, sendOrganizerWhatWentDownEmail } from '@/lib/email'
-import { eventFollowUpEmail, eventReminderEmail, organizerCompleteEventReminderEmail } from '@/lib/email-templates'
+import {
+  eventFollowUpEmail,
+  eventReminderEmail,
+  organizerCompleteEventReminderEmail,
+  verificationReminderEmail,
+} from '@/lib/email-templates'
 import { createBulkNotifications, type CreateNotificationParams } from '@/lib/notifications'
 import { formatMoneyExact } from '@/lib/helpers'
 
@@ -202,6 +207,134 @@ async function runCompletionReminders(
         recipient_emails: [organizer.email],
         subject,
         body: `${campaignKey}\ncompletion-reminder`,
+        email_type: 'automated',
+        status: 'sent',
+      })
+    } else {
+      outcome.skippedReason = 'send failed'
+    }
+
+    outcomes.push(outcome)
+  }
+
+  return outcomes
+}
+
+interface VerificationReminderOutcome {
+  profileId: string
+  email: string
+  amountPendingRands: number
+  sent: boolean
+  skippedReason?: string
+}
+
+/**
+ * Weekly nudge to verify, for anyone holding funds they can't be paid until
+ * they do. Weekly rather than daily: verification means gathering documents
+ * and bank details, so chasing it every day would just be noise.
+ */
+async function runVerificationReminders(dryRun: boolean): Promise<VerificationReminderOutcome[]> {
+  const outcomes: VerificationReminderOutcome[] = []
+
+  const { data: profiles } = await supabaseAdmin
+    .from('profiles')
+    .select('id, email, full_name, is_verified, wallet_balance, held_balance')
+    .eq('is_verified', false)
+
+  for (const profile of profiles || []) {
+    if (!profile.email) continue
+
+    const amountPendingRands =
+      Number(profile.wallet_balance || 0) + Number(profile.held_balance || 0)
+
+    // Only chase people who actually have money riding on this.
+    if (amountPendingRands <= 0) continue
+
+    // Weekly: skip if we've sent one in the last 7 days. Checking recency
+    // beats a day-of-week rule — it survives missed runs without doubling up.
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    const { data: recentLog } = await supabaseAdmin
+      .from('email_logs')
+      .select('id')
+      .eq('email_type', 'automated')
+      .like('body', `%verify-reminder-${profile.id}%`)
+      .gte('sent_at', sevenDaysAgo)
+      .limit(1)
+      .maybeSingle()
+
+    if (recentLog?.id) {
+      outcomes.push({
+        profileId: profile.id,
+        email: profile.email,
+        amountPendingRands,
+        sent: false,
+        skippedReason: 'sent within the last 7 days',
+      })
+      continue
+    }
+
+    // The completion reminder already carries a "your account isn't verified"
+    // notice, so don't also send a standalone verification email the same day —
+    // that's two emails making the same request.
+    const { data: completionToday } = await supabaseAdmin
+      .from('email_logs')
+      .select('id')
+      .eq('email_type', 'automated')
+      .contains('recipient_ids', [profile.id])
+      .like('body', '%complete-reminder-%')
+      .gte('sent_at', startOfDay(new Date()).toISOString())
+      .limit(1)
+      .maybeSingle()
+
+    if (completionToday?.id) {
+      outcomes.push({
+        profileId: profile.id,
+        email: profile.email,
+        amountPendingRands,
+        sent: false,
+        skippedReason: 'completion reminder today already covers verification',
+      })
+      continue
+    }
+
+    const outcome: VerificationReminderOutcome = {
+      profileId: profile.id,
+      email: profile.email,
+      amountPendingRands,
+      sent: false,
+    }
+
+    if (dryRun) {
+      outcome.skippedReason = 'dry run — sending disabled'
+      outcomes.push(outcome)
+      continue
+    }
+
+    const subject = 'Verify your Ziyawa account to receive your funds'
+    const result = await sendEmail({
+      from: ACCOUNTS_FROM_EMAIL,
+      replyTo: process.env.ACCOUNTS_EMAIL || 'accounts@ziyawa.com',
+      to: profile.email,
+      subject,
+      html: verificationReminderEmail({
+        recipientName: (profile.full_name || 'there').split(' ')[0],
+        amountPending: formatMoneyExact(amountPendingRands),
+        verifyUrl: `${SITE_URL}/dashboard/settings?tab=verification`,
+      }),
+      tags: [
+        { name: 'category', value: 'event-lifecycle' },
+        { name: 'mode', value: 'verification-reminder' },
+      ],
+    })
+
+    if (result.success) {
+      outcome.sent = true
+      await supabaseAdmin.from('email_logs').insert({
+        sender_id: null,
+        recipient_ids: [profile.id],
+        recipient_emails: [profile.email],
+        subject,
+        body: `verify-reminder-${profile.id}\nverification-reminder`,
         email_type: 'automated',
         status: 'sent',
       })
@@ -425,6 +558,7 @@ export async function GET(request: NextRequest) {
     const remindersEnabled =
       process.env.ORGANIZER_COMPLETION_REMINDERS_ENABLED === 'true' && canSendEmail
     const completionReminders = await runCompletionReminders(today, !remindersEnabled)
+    const verificationReminders = await runVerificationReminders(!remindersEnabled)
 
     return NextResponse.json({
       success: true,
@@ -435,6 +569,12 @@ export async function GET(request: NextRequest) {
         due: completionReminders.length,
         sent: completionReminders.filter((r) => r.sent).length,
         details: completionReminders,
+      },
+      verificationReminders: {
+        enabled: remindersEnabled,
+        due: verificationReminders.length,
+        sent: verificationReminders.filter((r) => r.sent).length,
+        details: verificationReminders,
       },
     })
   } catch (error) {

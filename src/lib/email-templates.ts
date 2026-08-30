@@ -752,7 +752,51 @@ export function organizerSettlementApologyEmail(data: {
     </p>
     `}
 
+    <div style="background-color: #f3f4f6; border-radius: 8px; padding: 16px; margin: 20px 0; color: #374151;">
+      We'll keep sending you automated reminders until both steps above are done. They stop as soon as your event is marked complete and your account is verified.
+    </div>
+
     <p>Thanks for your patience, and sorry again for the delay. If anything is unclear, just reply to this email and we'll sort it out.</p>
+  `;
+
+  return emailWrapper(content);
+}
+
+// Weekly nudge for someone with funds waiting who hasn't verified yet.
+// Deliberately less frequent than the completion reminder — verification is a
+// bigger task (documents, bank details), so daily chasing would just be noise.
+export function verificationReminderEmail(data: {
+  recipientName: string;
+  amountPending: string;
+  verifyUrl: string;
+}): string {
+  const content = `
+    <h1>Verify your account to get paid</h1>
+    <p>Hi ${data.recipientName},</p>
+    <p>You have funds waiting on Ziyawa, but we can only settle them to a verified account.</p>
+
+    <div class="highlight-box">
+      <div class="detail-row">
+        <span class="detail-label">Awaiting settlement</span>
+        <span class="detail-value">${data.amountPending}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Account verified</span>
+        <span class="detail-value">Not yet</span>
+      </div>
+    </div>
+
+    <p>Verification takes a few minutes — you'll need your ID document and your bank details. It protects you and everyone else on Ziyawa.</p>
+
+    <p style="text-align: center;">
+      <a href="${data.verifyUrl}" class="button">
+        Verify my account
+      </a>
+    </p>
+
+    <div style="background-color: #f3f4f6; border-radius: 8px; padding: 16px; margin: 20px 0; color: #374151;">
+      We'll send this reminder once a week until your account is verified.
+    </div>
   `;
 
   return emailWrapper(content);
