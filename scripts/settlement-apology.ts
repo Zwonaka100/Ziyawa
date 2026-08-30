@@ -5,11 +5,14 @@
  * PREVIEW BY DEFAULT — sends nothing. It writes each rendered email to
  * scripts/out/ so the content can be read and approved first.
  *
- *   npx tsx scripts/settlement-apology.ts            # preview only (safe)
- *   npx tsx scripts/settlement-apology.ts --send     # actually send
+ *   npx tsx scripts/settlement-apology.ts --event=<id>          # preview
+ *   npx tsx scripts/settlement-apology.ts --event=<id> --send   # send
  *
- * Recipients are resolved live from the database: published past events that
- * are not yet marked complete and still have funds waiting.
+ * An apology is a deliberate, one-off gesture for a specific event whose funds
+ * we genuinely left sitting — NOT a routine notice. Events that are simply
+ * awaiting completion in the normal course get the standard reminder from the
+ * event-lifecycle job instead. So --event is required: this never fans out to
+ * every stale event on its own.
  */
 
 import fs from 'node:fs'
@@ -37,6 +40,17 @@ loadEnv('.env.local')
 
 async function main() {
   const shouldSend = process.argv.includes('--send')
+  const eventArg = process.argv.find((arg) => arg.startsWith('--event='))
+  const targetEventId = eventArg?.split('=')[1]?.trim()
+
+  if (!targetEventId) {
+    console.error(
+      'Refusing to run without --event=<event-id>.\n' +
+      'An apology is a one-off for a specific event whose funds we left sitting.\n' +
+      'Routine "please complete your event" nudges come from the event-lifecycle job.'
+    )
+    process.exit(1)
+  }
 
   const { organizerSettlementApologyEmail } = await import('../src/lib/email-templates')
   const { sendEmail } = await import('../src/lib/email')
@@ -54,14 +68,16 @@ async function main() {
   const { data: pastEvents, error } = await supabase
     .from('events')
     .select('id, title, event_date, state, organizer_id')
-    .eq('is_published', true)
-    .lt('event_date', todayKey)
+    .eq('id', targetEventId)
 
   if (error) throw error
 
-  const stale = (pastEvents || []).filter(
-    (e) => e.state !== 'completed' && e.state !== 'cancelled'
-  )
+  if (!pastEvents?.length) {
+    console.error(`No event found with id ${targetEventId}`)
+    process.exit(1)
+  }
+
+  const stale = pastEvents
 
   const outDir = path.resolve(process.cwd(), 'scripts/out')
   fs.mkdirSync(outDir, { recursive: true })
