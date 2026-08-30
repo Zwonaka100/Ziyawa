@@ -57,17 +57,15 @@ export function Navbar() {
   const { unreadCount } = useUnreadMessages(user?.id)
   const { hasEventWork, activeCount } = useEventWork()
   const canUseProMessages = Boolean(profile?.is_admin || profile?.is_organizer || profile?.is_artist || profile?.is_provider)
-  // Artists/Crew directories are for organisers sourcing talent for their events.
-  // Groovists (and any other logged-in non-organiser role) only need Ziwaphi.
-  // Logged-out visitors still see the full nav (public discovery/SEO).
-  const canSeeTalentDirectories = !profile || Boolean(profile.is_organizer || profile.is_admin)
+  // Artist/Crew directories are for organisers sourcing talent, and for artists/crew
+  // browsing their own kind. Groovists and logged-out visitors get neither link.
+  const canSeeArtistDirectory = Boolean(profile?.is_organizer || profile?.is_artist || profile?.is_admin)
+  const canSeeCrewDirectory = Boolean(profile?.is_organizer || profile?.is_provider || profile?.is_admin)
 
   const navLinks = [
     { href: '/ziwaphi', label: 'Ziwaphi?', icon: Calendar },
-    ...(canSeeTalentDirectories ? [
-      { href: '/artists', label: 'Artists', icon: Music },
-      { href: '/crew', label: 'Crew', icon: Users },
-    ] : []),
+    ...(canSeeArtistDirectory ? [{ href: '/artists', label: 'Artists', icon: Music }] : []),
+    ...(canSeeCrewDirectory ? [{ href: '/crew', label: 'Crew', icon: Users }] : []),
   ]
 
   const isActive = (href: string) => pathname.startsWith(href)

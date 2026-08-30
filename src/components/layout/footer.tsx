@@ -64,16 +64,6 @@ export function Footer() {
                   Ziwaphi? (Events)
                 </Link>
               </li>
-              <li>
-                <Link href="/artists" className="hover:text-primary">
-                  Artist Directory
-                </Link>
-              </li>
-              <li>
-                <Link href="/crew" className="hover:text-primary">
-                  Crew Directory
-                </Link>
-              </li>
             </ul>
           </div>
 

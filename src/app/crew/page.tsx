@@ -14,20 +14,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { 
-  Search, 
-  MapPin, 
-  Star, 
+import {
+  Search,
+  MapPin,
+  Star,
   Briefcase,
   Loader2,
   Users
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { 
-  type PublicProvider, 
-  type ServiceCategory, 
+import { useAuth } from '@/components/providers/auth-provider'
+import {
+  type PublicProvider,
+  type ServiceCategory,
   type SaProvince,
-  SERVICE_CATEGORY_LABELS 
+  SERVICE_CATEGORY_LABELS
 } from '@/types/database'
 
 // Province labels
@@ -61,6 +62,8 @@ const CATEGORY_COLORS: Record<ServiceCategory, string> = {
 }
 
 export default function CrewPage() {
+  const { user, profile, loading: authLoading } = useAuth()
+  const canView = Boolean(profile?.is_organizer || profile?.is_provider || profile?.is_admin)
   const [providers, setProviders] = useState<PublicProvider[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -68,9 +71,10 @@ export default function CrewPage() {
   const [selectedProvince, setSelectedProvince] = useState<SaProvince | 'all'>('all')
 
   useEffect(() => {
+    if (authLoading || !canView) return
     fetchProviders()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategory, selectedProvince])
+  }, [selectedCategory, selectedProvince, authLoading, canView])
 
   const fetchProviders = async () => {
     setLoading(true)
@@ -184,6 +188,36 @@ export default function CrewPage() {
   )
 
   const categories = Object.entries(SERVICE_CATEGORY_LABELS) as [ServiceCategory, string][]
+
+  if (authLoading) {
+    return (
+      <div className="flex justify-center py-24">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (!canView) {
+    return (
+      <div className="container mx-auto px-4 py-16 text-center max-w-lg">
+        <Users className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
+        <h1 className="text-2xl font-bold mb-2">Crew Directory</h1>
+        <p className="text-muted-foreground mb-6">
+          This directory is for event organizers sourcing event staff and services, and for crew browsing each other. Looking for something to attend instead?
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Link href="/ziwaphi">
+            <Button size="lg">Find Events on Ziwaphi</Button>
+          </Link>
+          {!user && (
+            <Link href="/auth/signin">
+              <Button size="lg" variant="outline">Sign In</Button>
+            </Link>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">

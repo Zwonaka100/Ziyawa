@@ -10,6 +10,17 @@ import Image from 'next/image'
 export default async function HomePage() {
   const supabase = await createClient()
 
+  const { data: { user } } = await supabase.auth.getUser()
+  let canBrowseArtists = false
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_organizer, is_artist, is_admin')
+      .eq('id', user.id)
+      .single()
+    canBrowseArtists = Boolean(profile?.is_organizer || profile?.is_artist || profile?.is_admin)
+  }
+
   // Fetch upcoming events only (limit 12)
   const { data: events } = await supabase
     .from('events')
@@ -59,12 +70,14 @@ export default async function HomePage() {
                 Find Events
               </Button>
             </Link>
-            <Link href="/artists">
-              <Button size="lg" className="w-full sm:w-auto bg-transparent border-2 border-white text-white hover:bg-white hover:text-black">
-                <Music className="mr-2 h-5 w-5" />
-                Browse Artists
-              </Button>
-            </Link>
+            {canBrowseArtists && (
+              <Link href="/artists">
+                <Button size="lg" className="w-full sm:w-auto bg-transparent border-2 border-white text-white hover:bg-white hover:text-black">
+                  <Music className="mr-2 h-5 w-5" />
+                  Browse Artists
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </section>

@@ -1,12 +1,15 @@
 import { Suspense } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { ArtistsGrid } from '@/components/artists/artists-grid'
 import { ArtistsFilter } from '@/components/artists/artists-filter'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
 
 export const metadata = {
   title: 'Artist Directory | Ziyawa',
   description: 'Browse talented artists across South Africa. Find the perfect act for your event.',
+  robots: { index: false, follow: false },
 }
 
 interface ArtistsPageProps {
@@ -18,6 +21,40 @@ interface ArtistsPageProps {
 
 export default async function ArtistsPage({ searchParams }: ArtistsPageProps) {
   const params = await searchParams
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  let allowed = false
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_organizer, is_artist, is_admin')
+      .eq('id', user.id)
+      .single()
+    allowed = Boolean(profile?.is_organizer || profile?.is_artist || profile?.is_admin)
+  }
+
+  if (!allowed) {
+    return (
+      <div className="container mx-auto px-4 py-16 text-center max-w-lg">
+        <p className="text-3xl mb-2">🎤</p>
+        <h1 className="text-2xl font-bold mb-2">Artist Directory</h1>
+        <p className="text-muted-foreground mb-6">
+          This directory is for event organizers sourcing talent, and for artists browsing each other. Looking for something to attend instead?
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Link href="/ziwaphi">
+            <Button size="lg">Find Events on Ziwaphi</Button>
+          </Link>
+          {!user && (
+            <Link href="/auth/signin">
+              <Button size="lg" variant="outline">Sign In</Button>
+            </Link>
+          )}
+        </div>
+      </div>
+    )
+  }
   
   return (
     <div className="container mx-auto px-4 py-8">
