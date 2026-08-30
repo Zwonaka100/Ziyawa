@@ -56,6 +56,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [adminRole, setAdminRole] = useState<string | null>(null)
   const [accessChecked, setAccessChecked] = useState(false)
 
+  // Derived rather than stored: the render guard below needs to distinguish
+  // "signed out" from "still checking", otherwise it spins forever when the
+  // redirect doesn't land (stale session, blocked navigation).
+  const signedOut = !loading && !user
+
   useEffect(() => {
     let cancelled = false
 
@@ -77,6 +82,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       if (cancelled) return
 
       if (error || !data?.is_admin) {
+        if (error) console.error('Admin access check failed:', error)
         setIsAdmin(false)
         setAdminRole(null)
         setAccessChecked(true)
@@ -100,6 +106,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const supabase = createClient()
     await supabase.auth.signOut()
     router.push('/')
+  }
+
+  // Session is gone (or went stale) — say so and offer a way back in, rather
+  // than spinning while a redirect that may never land is pending.
+  if (signedOut) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="text-center max-w-sm">
+          <Shield className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+          <h1 className="text-lg font-semibold mb-1">Admin sign-in required</h1>
+          <p className="text-sm text-muted-foreground mb-4">
+            Your session has ended. Sign in again to reach the admin panel.
+          </p>
+          <Link href="/auth/signin?redirect=/admin">
+            <Button>Sign in</Button>
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   if (loading || !accessChecked || isAdmin === null) {
