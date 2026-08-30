@@ -32,6 +32,8 @@ import {
   Eye,
   FileText,
 } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
+import { reasonsForEntityType } from '@/lib/verification-rejection-reasons'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
@@ -133,8 +135,24 @@ export default function AdminVerificationsPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending')
   const [rejectDialogId, setRejectDialogId] = useState<string | null>(null)
   const [rejectionReason, setRejectionReason] = useState('')
+  const [rejectionCodes, setRejectionCodes] = useState<string[]>([])
+  // Which reason list to show — business submissions have their own failure modes.
+  const [rejectEntityType, setRejectEntityType] = useState<'individual' | 'business'>('individual')
   const [processing, setProcessing] = useState<string | null>(null)
   const [detailRow, setDetailRow] = useState<VerificationRow | null>(null)
+
+  const openRejectDialog = (row: VerificationRow) => {
+    setRejectEntityType(row.entity_type)
+    setRejectionCodes([])
+    setRejectionReason('')
+    setRejectDialogId(row.id)
+  }
+
+  const closeRejectDialog = () => {
+    setRejectDialogId(null)
+    setRejectionReason('')
+    setRejectionCodes([])
+  }
 
   const fetchRows = useCallback(async () => {
     setLoading(true)
@@ -171,19 +189,24 @@ export default function AdminVerificationsPage() {
 
   useEffect(() => { void fetchRows() }, [fetchRows])
 
-  const handleAction = async (id: string, action: 'approve' | 'reject', reason?: string) => {
+  const handleAction = async (id: string, action: 'approve' | 'reject') => {
     setProcessing(id)
     try {
       const res = await fetch(`/api/admin/verifications/${id}/review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, rejection_reason: reason }),
+        body: JSON.stringify({
+          action,
+          rejection_codes: action === 'reject' ? rejectionCodes : undefined,
+          rejection_reason: action === 'reject' ? rejectionReason.trim() : undefined,
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      toast.success(action === 'approve' ? 'Verification approved' : 'Verification rejected')
-      setRejectDialogId(null)
-      setRejectionReason('')
+      // Approval reports whether the payout account was actually set up, since
+      // identity can be approved while the Paystack recipient fails.
+      toast.success(action === 'approve' ? (data.message || 'Verification approved') : 'Verification rejected')
+      closeRejectDialog()
       setDetailRow(null)
       await fetchRows()
     } catch (e) {
@@ -308,7 +331,7 @@ export default function AdminVerificationsPage() {
                           size="sm"
                           variant="destructive"
                           disabled={processing === row.id}
-                          onClick={() => { setRejectDialogId(row.id); setRejectionReason('') }}
+                          onClick={() => openRejectDialog(row)}
                         >
                           <XCircle className="h-4 w-4 mr-1" />
                           Reject
@@ -324,27 +347,63 @@ export default function AdminVerificationsPage() {
       )}
 
       {/* Reject dialog */}
-      <Dialog open={!!rejectDialogId} onOpenChange={(o) => { if (!o) { setRejectDialogId(null); setRejectionReason('') } }}>
-        <DialogContent>
+      <Dialog open={!!rejectDialogId} onOpenChange={(o) => { if (!o) closeRejectDialog() }}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Reject verification</DialogTitle>
             <DialogDescription>
-              Provide a reason — the user will see this message so they can fix the issue and resubmit.
+              Tick everything that needs fixing. The user is emailed exactly these points, so they know what to correct
+              before submitting again.
             </DialogDescription>
           </DialogHeader>
-          <Textarea
-            value={rejectionReason}
-            onChange={(e) => setRejectionReason(e.target.value)}
-            placeholder="e.g. Document image is blurry. Please re-upload a clear photo of both sides."
-            rows={4}
-            maxLength={500}
-          />
+
+          <div className="space-y-2">
+            {reasonsForEntityType(rejectEntityType).map((reason) => {
+              const checked = rejectionCodes.includes(reason.code)
+              return (
+                <label
+                  key={reason.code}
+                  className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                    checked ? 'border-primary bg-primary/5' : 'hover:border-muted-foreground'
+                  }`}
+                >
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={(value) => {
+                      setRejectionCodes((current) =>
+                        value === true
+                          ? [...current, reason.code]
+                          : current.filter((code) => code !== reason.code)
+                      )
+                    }}
+                    className="mt-0.5"
+                  />
+                  <div>
+                    <p className="text-sm font-medium">{reason.adminLabel}</p>
+                    <p className="text-xs text-muted-foreground">{reason.userMessage}</p>
+                  </div>
+                </label>
+              )
+            })}
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Anything else? (optional)</p>
+            <Textarea
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              placeholder="Added to the end of the message the user receives."
+              rows={3}
+              maxLength={500}
+            />
+          </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setRejectDialogId(null); setRejectionReason('') }}>Cancel</Button>
+            <Button variant="outline" onClick={closeRejectDialog}>Cancel</Button>
             <Button
               variant="destructive"
-              disabled={!rejectionReason.trim() || processing === rejectDialogId}
-              onClick={() => rejectDialogId && handleAction(rejectDialogId, 'reject', rejectionReason.trim())}
+              disabled={(rejectionCodes.length === 0 && !rejectionReason.trim()) || processing === rejectDialogId}
+              onClick={() => rejectDialogId && handleAction(rejectDialogId, 'reject')}
             >
               {processing === rejectDialogId ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Confirm rejection
@@ -446,7 +505,7 @@ export default function AdminVerificationsPage() {
                 <Button
                   variant="outline"
                   className="text-red-600 border-red-300"
-                  onClick={() => { setRejectDialogId(detailRow.id); setDetailRow(null) }}
+                  onClick={() => { openRejectDialog(detailRow); setDetailRow(null) }}
                 >
                   Reject
                 </Button>

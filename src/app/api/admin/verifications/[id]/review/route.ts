@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createNotification } from '@/lib/notifications'
 import { createTransferRecipient } from '@/lib/paystack'
+import { buildRejectionMessage } from '@/lib/verification-rejection-reasons'
 
 const supabaseAdmin = createAdminClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -126,15 +127,27 @@ export async function POST(
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
     }
 
-    const body = await request.json().catch(() => ({})) as { action?: string; rejection_reason?: string }
+    const body = await request.json().catch(() => ({})) as {
+      action?: string
+      rejection_reason?: string
+      rejection_codes?: string[]
+    }
     const { action, rejection_reason } = body
-    const rejectionText = typeof rejection_reason === 'string' ? rejection_reason.trim() : ''
+    const rejectionCodes = Array.isArray(body.rejection_codes) ? body.rejection_codes : []
+    const rejectionNote = typeof rejection_reason === 'string' ? rejection_reason.trim() : ''
+
+    // Compose the user-facing text server-side from known codes, so the client
+    // cannot put arbitrary wording into an email we send on the user's behalf.
+    const rejectionText = buildRejectionMessage(rejectionCodes, rejectionNote)
 
     if (!action || !['approve', 'reject'].includes(action)) {
       return NextResponse.json({ error: 'action must be approve or reject' }, { status: 400 })
     }
     if (action === 'reject' && !rejectionText) {
-      return NextResponse.json({ error: 'rejection_reason is required when rejecting' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Select at least one rejection reason, or add a note explaining what needs fixing' },
+        { status: 400 }
+      )
     }
 
     // Fetch the request
@@ -224,7 +237,9 @@ export async function POST(
       userId: verificationRequest.profile_id,
       type: 'profile_verified',
       title: 'Verification unsuccessful',
-      message: `Your verification was not approved. Reason: ${rejectionText}. Please resubmit with the correct documents.`,
+      message:
+        `We couldn't approve your verification yet. Here's what needs fixing:\n\n${rejectionText}\n\n` +
+        'Once sorted, submit again from your settings — you can reuse anything that was fine.',
       link: '/dashboard/settings?tab=verification',
       sendEmail: true,
     })
