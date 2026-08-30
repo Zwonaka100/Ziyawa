@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     // Get event details
     const { data: event, error: eventError } = await supabase
       .from('events')
-      .select('id, title, ticket_price, capacity, tickets_sold, state, organizer_id')
+      .select('id, title, ticket_price, capacity, tickets_sold, state, organizer_id, event_date')
       .eq('id', eventId)
       .single();
 
@@ -59,6 +59,14 @@ export async function POST(request: NextRequest) {
     if (!['published', 'locked'].includes(event.state)) {
       return NextResponse.json(
         { error: 'Event is not available for ticket sales' },
+        { status: 400 }
+      );
+    }
+
+    const eventHasEnded = new Date(`${event.event_date}T23:59:59`).getTime() < Date.now();
+    if (eventHasEnded) {
+      return NextResponse.json(
+        { error: 'This event has ended and ticket sales are closed' },
         { status: 400 }
       );
     }
