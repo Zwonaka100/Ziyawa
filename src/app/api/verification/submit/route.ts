@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { entity_type, bank_code, bank_name, account_number, account_holder } = body
+    const { entity_type, bank_code, bank_name, account_number, account_holder, bank_document_url } = body
 
     if (!entity_type || !['individual', 'business'].includes(entity_type)) {
       return NextResponse.json({ error: 'entity_type must be individual or business' }, { status: 400 })
@@ -61,6 +61,15 @@ export async function POST(request: NextRequest) {
     if (!bank_code || !bank_name || !account_number || !account_holder?.trim()) {
       return NextResponse.json(
         { error: 'Bank, account number and account holder name are all required' },
+        { status: 400 }
+      )
+    }
+
+    // The bank-issued document is the safeguard against a mistyped account
+    // number, which nothing else in this flow can catch for ZAR accounts.
+    if (!bank_document_url) {
+      return NextResponse.json(
+        { error: 'A bank confirmation letter or recent statement is required' },
         { status: 400 }
       )
     }
@@ -87,6 +96,7 @@ export async function POST(request: NextRequest) {
       bank_name: String(bank_name),
       account_number: normalizedAccount,
       account_holder: declaredAccountHolder,
+      bank_document_url: String(bank_document_url),
     }
 
     if (entity_type === 'individual') {

@@ -119,6 +119,9 @@ function SettingsPageInner() {
   const [bankCode, setBankCode] = useState('')
   const [accountNumber, setAccountNumber] = useState('')
   const [accountHolder, setAccountHolder] = useState('')
+  // Bank-issued proof of the account. This is the safeguard that catches a
+  // mistyped account number, which Paystack cannot check for ZAR accounts.
+  const [bankDocUrl, setBankDocUrl] = useState('')
 
   // Security tab state
   const [mfaFactors, setMfaFactors] = useState<{ id: string; factor_type: string }[]>([])
@@ -270,6 +273,25 @@ function SettingsPageInner() {
     }
   }
 
+  /**
+   * South African banks routinely email statements as password-protected PDFs.
+   * An encrypted file is useless to a reviewer, so catch it at upload with a
+   * clear instruction rather than letting it fail silently at review time.
+   * Encrypted PDFs carry an /Encrypt entry in the trailer dictionary.
+   */
+  const isPasswordProtectedPdf = async (file: File): Promise<boolean> => {
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) return false
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer())
+      const text = new TextDecoder('latin1').decode(bytes)
+      return text.includes('/Encrypt')
+    } catch {
+      // If it can't be inspected, let the upload through — the reviewer will
+      // notice an unreadable file, and a false rejection is worse.
+      return false
+    }
+  }
+
   const uploadDocumentFile = async (
     file: File,
     docKey: string,
@@ -277,6 +299,14 @@ function SettingsPageInner() {
   ) => {
     if (file.size > 10 * 1024 * 1024) {
       toast.error('File must be under 10MB')
+      return
+    }
+
+    if (await isPasswordProtectedPdf(file)) {
+      toast.error(
+        'This PDF is password-protected, so our team can’t open it. Remove the password and re-upload, or upload a bank confirmation letter instead.',
+        { duration: 8000 }
+      )
       return
     }
     setUploadingDoc(docKey)
@@ -307,6 +337,7 @@ function SettingsPageInner() {
         bank_name: banks.find((b) => b.code === bankCode)?.name || '',
         account_number: accountNumber.trim(),
         account_holder: accountHolder.trim(),
+        bank_document_url: bankDocUrl,
       }
       if (entityType === 'individual') {
         Object.assign(body, {
@@ -409,7 +440,7 @@ function SettingsPageInner() {
   const needsVerification = profile.is_artist || profile.is_organizer || (profile as { is_provider?: boolean }).is_provider
   const canSubmitVerification = !isVerified && !hasPending
 
-  const bankDetailsComplete = !!bankCode && !!accountNumber.trim() && !!accountHolder.trim()
+  const bankDetailsComplete = !!bankCode && !!accountNumber.trim() && !!accountHolder.trim() && !!bankDocUrl
 
   const identityComplete = entityType === 'individual'
     ? !!idNumber && !!legalName.trim() && !!docFrontUrl
@@ -834,9 +865,23 @@ function SettingsPageInner() {
                       </p>
                     </div>
 
+                    <DocUpload
+                      label="Bank confirmation letter or recent statement"
+                      docKey="bank-doc"
+                      value={bankDocUrl}
+                      uploading={uploadingDoc === 'bank-doc'}
+                      onFile={(f) => uploadDocumentFile(f, 'bank-doc', setBankDocUrl)}
+                    />
+                    <p className="text-xs text-muted-foreground -mt-2">
+                      Must clearly show your account number and the account holder name. Most banking apps generate a
+                      confirmation letter in seconds.
+                    </p>
+
                     <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
                       <p className="text-xs text-amber-800">
-                        Double-check your account number. Banks in South Africa can&apos;t confirm account names automatically, so a wrong number can send money to someone else.
+                        <strong>Password-protected PDFs can&apos;t be reviewed.</strong> If your statement is locked,
+                        remove the password first or upload a bank confirmation letter instead. Double-check your account
+                        number too — a wrong number can send money to someone else.
                       </p>
                     </div>
                   </div>

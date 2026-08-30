@@ -61,6 +61,7 @@ interface VerificationRow {
   account_number: string | null
   account_holder: string | null
   legal_name: string | null
+  bank_document_url: string | null
   profiles: {
     id: string
     full_name: string | null
@@ -145,7 +146,7 @@ export default function AdminVerificationsPage() {
           rejection_reason, id_type, id_number, doc_front_url, doc_back_url,
           business_name, registration_number, company_reg_cert_url,
           rep_id_number, rep_id_front_url, rep_id_back_url,
-          bank_code, bank_name, account_number, account_holder, legal_name,
+          bank_code, bank_name, account_number, account_holder, legal_name, bank_document_url,
           profiles!verification_requests_profile_id_fkey!inner (id, full_name, email, avatar_url, is_organizer, is_artist, is_provider, is_verified, verified_at, verified_entity_type)
         `)
         .order('submitted_at', { ascending: false })
@@ -389,6 +390,7 @@ export default function AdminVerificationsPage() {
                   <>
                     <Detail label="Bank" value={detailRow.bank_name} />
                     <Detail label="Account number" value={detailRow.account_number} />
+                    <DocField label="Bank letter / statement" path={detailRow.bank_document_url} />
                     {/* Show both names together — comparing them is the check. */}
                     <div className="grid grid-cols-2 gap-3">
                       <div>

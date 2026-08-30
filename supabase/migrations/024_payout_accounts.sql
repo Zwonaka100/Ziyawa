@@ -97,7 +97,11 @@ ALTER TABLE verification_requests
   ADD COLUMN IF NOT EXISTS bank_name TEXT,
   ADD COLUMN IF NOT EXISTS account_number TEXT,
   ADD COLUMN IF NOT EXISTS account_holder TEXT,
-  ADD COLUMN IF NOT EXISTS legal_name TEXT;
+  ADD COLUMN IF NOT EXISTS legal_name TEXT,
+  ADD COLUMN IF NOT EXISTS bank_document_url TEXT;
+
+COMMENT ON COLUMN verification_requests.bank_document_url IS
+  'Bank confirmation letter or recent statement showing the account number and holder name. Since Paystack cannot validate SA account names, this bank-issued document is what an admin checks the typed account number and holder against.';
 
 COMMENT ON COLUMN verification_requests.legal_name IS
   'Full name exactly as on the ID document (individual), or the registered business name. Previously never captured for individuals, leaving nothing to check the bank account holder against.';
