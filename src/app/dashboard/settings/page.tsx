@@ -108,6 +108,14 @@ function SettingsPageInner() {
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null)
   const [submittingVerification, setSubmittingVerification] = useState(false)
 
+  // Bank details captured as part of verification — this is the account any
+  // future payout is sent to, so the holder name must be confirmed by the bank
+  // (via Paystack) before the form can be submitted.
+  const [banks, setBanks] = useState<{ code: string; name: string }[]>([])
+  const [bankCode, setBankCode] = useState('')
+  const [accountNumber, setAccountNumber] = useState('')
+  const [accountHolder, setAccountHolder] = useState('')
+
   // Security tab state
   const [mfaFactors, setMfaFactors] = useState<{ id: string; factor_type: string }[]>([])
   const [loadingMfa, setLoadingMfa] = useState(true)
@@ -167,6 +175,22 @@ function SettingsPageInner() {
       void fetchMfaFactors()
     }
   }, [user, fetchVerificationStatus, fetchMfaFactors])
+
+  // Bank list is cached server-side for 24h and falls back to a hardcoded SA
+  // list, so this is safe to load whenever the settings page opens.
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/payments/banks')
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled && Array.isArray(data.banks)) setBanks(data.banks)
+      })
+      .catch(() => {
+        // Non-fatal: the picker simply stays empty and the user can retry.
+      })
+    return () => { cancelled = true }
+  }, [])
+
 
   if (authLoading || !user || !profile) return null
 
@@ -273,7 +297,13 @@ function SettingsPageInner() {
   const handleSubmitVerification = async () => {
     setSubmittingVerification(true)
     try {
-      const body: Record<string, unknown> = { entity_type: entityType }
+      const body: Record<string, unknown> = {
+        entity_type: entityType,
+        bank_code: bankCode,
+        bank_name: banks.find((b) => b.code === bankCode)?.name || '',
+        account_number: accountNumber.trim(),
+        account_holder: accountHolder.trim(),
+      }
       if (entityType === 'individual') {
         Object.assign(body, { id_type: idType, id_number: idNumber, doc_front_url: docFrontUrl, doc_back_url: docBackUrl })
       } else {
@@ -369,9 +399,13 @@ function SettingsPageInner() {
   const needsVerification = profile.is_artist || profile.is_organizer || (profile as { is_provider?: boolean }).is_provider
   const canSubmitVerification = !isVerified && !hasPending
 
-  const verificationComplete = entityType === 'individual'
+  const bankDetailsComplete = !!bankCode && !!accountNumber.trim() && !!accountHolder.trim()
+
+  const identityComplete = entityType === 'individual'
     ? !!idNumber && !!docFrontUrl
     : !!businessName && !!regNumber && !!regCertUrl && !!repIdNumber && !!repFrontUrl
+
+  const verificationComplete = identityComplete && bankDetailsComplete
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -728,6 +762,61 @@ function SettingsPageInner() {
                     </div>
                   )}
 
+                  <Separator />
+
+                  {/* Payout bank account */}
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-sm font-medium">Payout bank account</p>
+                      <p className="text-xs text-muted-foreground">
+                        Where we&apos;ll send your money. The account holder name must match the ID you upload above — our team checks this before approving.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Bank</Label>
+                      <Select value={bankCode} onValueChange={setBankCode}>
+                        <SelectTrigger>
+                          <SelectValue placeholder={banks.length ? 'Select your bank' : 'Loading banks…'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {banks.map((bank) => (
+                            <SelectItem key={bank.code} value={bank.code}>{bank.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Account number</Label>
+                      <Input
+                        value={accountNumber}
+                        onChange={(e) => setAccountNumber(e.target.value.replace(/[^\d]/g, ''))}
+                        placeholder="1234567890"
+                        inputMode="numeric"
+                        maxLength={15}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Account holder name</Label>
+                      <Input
+                        value={accountHolder}
+                        onChange={(e) => setAccountHolder(e.target.value)}
+                        placeholder={entityType === 'business' ? 'Registered business name' : 'Name exactly as it appears on your bank account'}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Must match your {entityType === 'business' ? 'registration certificate' : 'ID document'}. Payouts to a name that doesn&apos;t match will be held.
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
+                      <p className="text-xs text-amber-800">
+                        Double-check your account number. Banks in South Africa can&apos;t confirm account names automatically, so a wrong number can send money to someone else.
+                      </p>
+                    </div>
+                  </div>
+
                   <Button
                     className="w-full"
                     disabled={submittingVerification || !verificationComplete || !!uploadingDoc}
@@ -736,6 +825,12 @@ function SettingsPageInner() {
                     {submittingVerification ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
                     Submit for review
                   </Button>
+
+                  {identityComplete && !bankDetailsComplete && (
+                    <p className="text-xs text-center text-amber-600">
+                      Check your bank account above to enable submission.
+                    </p>
+                  )}
                   <p className="text-xs text-center text-muted-foreground">
                     Documents are stored securely. Our team will review within 1–2 business days.
                   </p>

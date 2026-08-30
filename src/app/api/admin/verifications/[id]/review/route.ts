@@ -11,11 +11,93 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createNotification } from '@/lib/notifications'
+import { createTransferRecipient } from '@/lib/paystack'
 
 const supabaseAdmin = createAdminClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+interface VerificationBankDetails {
+  profile_id: string
+  bank_code: string | null
+  bank_name: string | null
+  account_number: string | null
+  account_holder: string | null
+}
+
+/**
+ * Store the verified bank details and create the Paystack Transfer Recipient
+ * that future payouts will target.
+ *
+ * Note there is no machine check on the account itself: Paystack's resolve
+ * endpoint supports only NGN/USD/GHS/KES (not ZAR), and createTransferRecipient
+ * accepts any well-formed account number without validating it. The admin's
+ * comparison of the declared account holder against the ID document, made
+ * before calling this, is the actual safeguard.
+ *
+ * Returns rather than throws: identity approval has already succeeded by the
+ * time this runs, and a Paystack outage should not roll that back or leave the
+ * request stuck as pending. A failure is persisted on the row so it can be
+ * retried and shown to an admin.
+ */
+async function setUpPayoutAccount(
+  request: VerificationBankDetails
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { profile_id, bank_code, bank_name, account_number, account_holder } = request
+
+  if (!bank_code || !bank_name || !account_number || !account_holder) {
+    return { ok: false, error: 'No bank details were submitted with this request' }
+  }
+
+  try {
+    const recipient = await createTransferRecipient({
+      name: account_holder,
+      account_number,
+      bank_code,
+    })
+
+    if (!recipient.status || !recipient.data?.recipient_code) {
+      throw new Error('Paystack did not return a recipient code')
+    }
+
+    const { error } = await supabaseAdmin
+      .from('payout_accounts')
+      .upsert({
+        profile_id,
+        bank_code,
+        bank_name,
+        account_number,
+        account_holder,
+        paystack_recipient_code: recipient.data.recipient_code,
+        recipient_error: null,
+        verified_at: new Date().toISOString(),
+      }, { onConflict: 'profile_id' })
+
+    if (error) throw error
+
+    return { ok: true }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    console.error('Payout account setup failed:', message)
+
+    // Keep the details so an admin can see what was attempted and retry,
+    // rather than losing them because Paystack was unavailable.
+    await supabaseAdmin
+      .from('payout_accounts')
+      .upsert({
+        profile_id,
+        bank_code,
+        bank_name,
+        account_number,
+        account_holder,
+        paystack_recipient_code: null,
+        recipient_error: message,
+      }, { onConflict: 'profile_id' })
+
+    return { ok: false, error: message }
+  }
+}
 
 export async function POST(
   request: NextRequest,
@@ -55,7 +137,7 @@ export async function POST(
     // Fetch the request
     const { data: verificationRequest, error: fetchError } = await supabaseAdmin
       .from('verification_requests')
-      .select('id, profile_id, entity_type, status, submitted_at')
+      .select('id, profile_id, entity_type, status, submitted_at, bank_code, bank_name, account_number, account_holder')
       .eq('id', requestId)
       .single()
 
@@ -98,6 +180,12 @@ export async function POST(
         throw profileUpdateError
       }
 
+      // Set up the payout destination now, while an admin is looking at this
+      // person — so a bad account surfaces here rather than when someone is
+      // waiting to be paid. A Paystack failure must not undo the identity
+      // approval, so it is recorded and left for retry instead of thrown.
+      const payoutSetup = await setUpPayoutAccount(verificationRequest)
+
       await createNotification({
         userId: verificationRequest.profile_id,
         type: 'profile_verified',
@@ -109,7 +197,11 @@ export async function POST(
 
       return NextResponse.json({
         success: true,
-        message: 'Verification approved. User has been notified.',
+        message: payoutSetup.ok
+          ? 'Verification approved. Payout account is ready.'
+          : `Verification approved, but the payout account could not be set up: ${payoutSetup.error}`,
+        payoutAccountReady: payoutSetup.ok,
+        payoutAccountError: payoutSetup.ok ? null : payoutSetup.error,
       })
     }
 

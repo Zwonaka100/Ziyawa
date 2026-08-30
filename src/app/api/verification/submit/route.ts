@@ -50,16 +50,43 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { entity_type } = body
+    const { entity_type, bank_code, bank_name, account_number, account_holder } = body
 
     if (!entity_type || !['individual', 'business'].includes(entity_type)) {
       return NextResponse.json({ error: 'entity_type must be individual or business' }, { status: 400 })
     }
 
+    // Bank details are required: verification exists so we can pay people, and
+    // an approved account with no payable destination is not much use.
+    if (!bank_code || !bank_name || !account_number || !account_holder?.trim()) {
+      return NextResponse.json(
+        { error: 'Bank, account number and account holder name are all required' },
+        { status: 400 }
+      )
+    }
+
+    // Account number length is not fixed across SA banks — Standard Bank issues
+    // 9- and 11-digit numbers — so only sanity-check the shape.
+    const normalizedAccount = String(account_number).replace(/\s/g, '')
+    if (!/^\d{6,15}$/.test(normalizedAccount)) {
+      return NextResponse.json({ error: 'Account number must be between 6 and 15 digits' }, { status: 400 })
+    }
+
+    // The account holder name is self-declared and CANNOT be machine-checked:
+    // Paystack's resolve endpoint supports only NGN/USD/GHS/KES, not ZAR, and
+    // createTransferRecipient accepts any account number without validating it.
+    // An admin therefore compares this name against the ID document at review
+    // time — that comparison is the only real safeguard available in SA.
+    const declaredAccountHolder = String(account_holder).trim()
+
     let insertData: Record<string, unknown> = {
       profile_id: user.id,
       entity_type,
       status: 'pending',
+      bank_code: String(bank_code),
+      bank_name: String(bank_name),
+      account_number: normalizedAccount,
+      account_holder: declaredAccountHolder,
     }
 
     if (entity_type === 'individual') {

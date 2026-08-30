@@ -56,6 +56,10 @@ interface VerificationRow {
   rep_id_number: string | null
   rep_id_front_url: string | null
   rep_id_back_url: string | null
+  bank_code: string | null
+  bank_name: string | null
+  account_number: string | null
+  account_holder: string | null
   profiles: {
     id: string
     full_name: string | null
@@ -101,6 +105,7 @@ export default function AdminVerificationsPage() {
           rejection_reason, id_type, id_number, doc_front_url, doc_back_url,
           business_name, registration_number, company_reg_cert_url,
           rep_id_number, rep_id_front_url, rep_id_back_url,
+          bank_code, bank_name, account_number, account_holder,
           profiles!verification_requests_profile_id_fkey!inner (id, full_name, email, avatar_url, is_organizer, is_artist, is_provider, is_verified, verified_at, verified_entity_type)
         `)
         .order('submitted_at', { ascending: false })
@@ -335,6 +340,33 @@ export default function AdminVerificationsPage() {
                   <DocField label="Rep — back of ID" path={detailRow.rep_id_back_url} />
                 </>
               )}
+
+              {/* Payout destination — approving creates a Paystack recipient
+                  for this account, so it is part of the review decision. */}
+              <div className="pt-2 border-t space-y-3">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Payout account</p>
+                {detailRow.account_number ? (
+                  <>
+                    <Detail label="Bank" value={detailRow.bank_name} />
+                    <Detail label="Account number" value={detailRow.account_number} />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Account holder (self-declared)</p>
+                      <p className="font-medium">{detailRow.account_holder || '—'}</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
+                      <p className="text-xs text-amber-800">
+                        <strong>Check this name against the ID document above before approving.</strong> South African
+                        banks can&apos;t confirm account names through Paystack, so this manual comparison is the only
+                        safeguard against paying the wrong person.
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No bank details submitted — this request predates payout capture. Approving will verify identity only.
+                  </p>
+                )}
+              </div>
             </div>
           )}
           <DialogFooter>
