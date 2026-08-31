@@ -237,7 +237,7 @@ export async function PATCH(
       type: 'refund_issued',
       title: 'Refund approved and credited',
       message: `Your refund has been approved and credited to your Ziyawa wallet. Amount: R${amountRands.toFixed(2)}.`,
-      link: '/wallet',
+      link: '/earnings',
       transactionId: refundTx.id,
       sendEmail: true,
     })

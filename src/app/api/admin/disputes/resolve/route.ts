@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
           type: 'payment_received',
           title: 'Dispute resolved — payment released',
           message: `Your booking dispute has been resolved in your favour. The payment has been released to your wallet.`,
-          link: '/wallet',
+          link: '/earnings',
           sendEmail: true,
         })
       }
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
           type: 'payment_received',
           title: 'Dispute resolved — refund issued',
           message: `Your booking dispute has been resolved in your favour. The payment has been refunded to your wallet.`,
-          link: '/wallet',
+          link: '/earnings',
           sendEmail: true,
         })
       }

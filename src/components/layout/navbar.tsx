@@ -231,9 +231,9 @@ export function Navbar() {
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuItem asChild>
-                    <Link href="/wallet" className="flex w-full items-center">
+                    <Link href="/earnings" className="flex w-full items-center">
                       <Wallet className="mr-2 h-4 w-4" />
-                      <span className="flex-1">Wallet</span>
+                      <span className="flex-1">Earnings</span>
                       <span className="text-xs text-muted-foreground">
                         {formatCurrency(profile.wallet_balance)}
                       </span>
@@ -402,10 +402,10 @@ export function Navbar() {
                           </Button>
                         </Link>
                       )}
-                      <Link href="/wallet" onClick={() => setMobileMenuOpen(false)}>
+                      <Link href="/earnings" onClick={() => setMobileMenuOpen(false)}>
                         <Button variant="outline" className="w-full justify-start">
                           <Wallet className="mr-2 h-4 w-4" />
-                          Wallet ({formatCurrency(profile.wallet_balance)})
+                          Earnings ({formatCurrency(profile.wallet_balance)})
                         </Button>
                       </Link>
                     </div>

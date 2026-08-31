@@ -499,7 +499,7 @@ async function processBookingPayment(
         type: 'payment_received',
         title: 'Booking payment received',
         message: `${formattedAmount} has been held in escrow for your booking. It will be released once the booking is marked complete by both parties.`,
-        link: '/wallet',
+        link: '/earnings',
         sendEmail: false,
       })
 
@@ -610,7 +610,7 @@ async function handleTransferSuccess(data: { reference: string }) {
       type: 'payout_completed',
       title: 'Payout completed',
       message: `Your payout of ${formatZarFromCents((transaction.amount as number) || 0)} has been completed successfully.`,
-      link: '/wallet',
+      link: '/earnings',
       transactionId: transaction.id,
       sendEmail: false,
     })
@@ -626,7 +626,7 @@ async function handleTransferSuccess(data: { reference: string }) {
         recipientName: profile.full_name || 'there',
         amount: formatZarFromCents((transaction.amount as number) || 0),
         status: 'completed',
-        actionUrl: `${SITE_URL}/wallet`,
+        actionUrl: `${SITE_URL}/earnings`,
       })
     }
   }
@@ -683,7 +683,7 @@ async function handleTransferFailed(data: { reference: string; reason: string })
       type: 'payment_failed',
       title: 'Payout failed',
       message: `Your payout of ${formatZarFromCents((transaction.amount as number) || 0)} could not be completed. The funds have been returned to your wallet.`,
-      link: '/wallet',
+      link: '/earnings',
       transactionId: transaction.id,
       sendEmail: false,
     });
@@ -699,7 +699,7 @@ async function handleTransferFailed(data: { reference: string; reason: string })
         recipientName: profile.full_name || 'there',
         amount: formatZarFromCents((transaction.amount as number) || 0),
         status: 'failed',
-        actionUrl: `${SITE_URL}/wallet`,
+        actionUrl: `${SITE_URL}/earnings`,
       })
     }
   }
@@ -760,7 +760,7 @@ async function handleTransferReversed(data: { reference: string }) {
       type: 'refund_issued',
       title: 'Payout reversed',
       message: `Paystack reversed your payout of ${formatZarFromCents((transaction.amount as number) || 0)}. The funds are now back in your wallet.`,
-      link: '/wallet',
+      link: '/earnings',
       transactionId: transaction.id,
       sendEmail: false,
     });
@@ -776,7 +776,7 @@ async function handleTransferReversed(data: { reference: string }) {
         recipientName: profile.full_name || 'there',
         amount: formatZarFromCents((transaction.amount as number) || 0),
         status: 'reversed',
-        actionUrl: `${SITE_URL}/wallet`,
+        actionUrl: `${SITE_URL}/earnings`,
       })
     }
   }

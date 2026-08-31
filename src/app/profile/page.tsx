@@ -269,7 +269,7 @@ export default function ProfilePage() {
           </Link>
         )}
 
-        <Link href="/wallet">
+        <Link href="/earnings">
           <Card className="hover:border-primary transition-colors cursor-pointer h-full">
             <CardContent className="pt-6 flex items-center gap-3">
               <div className="p-2 bg-green-500/10 rounded-lg">

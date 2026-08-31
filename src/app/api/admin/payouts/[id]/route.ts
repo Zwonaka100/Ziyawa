@@ -285,7 +285,7 @@ export async function POST(
       type: 'payout_sent',
       title: 'Payout on its way',
       message: `Your payout of R${amountRands.toFixed(2)} has been approved and sent to your bank account.`,
-      link: '/wallet',
+      link: '/earnings',
       transactionId: transaction.id,
       sendEmail: true,
     })

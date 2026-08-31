@@ -191,7 +191,7 @@ Once set up, organizers can find and book you! 🎵`,
     category: 'artists',
     links: [
       { text: 'Artist Dashboard', href: '/dashboard/artist' },
-      { text: 'Wallet', href: '/wallet' }
+      { text: 'Wallet', href: '/earnings' }
     ]
   },
 
@@ -236,7 +236,7 @@ Organizers will find you when planning events! 🔧`,
 **Note:** Make sure your bank details are correct in your profile! 🏦`,
     category: 'payments',
     links: [
-      { text: 'Wallet', href: '/wallet' },
+      { text: 'Wallet', href: '/earnings' },
       { text: 'Profile Settings', href: '/profile' }
     ]
   },
@@ -253,7 +253,7 @@ Organizers will find you when planning events! 🔧`,
 All payments are processed securely through Paystack, one of Africa's leading payment providers. 🔒`,
     category: 'payments',
     links: [
-      { text: 'Wallet', href: '/wallet' }
+      { text: 'Wallet', href: '/earnings' }
     ]
   },
 

@@ -34,7 +34,7 @@ interface Transaction {
   created_at: string
 }
 
-export default function WalletPage() {
+export default function EarningsPage() {
   const { user, profile, loading } = useAuth()
   const router = useRouter()
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -121,7 +121,7 @@ export default function WalletPage() {
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `ziyawa-wallet-statement-${new Date().toISOString().slice(0, 10)}.csv`
+    link.download = `ziyawa-earnings-statement-${new Date().toISOString().slice(0, 10)}.csv`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -131,51 +131,51 @@ export default function WalletPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl space-y-6">
       <div>
-        <h1 className="text-3xl font-bold mb-2">My Wallet</h1>
+        <h1 className="text-3xl font-bold mb-2">Earnings</h1>
         <p className="text-muted-foreground">
-          Only cleared funds can be withdrawn. Escrow funds stay protected until the job or event is complete.
+          Money from your events shows up here and is paid to your verified bank account after our team reviews it.
         </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="bg-gradient-to-br from-primary/10 to-primary/5">
           <CardHeader className="pb-2">
-            <CardDescription>Available Balance</CardDescription>
+            <CardDescription>Ready for payout</CardDescription>
             <CardTitle className="text-3xl font-bold text-primary">
               {formatCurrency(availableBalance)}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
-              Ready for withdrawal or spending.
+              Cleared and queued to be paid to you.
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Held in Escrow</CardDescription>
+            <CardDescription>Not yet cleared</CardDescription>
             <CardTitle className="text-3xl font-bold text-amber-600">
               {formatCurrency(heldBalance)}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
-              Protected until event or service completion is confirmed.
+              Clears once your event is marked complete.
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Payouts Processing</CardDescription>
+            <CardDescription>Payout on the way</CardDescription>
             <CardTitle className="text-3xl font-bold text-primary">
               {formatCurrency(pendingPayoutBalance)}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
-              Already requested and moving through Paystack.
+              Approved and heading to your bank account.
             </p>
           </CardContent>
         </Card>
@@ -232,8 +232,8 @@ export default function WalletPage() {
                   new: '1',
                   category: 'payment',
                   priority: 'high',
-                  subject: 'Wallet payout or balance issue',
-                  message: 'Please review my wallet or payout issue. Include the payout amount, date, and what happened.',
+                  subject: 'Payout or earnings issue',
+                  message: 'Please review my payout or earnings issue. Include the amount, date, and what happened.',
                 },
               }}
             >
@@ -244,15 +244,15 @@ export default function WalletPage() {
           <div className="mt-4 grid gap-2 sm:grid-cols-3">
             <div className="rounded-lg border bg-muted/30 p-3 text-sm">
               <p className="font-medium">1. Earn</p>
-              <p className="text-muted-foreground">Ticket and booking payments first enter escrow for safety.</p>
+              <p className="text-muted-foreground">Ticket sales are collected and held while your event runs.</p>
             </div>
             <div className="rounded-lg border bg-muted/30 p-3 text-sm">
               <p className="font-medium">2. Confirm</p>
-              <p className="text-muted-foreground">Once the event or service is completed, funds move to available balance.</p>
+              <p className="text-muted-foreground">Once your event is marked complete, your money clears.</p>
             </div>
             <div className="rounded-lg border bg-muted/30 p-3 text-sm">
-              <p className="font-medium">3. Withdraw</p>
-              <p className="text-muted-foreground">Bank payouts usually land within 24 hours after Paystack confirms them.</p>
+              <p className="font-medium">3. Get paid</p>
+              <p className="text-muted-foreground">We review and send it to your bank, usually landing within 24 hours.</p>
             </div>
           </div>
         </CardContent>
@@ -425,7 +425,7 @@ function TransactionList({
         <Wallet className="h-12 w-12 mx-auto mb-4 opacity-50" />
         <p>No transactions yet</p>
         <p className="text-sm mt-1">
-          Your wallet activity will appear here.
+          Your earnings activity will appear here.
         </p>
       </div>
     )
@@ -437,7 +437,7 @@ function TransactionList({
         const isCredit = tx.type === 'wallet_deposit' || (tx.recipient_id === currentUserId && tx.type !== 'payout')
         const label =
           tx.type === 'ticket_purchase' ? 'Ticket Payment' :
-          tx.type === 'wallet_deposit' ? 'Wallet Deposit' :
+          tx.type === 'wallet_deposit' ? 'Added funds' :
           tx.type === 'booking_payment' ? 'Booking Payment' :
           tx.type === 'artist_booking' ? 'Artist Booking' :
           tx.type === 'vendor_service' ? 'Service Payment' :
@@ -445,7 +445,7 @@ function TransactionList({
           tx.type
 
         const stateLabel =
-          tx.state === 'held' ? 'In Escrow' :
+          tx.state === 'held' ? 'Clearing' :
           tx.type === 'payout' && tx.state === 'released' ? 'Processing' :
           tx.state === 'released' ? 'Available' :
           tx.state === 'settled' ? 'Settled' :
@@ -457,13 +457,13 @@ function TransactionList({
           tx.type === 'payout' && tx.state === 'released'
             ? 'Sent to Paystack for bank transfer.'
             : tx.type === 'payout' && tx.state === 'failed'
-              ? 'Payout failed and the funds were restored to your wallet.'
+              ? 'Payout failed and the funds were returned to your available earnings.'
               : tx.type === 'payout' && tx.state === 'refunded'
-                ? 'Transfer reversed and the funds were returned to your wallet.'
+                ? 'Transfer reversed and the funds were returned to your available earnings.'
                 : tx.state === 'held'
                   ? 'Protected until completion checks pass.'
                   : tx.state === 'released'
-                    ? 'Funds are now available in your wallet.'
+                    ? 'This money has cleared and is ready for payout.'
                     : tx.state === 'settled'
                       ? 'Completed successfully.'
                       : tx.state === 'initiated'

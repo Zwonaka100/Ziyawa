@@ -450,7 +450,7 @@ export async function releaseEligibleHeldFunds(options?: {
           transaction,
           'Event revenue released',
           `${formatCurrency(Number(transaction.net_amount || 0) / 100)} from "${event.title}" is now available in your wallet.`,
-          '/wallet'
+          '/earnings'
         )
 
         result.released += 1
@@ -501,7 +501,7 @@ export async function releaseEligibleHeldFunds(options?: {
           transaction,
           'Booking payout released',
           `${formatCurrency(Number(transaction.net_amount || 0) / 100)} is now available in your wallet for your completed booking.`,
-          '/wallet'
+          '/earnings'
         )
 
         result.released += 1
