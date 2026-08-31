@@ -102,7 +102,7 @@ export default function ForArtistsPage() {
               { icon: Globe, title: 'Public Profile', desc: 'Showcase your stage name, genre, bio, pricing, and social links. Organizers find you through the Artist Directory.' },
               { icon: Music, title: 'Media Gallery', desc: 'Upload promo photos and link your YouTube videos. Let your work speak for itself.' },
               { icon: MessageSquare, title: 'Direct Messaging', desc: 'Chat directly with organizers to discuss booking details, setlists, and logistics.' },
-              { icon: CreditCard, title: 'Secure Payments', desc: 'The organizer pays upfront when they book you. Funds are held in escrow and released to your wallet after the event is complete. No chasing invoices.' },
+              { icon: CreditCard, title: 'Secure Payments', desc: 'The organizer pays upfront when they book you. The payment is held until the event is complete, then paid to your bank account. No chasing invoices.' },
               { icon: Star, title: 'Reviews & Ratings', desc: 'Build your reputation with verified reviews from organizers you\'ve worked with.' },
               { icon: TrendingUp, title: 'Grow Your Career', desc: 'The more you perform, the more reviews you earn. A strong profile helps organizers find and trust you.' },
             ].map((item) => (
@@ -139,8 +139,8 @@ export default function ForArtistsPage() {
             {[
               { step: '1', title: 'Create Your Profile', desc: 'Sign up and set up your artist profile with your stage name, genre, pricing, and media.' },
               { step: '2', title: 'Get Discovered', desc: 'Organizers browse the Artist Directory and find you based on genre, location, and reviews.' },
-              { step: '3', title: 'Accept Bookings', desc: 'Receive booking requests, negotiate terms, and confirm. The organizer pays upfront — funds are held in escrow until the event is done.' },
-              { step: '4', title: 'Perform & Get Paid', desc: 'Do your thing. After the event, both you and the organizer confirm completion, and your earnings release to your Ziyawa wallet.' },
+              { step: '3', title: 'Accept Bookings', desc: 'Receive booking requests, negotiate terms, and confirm. The organizer pays upfront — the payment is held until the event is done.' },
+              { step: '4', title: 'Perform & Get Paid', desc: 'Do your thing. After the event, both you and the organizer confirm completion, and your earnings are paid to your bank account.' },
             ].map((item) => (
               <div key={item.step} className="flex items-start gap-4">
                 <div className="w-8 h-8 bg-neutral-900 text-white rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">

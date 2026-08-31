@@ -675,7 +675,7 @@ function SettingsPageInner() {
                     <CheckCircle className="h-8 w-8 text-green-500" />
                     <div>
                       <p className="font-semibold text-green-700">Identity verified</p>
-                      <p className="text-sm text-muted-foreground">You can withdraw funds from your wallet at any time</p>
+                      <p className="text-sm text-muted-foreground">We can now pay your earnings out to your bank account</p>
                     </div>
                   </div>
                 ) : latestRequest ? (
@@ -702,7 +702,7 @@ function SettingsPageInner() {
                     <div>
                       <p className="font-medium">Not yet verified</p>
                       {needsVerification
-                        ? <p className="text-sm text-muted-foreground">Verification is required before you can withdraw funds</p>
+                        ? <p className="text-sm text-muted-foreground">Verification is required before we can pay out your earnings</p>
                         : <p className="text-sm text-muted-foreground">Optional — add a verified badge to your profile</p>
                       }
                     </div>

@@ -905,7 +905,7 @@ export default function ProviderDashboardPage() {
               Open a Dispute
             </DialogTitle>
             <DialogDescription>
-              Disputes freeze escrow funds until our team reviews the case. Describe the issue clearly.
+              Disputes freeze the held funds until our team reviews the case. Describe the issue clearly.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2">

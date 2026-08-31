@@ -196,12 +196,12 @@ export default function ForCrewPage() {
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="font-bold text-neutral-900 mt-0.5">4.</span>
-                      Deliver the service — payment releases to your wallet after the event
+                      Deliver the service — payment clears after the event
                     </li>
                   </ul>
                 </div>
                 <div className="mt-6 p-3 bg-neutral-50 rounded-lg text-xs text-muted-foreground">
-                  <span className="font-semibold text-neutral-900">Payment:</span> The organizer pays upfront when they book your service. Funds are held in escrow and released to your Ziyawa wallet after the event is complete and both sides confirm.
+                  <span className="font-semibold text-neutral-900">Payment:</span> The organizer pays upfront when they book your service. The payment is held until the event is complete and both sides confirm, then paid to your bank account.
                 </div>
               </CardContent>
             </Card>
@@ -223,7 +223,7 @@ export default function ForCrewPage() {
               { icon: Briefcase, title: 'Work Assignments', desc: 'See your upcoming event shifts, assigned roles, and event-day tools all in one place.' },
               { icon: ClipboardList, title: 'Service Listings', desc: 'Create multiple service listings with photos, pricing, and availability for organizers to book.' },
               { icon: MessageSquare, title: 'Message Organizers', desc: 'Chat directly with organizers to discuss rates, event details, and logistics before committing.' },
-              { icon: CreditCard, title: 'Wallet & Payments', desc: 'Service booking payments are paid upfront by the organizer and held in escrow until the event is done. Staff pay is tracked. Withdraw your earnings anytime.' },
+              { icon: CreditCard, title: 'Getting Paid', desc: 'Service booking payments are paid upfront by the organizer and held until the event is done. Staff pay is tracked, and your earnings are paid to your bank account.' },
               { icon: Star, title: 'Reviews & Reputation', desc: 'Organizers review you after every job. A strong track record means more work and higher rates.' },
             ].map((item) => (
               <Card key={item.title} className="border-0 shadow-sm">

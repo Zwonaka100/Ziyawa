@@ -58,7 +58,7 @@ export default function AboutPage() {
           <div>
             <h2 className="text-2xl font-bold mb-4">Our Solution</h2>
             <p className="text-muted-foreground leading-relaxed">
-              Ziyawa brings everything into one platform. Create events, sell tickets, book talent, hire crew, and manage payments — all in one place. Every payment is secured through escrow — organizers pay upfront for bookings, artists and crew get paid after the event, and ticket revenue releases once the event is done. Everyone is protected, and every groovist can trust what they&apos;re paying for.
+              Ziyawa brings everything into one platform. Create events, sell tickets, book talent, hire crew, and manage payments — all in one place. Every payment is protected — organizers pay upfront for bookings, artists and crew get paid after the event, and ticket revenue clears once the event is done. Everyone is protected, and every groovist can trust what they&apos;re paying for.
             </p>
           </div>
 
@@ -144,7 +144,7 @@ export default function AboutPage() {
               { icon: Wallet, title: 'Wallet & Payouts', desc: 'All earnings go to your Ziyawa wallet. Withdraw to your bank account anytime — with full transaction history.' },
               { icon: MessageSquare, title: 'Direct Messaging', desc: 'Message organizers, artists, and crew directly on the platform. Coordinate bookings, ask questions, and stay connected.' },
               { icon: Star, title: 'Reviews & Ratings', desc: 'Leave reviews after events. Organizers, artists, and crew all build public track records that help the community make better choices.' },
-              { icon: Shield, title: 'Escrow Payments', desc: 'Every payment is held in escrow. Booking payments release after the event. Ticket revenue releases 48 hours after completion. Everyone is protected.' },
+              { icon: Shield, title: 'Protected Payments', desc: 'Payments are held until the work is done. Booking payments clear after the event. Ticket revenue clears 48 hours after completion. Everyone is protected.' },
               { icon: Bot, title: 'Ziwaphi AI Assistant', desc: 'Ask Ziwaphi to help you find events by date, location, genre, or vibe. A conversational way to discover what\u2019s happening near you.' },
               { icon: Search, title: 'Event Discovery', desc: 'Search and filter events by province, date, price range, or keyword. Find exactly what you\u2019re looking for across South Africa.' },
             ].map((feature) => (
@@ -167,21 +167,21 @@ export default function AboutPage() {
         <div className="container mx-auto px-4 max-w-2xl">
           <h2 className="text-2xl md:text-3xl font-bold text-center mb-4">How Payments Work</h2>
           <p className="text-center text-muted-foreground mb-12 max-w-xl mx-auto">
-            Every rand on Ziyawa is processed through Paystack and protected by our escrow system.
+            Every rand on Ziyawa is processed through Paystack and held until the event is done.
           </p>
           <div className="space-y-6">
             <div className="flex gap-4">
               <div className="w-8 h-8 bg-neutral-900 text-white rounded-full flex items-center justify-center shrink-0 text-sm font-bold">1</div>
               <div>
                 <h3 className="font-semibold mb-1">Groovists buy tickets</h3>
-                <p className="text-sm text-muted-foreground">Payment goes through Paystack. The money is held in escrow — not in the organizer&apos;s pocket — until after the event.</p>
+                <p className="text-sm text-muted-foreground">Payment goes through Paystack. The money is held — not in the organizer&apos;s pocket — until after the event.</p>
               </div>
             </div>
             <div className="flex gap-4">
               <div className="w-8 h-8 bg-neutral-900 text-white rounded-full flex items-center justify-center shrink-0 text-sm font-bold">2</div>
               <div>
                 <h3 className="font-semibold mb-1">Organizers book artists & crew</h3>
-                <p className="text-sm text-muted-foreground">The organizer pays upfront. Those funds are also held in escrow — the artist or crew member doesn&apos;t receive the money yet.</p>
+                <p className="text-sm text-muted-foreground">The organizer pays upfront. Those funds are also held — the artist or crew member doesn&apos;t receive the money yet.</p>
               </div>
             </div>
             <div className="flex gap-4">
@@ -227,7 +227,7 @@ export default function AboutPage() {
             <div>
               <h3 className="font-semibold text-lg mb-2">Nobody Gets Burned</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Our escrow system means organizers can&apos;t disappear with booking money, and artists and crew can&apos;t get stiffed after doing the work. The money is always there — it just doesn&apos;t move until the event is done and both sides confirm.
+                Holding payments means organizers can&apos;t disappear with booking money, and artists and crew can&apos;t get stiffed after doing the work. The money is always there — it just doesn&apos;t move until the event is done and both sides confirm.
               </p>
             </div>
             <Separator />
@@ -241,7 +241,7 @@ export default function AboutPage() {
             <div>
               <h3 className="font-semibold text-lg mb-2">Transparent Fees</h3>
               <p className="text-muted-foreground leading-relaxed">
-                No hidden costs. Ticket fees, booking commissions, and withdrawal charges are all published upfront on our{' '}
+                No hidden costs. Ticket fees and booking commissions are all published upfront on our{' '}
                 <Link href="/pricing" className="text-primary hover:underline font-medium">pricing page</Link>.
                 You always know what you&apos;re paying before you commit.
               </p>

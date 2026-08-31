@@ -374,7 +374,7 @@ function SupportPageContent() {
               <div>
                 <h3 className="font-semibold">Fast-track disputes and payout issues</h3>
                 <p className="text-sm text-muted-foreground">
-                  Coming from a booking, ticket, or wallet problem? Open a prefilled ticket and our team can review it faster.
+                  Coming from a booking, ticket, or payout problem? Open a prefilled ticket and our team can review it faster.
                 </p>
               </div>
               <Button variant="outline" onClick={() => setDialogOpen(true)}>

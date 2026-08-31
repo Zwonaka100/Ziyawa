@@ -55,7 +55,7 @@ const faqs = [
       },
       {
         q: 'When do I get paid?',
-        a: 'Ticket revenue is held in escrow and released to your Ziyawa wallet 48 hours after event completion. If you booked artists or crew services through the platform, those payments are also held in escrow and released to them after the event — so everyone gets paid safely.',
+        a: 'Ticket revenue is held while your event runs and clears 48 hours after you mark the event complete. It is then reviewed by our team and paid to your verified bank account. Payments for artists or crew booked through the platform are held the same way and released to them after the event.',
       },
       {
         q: 'Can I create multiple ticket tiers?',
@@ -63,7 +63,7 @@ const faqs = [
       },
       {
         q: 'How do I book artists or crew?',
-        a: 'Browse the Artist Directory or Crew Directory, send a booking request, and pay upfront. Funds are held in escrow until the event is complete and both sides confirm — protecting both you and the person you booked.',
+        a: 'Browse the Artist Directory or Crew Directory, send a booking request, and pay upfront. The payment is held until the event is complete and both sides confirm — protecting both you and the person you booked.',
       },
     ],
   },
@@ -80,7 +80,7 @@ const faqs = [
       },
       {
         q: 'How do I get paid after a performance?',
-        a: 'The organizer pays upfront when they book you. That payment is held in escrow and released to your Ziyawa wallet after the event is complete and both sides confirm. You can then withdraw to your bank account.',
+        a: 'The organizer pays upfront when they book you. That payment is held until the event is complete and both sides confirm, then reviewed by our team and paid to your verified bank account.',
       },
     ],
   },
@@ -89,7 +89,7 @@ const faqs = [
     questions: [
       {
         q: 'What\u2019s the difference between My Work and My Services?',
-        a: 'My Work is for getting hired to work at events \u2014 roles like door staff, security, bartending, or ushering. Organizers invite you, you show up, and they pay you directly. My Services is for listing your own bookable services (sound, catering, photography, etc.) that organizers can browse and book through the platform, with payment handled via escrow. You can choose one or both when you set up your crew profile.',
+        a: 'My Work is for getting hired to work at events \u2014 roles like door staff, security, bartending, or ushering. Organizers invite you, you show up, and they pay you directly. My Services is for listing your own bookable services (sound, catering, photography, etc.) that organizers can browse and book through the platform, with payment held until the job is done. You can choose one or both when you set up your crew profile.',
       },
       {
         q: 'What services can I list?',
@@ -102,19 +102,23 @@ const faqs = [
     ],
   },
   {
-    category: 'Wallet & Withdrawals',
+    category: 'Getting Paid',
     questions: [
       {
-        q: 'How do I withdraw my earnings?',
-        a: 'Go to your Wallet page and request a withdrawal. There\'s a flat R20 fee per withdrawal, with a minimum withdrawal of R100.',
+        q: 'How do I get paid?',
+        a: 'You don\'t need to request anything. Once your event is marked complete, your earnings are queued automatically, reviewed by our team, and paid to your verified bank account.',
       },
       {
-        q: 'How long do withdrawals take?',
-        a: 'Withdrawals are processed via Paystack. Funds typically arrive in your bank account within 24 hours.',
+        q: 'How long does it take?',
+        a: 'Payouts are reviewed by our team and then sent via Paystack. Once sent, funds typically arrive in your bank account within 24 hours.',
       },
       {
-        q: 'Can I deposit money into my wallet?',
-        a: 'Yes. Deposits incur a 2.5% + R3 processing fee to cover payment gateway costs.',
+        q: 'What do I need before I can be paid?',
+        a: 'A verified account. Go to Settings → Verification and submit your ID, your bank details, and a bank confirmation letter or recent statement. We can only pay out to an account in your own name.',
+      },
+      {
+        q: 'Are there any fees on payouts?',
+        a: 'No. Our commission is taken when the ticket is sold, so nothing further is deducted when we pay you.',
       },
     ],
   },
@@ -123,7 +127,7 @@ const faqs = [
     questions: [
       {
         q: 'How does Ziyawa protect my money?',
-        a: 'All payments go through Paystack and are held in escrow — not in anyone\'s pocket. Ticket revenue releases to the organizer after the event. Booking payments release to artists and crew after the event is complete and both sides confirm. Amounts over R5,000 require additional admin review. Everyone is protected.',
+        a: 'All payments go through Paystack and are held — not sitting in anyone\'s pocket. Ticket revenue clears to the organizer after the event. Booking payments clear to artists and crew once the event is complete and both sides confirm. Every payout is reviewed by our team before it is sent.',
       },
       {
         q: 'How do reviews work?',

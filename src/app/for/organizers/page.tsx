@@ -152,10 +152,10 @@ export default function ForOrganizersPage() {
           <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
             {[
               { icon: Calendar, title: 'Event Management', desc: 'Create, publish, and manage events with multiple ticket tiers, media galleries, and promo videos.' },
-              { icon: Users, title: 'Book Talent & Services', desc: 'Find and book artists, DJs, sound engineers, caterers, and more. You pay upfront, funds are held in escrow, and only released to them after the event is complete.' },
+              { icon: Users, title: 'Book Talent & Services', desc: 'Find and book artists, DJs, sound engineers, caterers, and more. You pay upfront, the payment is held, and it only reaches them after the event is complete.' },
               { icon: BarChart3, title: 'Organizer Dashboard', desc: 'Track ticket sales, revenue, bookings, and check-ins. Everything in one place.' },
               { icon: Ticket, title: 'Ticket Tiers', desc: 'Create Early Bird, VIP, General, and custom tiers with different pricing and capacities.' },
-              { icon: CreditCard, title: 'Secure Payouts', desc: 'Ticket revenue is held in escrow and released to your wallet 48 hours after event completion. Booking payments you make to artists and crew are also held until the event is done — everyone gets paid safely.' },
+              { icon: CreditCard, title: 'Secure Payouts', desc: 'Ticket revenue clears 48 hours after you mark the event complete, then goes to your verified bank account. Booking payments you make to artists and crew are also held until the event is done — everyone gets paid safely.' },
               { icon: Shield, title: 'Build Your Reputation', desc: 'Verified badge, attendee reviews, and a public track record that grows with every event.' },
             ].map((item) => (
               <Card key={item.title} className="border-0 shadow-sm">
@@ -193,7 +193,7 @@ export default function ForOrganizersPage() {
           <div className="space-y-8">
             {[
               { step: '1', title: 'Create Your Event', desc: 'Add event details, set ticket tiers, upload cover art and gallery images.' },
-              { step: '2', title: 'Book Your Lineup', desc: 'Browse artists and crew, send booking requests, and pay upfront. Funds are held in escrow until after the event — so everyone is protected.' },
+              { step: '2', title: 'Book Your Lineup', desc: 'Browse artists and crew, send booking requests, and pay upfront. Payments are held until after the event — so everyone is protected.' },
               { step: '3', title: 'Publish & Sell', desc: 'Go live on Ziwaphi. Share your event link and watch tickets sell.' },
               { step: '4', title: 'Host & Get Paid', desc: 'Check in attendees with QR codes. After the event, confirm completion — your ticket revenue releases to your wallet, and booking payments release to your artists and crew.' },
             ].map((item) => (

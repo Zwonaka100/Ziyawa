@@ -74,7 +74,7 @@ function RoleExplainer({ profile }: { profile: ProfileLike }) {
   if (!isProvider) suggestions.push({ label: 'Crew', hint: 'offer technical or creative services at events' })
 
   const verificationNote = !isVerified
-    ? 'Verify your identity in Settings to unlock withdrawals and get a verified badge on your public profile.'
+    ? 'Verify your identity in Settings so we can pay you, and get a verified badge on your public profile.'
     : null
 
   return (
@@ -276,7 +276,7 @@ export default function ProfilePage() {
                 <Wallet className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="font-medium">Wallet</p>
+                <p className="font-medium">Earnings</p>
                 <p className="text-sm text-green-600 font-semibold">{formatCurrency(profile.wallet_balance)}</p>
               </div>
             </CardContent>

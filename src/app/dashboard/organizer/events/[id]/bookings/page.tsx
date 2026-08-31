@@ -833,7 +833,7 @@ export default function EventBookingsPage() {
               <CardContent className="py-4 flex items-start gap-3">
                 <Clock className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-amber-800">
-                  Outstanding payments are released once both parties mark the booking as complete and any escrow hold period has passed.
+                  Outstanding payments clear once both parties mark the booking as complete and the hold period has passed.
                   Contact <Link href="/support" className="underline underline-offset-2">support</Link> if you have a dispute.
                 </p>
               </CardContent>
@@ -851,7 +851,7 @@ export default function EventBookingsPage() {
               Open a Dispute
             </DialogTitle>
             <DialogDescription>
-              Disputes freeze the escrow funds until our team reviews the case.
+              Disputes freeze the held funds until our team reviews the case.
               Please describe the issue clearly so we can resolve it quickly.
             </DialogDescription>
           </DialogHeader>

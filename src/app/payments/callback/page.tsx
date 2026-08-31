@@ -238,7 +238,7 @@ function getSuccessMessage(type: PaymentType): string {
     case 'ticket_purchase':
       return 'Your tickets have been booked successfully!';
     case 'wallet_deposit':
-      return 'Funds have been added to your wallet!';
+      return 'Funds have been added to your account.';
     case 'booking_payment':
       return 'Your booking has been confirmed!';
     default:
@@ -264,7 +264,7 @@ function getActionText(type: PaymentType): string {
     case 'ticket_purchase':
       return 'View My Tickets';
     case 'wallet_deposit':
-      return 'View Wallet';
+      return 'View Earnings';
     case 'booking_payment':
       return 'View Booking';
     default:
