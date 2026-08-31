@@ -1,17 +1,16 @@
 'use client'
 
-import Image from 'next/image'
-
 /**
  * ADMIN PAYOUTS PAGE
  * /admin/finance/payouts
- * 
- * Review and process payout requests
+ *
+ * The approval queue — the only route by which money leaves the platform.
+ * Approving fires a real, irreversible Paystack transfer, so the UI leads with
+ * what could go wrong: the funding balance, and why a given payout is blocked.
  */
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -23,549 +22,321 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import {
   ArrowLeft,
-  ChevronLeft,
-  ChevronRight,
-  User,
-  MoreHorizontal,
+  AlertTriangle,
   CheckCircle,
-  XCircle,
   Loader2,
-  Building,
-  CreditCard,
+  RefreshCw,
+  Wallet,
 } from 'lucide-react'
-import { formatCurrency } from '@/lib/helpers'
-import { format } from 'date-fns'
+import { formatMoneyExact } from '@/lib/helpers'
 import { toast } from 'sonner'
 
-interface PayoutRequest {
+interface PayoutRow {
   id: string
   user_id: string
   amount: number
+  bank_name: string | null
+  account_number: string | null
+  account_holder: string | null
   status: string
-  bank_name: string
-  account_number: string
-  account_holder: string
-  reference: string
+  reference: string | null
+  admin_notes: string | null
   requested_at: string
   processed_at: string | null
-  admin_notes: string | null
-  user?: {
-    full_name: string
+  recipient: {
+    full_name: string | null
     email: string
-    avatar_url: string
-  }
-  wallet?: {
-    balance: number
-    pending_balance: number
-  }
+    is_verified: boolean
+    wallet_balance: number
+    pending_payout_balance: number
+  } | null
+  payout_account: {
+    bank_name: string | null
+    account_number: string | null
+    account_holder: string | null
+    legal_name: string | null
+    paystack_recipient_code: string | null
+    recipient_error: string | null
+  } | null
+  blockers: string[]
+  payable: boolean
 }
 
-const ITEMS_PER_PAGE = 25
-
-const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  pending: { label: 'Pending Review', color: 'bg-yellow-100 text-yellow-700' },
-  approved: { label: 'Approved', color: 'bg-blue-100 text-blue-700' },
-  processing: { label: 'Processing', color: 'bg-purple-100 text-purple-700' },
-  completed: { label: 'Completed', color: 'bg-green-100 text-green-700' },
-  rejected: { label: 'Rejected', color: 'bg-red-100 text-red-700' },
-  failed: { label: 'Failed', color: 'bg-red-100 text-red-700' },
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    pending: 'border-orange-400 text-orange-600',
+    processing: 'border-blue-400 text-blue-600',
+    completed: 'bg-green-500 text-white border-transparent',
+    rejected: 'bg-red-500 text-white border-transparent',
+    failed: 'bg-red-500 text-white border-transparent',
+  }
+  return <Badge variant="outline" className={map[status] || ''}>{status}</Badge>
 }
 
 export default function AdminPayoutsPage() {
-  const [payouts, setPayouts] = useState<PayoutRequest[]>([])
+  const [rows, setRows] = useState<PayoutRow[]>([])
+  const [balance, setBalance] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('pending')
-  const [page, setPage] = useState(1)
-  const [totalCount, setTotalCount] = useState(0)
+  const [processing, setProcessing] = useState<string | null>(null)
+  const [confirmRow, setConfirmRow] = useState<PayoutRow | null>(null)
+  const [rejectRow, setRejectRow] = useState<PayoutRow | null>(null)
+  const [notes, setNotes] = useState('')
 
-  // Process dialog
-  const [processOpen, setProcessOpen] = useState(false)
-  const [selectedPayout, setSelectedPayout] = useState<PayoutRequest | null>(null)
-  const [processAction, setProcessAction] = useState<'approve' | 'reject' | 'complete'>('approve')
-  const [adminNotes, setAdminNotes] = useState('')
-  const [processing, setProcessing] = useState(false)
-
-  // Stats
-  const [stats, setStats] = useState({
-    pendingCount: 0,
-    pendingAmount: 0,
-    processedToday: 0,
-    processedAmount: 0,
-  })
-
-  const fetchStats = useCallback(async () => {
-    const supabase = createClient()
-    const today = new Date().toISOString().split('T')[0]
-    
-    const [pending, processed] = await Promise.all([
-      supabase.from('payout_requests').select('amount').eq('status', 'pending'),
-      supabase.from('payout_requests').select('amount').eq('status', 'completed').gte('processed_at', today),
-    ])
-
-    setStats({
-      pendingCount: pending.data?.length || 0,
-      pendingAmount: pending.data?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0,
-      processedToday: processed.data?.length || 0,
-      processedAmount: processed.data?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0,
-    })
-  }, [])
-
-  const fetchPayouts = useCallback(async () => {
-    const supabase = createClient()
+  const fetchRows = useCallback(async () => {
     setLoading(true)
-
-    let query = supabase
-      .from('payout_requests')
-      .select(`
-        *,
-        user:profiles!payout_requests_user_id_fkey(full_name, email, avatar_url),
-        wallet:wallets!payout_requests_user_id_fkey(balance, pending_balance)
-      `, { count: 'exact' })
-      .order('requested_at', { ascending: false })
-
-    if (statusFilter !== 'all') {
-      query = query.eq('status', statusFilter)
-    }
-
-    const from = (page - 1) * ITEMS_PER_PAGE
-    const to = from + ITEMS_PER_PAGE - 1
-    query = query.range(from, to)
-
-    const { data, count, error } = await query
-
-    if (!error && data) {
-      setPayouts(data)
-      setTotalCount(count || 0)
-    }
-
-    setLoading(false)
-  }, [page, statusFilter])
-
-  useEffect(() => {
-    void fetchPayouts()
-    void fetchStats()
-  }, [fetchPayouts, fetchStats])
-
-  const openProcess = (payout: PayoutRequest, action: 'approve' | 'reject' | 'complete') => {
-    setSelectedPayout(payout)
-    setProcessAction(action)
-    setAdminNotes('')
-    setProcessOpen(true)
-  }
-
-  const handleProcess = async () => {
-    if (!selectedPayout) return
-
-    setProcessing(true)
-
     try {
-      const supabase = createClient()
-      const { data: { user: admin } } = await supabase.auth.getUser()
-      
-      let newStatus = ''
-      if (processAction === 'approve') newStatus = 'approved'
-      else if (processAction === 'reject') newStatus = 'rejected'
-      else if (processAction === 'complete') newStatus = 'completed'
-
-      const updates: Record<string, unknown> = {
-        status: newStatus,
-        admin_notes: adminNotes || null,
-        processed_by: admin?.id,
-      }
-
-      if (newStatus === 'completed' || newStatus === 'rejected') {
-        updates.processed_at = new Date().toISOString()
-      }
-
-      // Update payout request
-      const { error } = await supabase
-        .from('payout_requests')
-        .update(updates)
-        .eq('id', selectedPayout.id)
-
-      if (error) throw error
-
-      // If completed, update wallet and create transaction
-      if (newStatus === 'completed') {
-        // Deduct from wallet
-        await supabase.rpc('deduct_wallet_balance', {
-          p_user_id: selectedPayout.user_id,
-          p_amount: selectedPayout.amount,
-        })
-
-        // Create payout transaction
-        await supabase.from('transactions').insert({
-          reference: `PAYOUT-${selectedPayout.reference}`,
-          type: 'payout',
-          status: 'completed',
-          amount: selectedPayout.amount,
-          platform_fee: 0,
-          net_amount: selectedPayout.amount,
-          payer_id: selectedPayout.user_id,
-          recipient_id: selectedPayout.user_id,
-          gateway_provider: 'bank_transfer',
-          gateway_response: {
-            bank_name: selectedPayout.bank_name,
-            account_number: selectedPayout.account_number,
-            account_holder: selectedPayout.account_holder,
-          },
-        })
-      }
-
-      // If rejected, release pending balance back to available
-      if (newStatus === 'rejected') {
-        await supabase.rpc('release_pending_balance', {
-          p_user_id: selectedPayout.user_id,
-          p_amount: selectedPayout.amount,
-        })
-      }
-
-      // Audit log
-      await supabase.from('admin_audit_logs').insert({
-        admin_id: admin?.id,
-        action: processAction,
-        entity_type: 'payout',
-        entity_id: selectedPayout.id,
-        details: {
-          amount: selectedPayout.amount,
-          status: newStatus,
-          notes: adminNotes,
-          user_email: selectedPayout.user?.email,
-        },
-      })
-
-      toast.success(`Payout ${processAction}${processAction === 'complete' ? 'd' : 'ed'} successfully`)
-      setProcessOpen(false)
-      void fetchPayouts()
-      void fetchStats()
+      const res = await fetch(`/api/admin/payouts?status=${statusFilter}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to load payouts')
+      setRows(data.requests || [])
+      setBalance(data.paystackBalanceRands)
     } catch (error) {
-      console.error('Process error:', error)
-      toast.error('Failed to process payout')
+      console.error('Failed to load payouts:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to load payouts')
     } finally {
-      setProcessing(false)
+      setLoading(false)
+    }
+  }, [statusFilter])
+
+  useEffect(() => { void fetchRows() }, [fetchRows])
+
+  const act = async (row: PayoutRow, action: 'approve' | 'reject') => {
+    setProcessing(row.id)
+    try {
+      const res = await fetch(`/api/admin/payouts/${row.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, admin_notes: notes.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast.success(data.message || 'Done')
+      setConfirmRow(null)
+      setRejectRow(null)
+      setNotes('')
+      await fetchRows()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Action failed')
+    } finally {
+      setProcessing(null)
     }
   }
 
-  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE)
+  const pendingTotal = rows
+    .filter((r) => r.status === 'pending')
+    .reduce((sum, r) => sum + Number(r.amount || 0), 0)
+
+  const balanceShort = balance !== null && pendingTotal > balance
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/admin/finance">
-          <Button variant="ghost" size="sm">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-        </Link>
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Payouts</h2>
-          <p className="text-muted-foreground">Review and process payout requests</p>
+          <Link href="/admin/finance" className="text-sm text-muted-foreground hover:text-primary inline-flex items-center mb-1">
+            <ArrowLeft className="h-4 w-4 mr-1" /> Finance
+          </Link>
+          <h1 className="text-2xl font-bold">Payouts</h1>
+          <p className="text-muted-foreground">Approve money leaving the platform</p>
         </div>
+        <Button variant="outline" onClick={() => void fetchRows()} disabled={loading}>
+          {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+          Refresh
+        </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="border-yellow-200 bg-yellow-50">
-          <CardContent className="p-4">
-            <p className="text-sm text-yellow-700">Pending Review</p>
-            <p className="text-2xl font-bold text-yellow-700">{stats.pendingCount}</p>
-            <p className="text-sm text-yellow-600">{formatCurrency(stats.pendingAmount)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Processed Today</p>
-            <p className="text-2xl font-bold text-green-600">{stats.processedToday}</p>
-            <p className="text-sm text-muted-foreground">{formatCurrency(stats.processedAmount)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Processing Time</p>
-            <p className="text-2xl font-bold">1-3 days</p>
-            <p className="text-sm text-muted-foreground">Average</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Min. Payout</p>
-            <p className="text-2xl font-bold">R100</p>
-            <p className="text-sm text-muted-foreground">Threshold</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
+      {/* Transfers are funded from the Paystack balance, so surface it up front. */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex gap-4">
-            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Requests</SelectItem>
-                <SelectItem value="pending">Pending Review</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="processing">Processing</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Payouts Table */}
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Bank Details</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="text-right">Wallet Balance</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Requested</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
-                  </TableCell>
-                </TableRow>
-              ) : payouts.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    No payout requests found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                payouts.map((payout) => {
-                  const statusConfig = STATUS_CONFIG[payout.status] || STATUS_CONFIG.pending
-
-                  return (
-                    <TableRow key={payout.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center">
-                            {payout.user?.avatar_url ? (
-                              <Image
-                                src={payout.user.avatar_url}
-                                alt=""
-                                width={32}
-                                height={32}
-                                className="w-full h-full rounded-full object-cover"
-                              />
-                            ) : (
-                              <User className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </div>
-                          <div>
-                            <Link href={`/admin/users/${payout.user_id}`} className="font-medium hover:underline">
-                              {payout.user?.full_name || 'Unknown'}
-                            </Link>
-                            <p className="text-xs text-muted-foreground">{payout.user?.email}</p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div className="flex items-center gap-1">
-                            <Building className="h-3 w-3 text-muted-foreground" />
-                            <span>{payout.bank_name}</span>
-                          </div>
-                          <div className="flex items-center gap-1 text-muted-foreground">
-                            <CreditCard className="h-3 w-3" />
-                            <span>***{payout.account_number.slice(-4)}</span>
-                          </div>
-                          <p className="text-xs text-muted-foreground">{payout.account_holder}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span className="font-bold text-lg">{formatCurrency(payout.amount)}</span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span className="text-muted-foreground">
-                          {payout.wallet ? formatCurrency(payout.wallet.balance) : '-'}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={statusConfig.color}>
-                          {statusConfig.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {format(new Date(payout.requested_at), 'MMM d, HH:mm')}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {payout.status === 'pending' && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openProcess(payout, 'approve')}>
-                                <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
-                                Approve
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => openProcess(payout, 'reject')}>
-                                <XCircle className="h-4 w-4 mr-2 text-red-600" />
-                                Reject
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
-                        {payout.status === 'approved' && (
-                          <Button
-                            size="sm"
-                            onClick={() => openProcess(payout, 'complete')}
-                          >
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            Mark Complete
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Showing {((page - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(page * ITEMS_PER_PAGE, totalCount)} of {totalCount}
-          </p>
+        <CardContent className="p-4 flex flex-wrap items-center gap-6">
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm">Page {page} of {totalPages}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+            <Wallet className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="text-xs text-muted-foreground">Paystack balance</p>
+              <p className="font-semibold">
+                {balance === null ? 'Unavailable' : formatMoneyExact(balance)}
+              </p>
+            </div>
           </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Pending payouts</p>
+            <p className="font-semibold">{formatMoneyExact(pendingTotal)}</p>
+          </div>
+          {balanceShort && (
+            <div className="flex items-start gap-2 text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <p className="text-xs">
+                Pending payouts exceed your Paystack balance. Transfers are funded from that balance,
+                so approvals will fail until it is topped up or settles.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="pending">Pending</SelectItem>
+          <SelectItem value="processing">Processing</SelectItem>
+          <SelectItem value="completed">Completed</SelectItem>
+          <SelectItem value="rejected">Rejected</SelectItem>
+          <SelectItem value="failed">Failed</SelectItem>
+          <SelectItem value="all">All</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {loading ? (
+        <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+      ) : rows.length === 0 ? (
+        <Card><CardContent className="p-10 text-center text-muted-foreground">
+          No {statusFilter === 'all' ? '' : statusFilter} payouts.
+        </CardContent></Card>
+      ) : (
+        <div className="space-y-3">
+          {rows.map((row) => (
+            <Card key={row.id}>
+              <CardContent className="p-4">
+                <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold">{row.recipient?.full_name || 'Unknown recipient'}</p>
+                      <StatusBadge status={row.status} />
+                      {row.recipient?.is_verified === false && (
+                        <Badge variant="outline" className="border-red-400 text-red-600">Unverified</Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{row.recipient?.email}</p>
+                    <p className="text-sm">
+                      {row.payout_account?.bank_name || row.bank_name || '—'} ····
+                      {String(row.payout_account?.account_number || row.account_number || '').slice(-4)}
+                      {' · '}
+                      {row.payout_account?.account_holder || row.account_holder || '—'}
+                    </p>
+                    {row.reference && (
+                      <p className="text-xs font-mono text-muted-foreground">{row.reference}</p>
+                    )}
+                    {row.admin_notes && (
+                      <p className="text-xs text-muted-foreground">Note: {row.admin_notes}</p>
+                    )}
+                  </div>
+
+                  <div className="text-right space-y-2">
+                    <p className="text-2xl font-bold">{formatMoneyExact(Number(row.amount || 0))}</p>
+                    {row.recipient && (
+                      <p className="text-xs text-muted-foreground">
+                        Available {formatMoneyExact(row.recipient.wallet_balance)}
+                      </p>
+                    )}
+                    {row.status === 'pending' && (
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setNotes(''); setRejectRow(row) }}
+                          disabled={processing === row.id}
+                        >
+                          Reject
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                          disabled={!row.payable || processing === row.id}
+                          onClick={() => { setNotes(''); setConfirmRow(row) }}
+                        >
+                          {processing === row.id ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                          Approve &amp; send
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Why this can't be paid — shown rather than hidden, so a stuck
+                    payout is visible and actionable. */}
+                {row.blockers.length > 0 && row.status === 'pending' && (
+                  <div className="mt-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                    <p className="text-xs font-medium text-amber-900 mb-1">Cannot pay out yet:</p>
+                    <ul className="text-xs text-amber-800 list-disc list-inside space-y-0.5">
+                      {row.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
 
-      {/* Process Dialog */}
-      <Dialog open={processOpen} onOpenChange={setProcessOpen}>
+      {/* Approve confirmation — deliberately explicit, since this is irreversible. */}
+      <Dialog open={!!confirmRow} onOpenChange={(o) => { if (!o) setConfirmRow(null) }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {processAction === 'approve' && 'Approve Payout'}
-              {processAction === 'reject' && 'Reject Payout'}
-              {processAction === 'complete' && 'Complete Payout'}
-            </DialogTitle>
+            <DialogTitle>Send this payout?</DialogTitle>
             <DialogDescription>
-              {processAction === 'approve' && 'Approve this payout request for processing'}
-              {processAction === 'reject' && 'Reject this payout request'}
-              {processAction === 'complete' && 'Mark this payout as completed (bank transfer done)'}
+              This immediately transfers money to the recipient&apos;s bank account. Paystack transfers
+              cannot be reversed once sent.
             </DialogDescription>
           </DialogHeader>
-
-          {selectedPayout && (
-            <div className="space-y-4 mt-4">
-              <div className="p-4 rounded-lg bg-neutral-50">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-medium">{selectedPayout.user?.full_name}</p>
-                    <p className="text-sm text-muted-foreground">{selectedPayout.user?.email}</p>
-                  </div>
-                  <p className="text-xl font-bold">{formatCurrency(selectedPayout.amount)}</p>
-                </div>
-                <div className="mt-3 pt-3 border-t text-sm">
-                  <p><strong>Bank:</strong> {selectedPayout.bank_name}</p>
-                  <p><strong>Account:</strong> {selectedPayout.account_number}</p>
-                  <p><strong>Holder:</strong> {selectedPayout.account_holder}</p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="notes">Admin Notes (optional)</Label>
-                <Textarea
-                  id="notes"
-                  value={adminNotes}
-                  onChange={(e) => setAdminNotes(e.target.value)}
-                  placeholder={processAction === 'reject' ? 'Reason for rejection...' : 'Any notes...'}
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4">
-                <Button variant="outline" onClick={() => setProcessOpen(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleProcess}
-                  disabled={processing}
-                  variant={processAction === 'reject' ? 'destructive' : 'default'}
-                >
-                  {processing ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      {processAction === 'approve' && <CheckCircle className="h-4 w-4 mr-2" />}
-                      {processAction === 'reject' && <XCircle className="h-4 w-4 mr-2" />}
-                      {processAction === 'complete' && <CheckCircle className="h-4 w-4 mr-2" />}
-                      {processAction === 'approve' && 'Approve'}
-                      {processAction === 'reject' && 'Reject'}
-                      {processAction === 'complete' && 'Mark Complete'}
-                    </>
-                  )}
-                </Button>
-              </div>
+          {confirmRow && (
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between"><span className="text-muted-foreground">Recipient</span><span className="font-medium">{confirmRow.recipient?.full_name}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Account holder</span><span className="font-medium">{confirmRow.payout_account?.account_holder || '—'}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Bank</span><span className="font-medium">{confirmRow.payout_account?.bank_name || '—'}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Account</span><span className="font-mono">{confirmRow.payout_account?.account_number || '—'}</span></div>
+              <div className="flex justify-between border-t pt-2"><span className="text-muted-foreground">Amount</span><span className="font-bold text-lg">{formatMoneyExact(Number(confirmRow.amount || 0))}</span></div>
             </div>
           )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmRow(null)}>Cancel</Button>
+            <Button
+              className="bg-green-600 hover:bg-green-700 text-white"
+              disabled={processing === confirmRow?.id}
+              onClick={() => confirmRow && act(confirmRow, 'approve')}
+            >
+              {processing === confirmRow?.id ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+              Confirm and send
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject */}
+      <Dialog open={!!rejectRow} onOpenChange={(o) => { if (!o) { setRejectRow(null); setNotes('') } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject payout</DialogTitle>
+            <DialogDescription>
+              The funds stay in the recipient&apos;s available balance and can be queued again later.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Why is this being rejected? Recorded against the payout."
+            rows={3}
+            maxLength={500}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setRejectRow(null); setNotes('') }}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={!notes.trim() || processing === rejectRow?.id}
+              onClick={() => rejectRow && act(rejectRow, 'reject')}
+            >
+              {processing === rejectRow?.id ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Confirm rejection
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

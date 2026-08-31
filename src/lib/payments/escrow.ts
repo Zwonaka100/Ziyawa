@@ -73,6 +73,62 @@ export function calculateHoldUntil(baseDate: string | null | undefined, holdHour
   return new Date(base.getTime() + holdHours * 60 * 60 * 1000).toISOString()
 }
 
+/**
+ * Queue a payout for money that has just become available, for an admin to
+ * approve. Money never leaves on its own: this only creates the request.
+ *
+ * Skips anyone without a usable payout destination (unverified, or no Paystack
+ * recipient) rather than queueing something that could never be paid — those
+ * users surface in the admin panel as blocked instead, via their payout_account.
+ *
+ * Idempotent by design: one pending request per person at a time, so the
+ * nightly release sweep cannot pile up duplicates for the same balance.
+ *
+ * Never throws — a queueing failure must not roll back a completed release, or
+ * money would stay stuck in `held` with no way forward.
+ */
+export async function enqueuePayoutRequest(profileId: string): Promise<void> {
+  try {
+    const { data: existing } = await supabaseAdmin
+      .from('payout_requests')
+      .select('id')
+      .eq('user_id', profileId)
+      .in('status', ['pending', 'approved', 'processing'])
+      .limit(1)
+      .maybeSingle()
+
+    if (existing?.id) return
+
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('id, is_verified, wallet_balance')
+      .eq('id', profileId)
+      .single()
+
+    const availableRands = Number(profile?.wallet_balance || 0)
+    if (!profile?.is_verified || availableRands <= 0) return
+
+    const { data: payoutAccount } = await supabaseAdmin
+      .from('payout_accounts')
+      .select('bank_name, account_number, account_holder, paystack_recipient_code')
+      .eq('profile_id', profileId)
+      .maybeSingle()
+
+    if (!payoutAccount?.paystack_recipient_code) return
+
+    await supabaseAdmin.from('payout_requests').insert({
+      user_id: profileId,
+      amount: availableRands,
+      bank_name: payoutAccount.bank_name,
+      account_number: payoutAccount.account_number,
+      account_holder: payoutAccount.account_holder,
+      status: 'pending',
+    })
+  } catch (error) {
+    console.error('Failed to queue payout request:', error)
+  }
+}
+
 export async function adjustProfileBalanceBuckets(
   userId: string,
   deltas: {
@@ -272,6 +328,10 @@ async function releaseTransactionToWallet(
     transactionId: transaction.id,
     sendEmail: true,
   })
+
+  // Funds are now available — queue them for admin approval. Nothing is sent
+  // here; an admin still has to approve before any transfer happens.
+  await enqueuePayoutRequest(transaction.recipient_id)
 
   return releaseAmountRands
 }
