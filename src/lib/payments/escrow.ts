@@ -270,27 +270,25 @@ function canReleaseEventTransaction(event: EventReleaseCandidate, tx: HeldTransa
 }
 
 /**
- * Ticket revenue acts as cover for what an organizer still owes on that event,
- * so it is not released while artists or crew remain unsettled.
+ * Ticket revenue is held only while a booking on that event is actively
+ * disputed, since an admin has to settle where that money belongs first.
  *
- * A booking counts as an outstanding obligation when it is:
- *   - `accepted`  — the artist/crew agreed to perform but has not been paid, so
- *                   the organizer still owes them and the revenue backs it.
- *   - `disputed`  — money is contested; an admin should settle it before any of
- *                   it is paid out.
+ * It deliberately does NOT hold for `accepted`. Under the agreed model nothing
+ * is paid at that point — a non-refundable booking fee falls due when both
+ * parties agree, and the performance fee only after the performance — so there
+ * is no debt yet for the revenue to cover. Holding there would also strand an
+ * organizer's revenue behind a booking that never progresses, and with artist
+ * and crew payouts deferred there is currently no reliable way to clear one.
+ * That would recreate the stuck-money problem for organizers, which is the
+ * opposite of the intent.
  *
- * Deliberately NOT blocking on:
- *   - `pending`   — merely requested, not agreed. Blocking here would strand
- *                   revenue behind stale requests nobody ever answered.
- *   - `confirmed` — already paid, and that payment is escrowed against the
- *                   booking itself, so ticket revenue is no longer the cover.
- *   - `completed` / `declined` / `cancelled` — nothing outstanding.
+ * `pending`, `confirmed`, `completed`, `declined` and `cancelled` never hold.
  *
  * Returns the blocking reasons rather than a boolean so the skip is explainable
  * — money not moving is exactly the thing that needs to be diagnosable.
  */
 async function outstandingEventObligations(eventId: string): Promise<string[]> {
-  const BLOCKING_STATES = ['accepted', 'disputed']
+  const BLOCKING_STATES = ['disputed']
 
   const [artistBookings, crewBookings] = await Promise.all([
     supabaseAdmin.from('bookings').select('id, state').eq('event_id', eventId).in('state', BLOCKING_STATES),

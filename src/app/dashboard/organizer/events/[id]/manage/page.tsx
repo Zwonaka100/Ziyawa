@@ -589,13 +589,12 @@ export default function OrganizerEventManagePage() {
         throw new Error(data.error || 'Failed to complete event')
       }
 
-      // Explain a zero release rather than leaving the organizer to guess: the
-      // most common reason is their own unsettled artist/crew bookings.
+      // Explain a zero release rather than leaving the organizer to guess.
       const blocked = data.releaseResult?.blockedByObligations || []
       if (blocked.length > 0) {
         toast.success(
-          'Event marked complete. Your ticket revenue stays on hold until the artists and crew booked ' +
-          'for this event are settled or their bookings are closed.',
+          'Event marked complete. Your ticket revenue is on hold while a booking on this event is ' +
+          'under dispute. Our team will resolve it and release your funds.',
           { duration: 9000 }
         )
       } else {
