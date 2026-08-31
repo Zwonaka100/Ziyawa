@@ -314,9 +314,22 @@ export async function resolveAccount(params: {
 // =====================================================
 
 import crypto from 'crypto';
+import { logOpsEvent } from './monitoring';
 
 /**
- * Verify webhook signature from Paystack
+ * Verify a webhook or transfer-approval signature from Paystack.
+ *
+ * This is the only thing standing between the open internet and the money
+ * paths: a request that passes here can mint tickets (charge.success), mark a
+ * payout settled and move balances (transfer.success), or approve an outgoing
+ * transfer. So it fails CLOSED in production.
+ *
+ * The local-dev bypass is deliberately gated on NODE_ENV rather than just on a
+ * missing secret. Previously a missing secret returned true everywhere, which
+ * meant one unset or renamed env var would silently disable payment
+ * authentication in production while everything still looked healthy — the
+ * failure mode most likely to appear during exactly the kind of gateway
+ * migration this project has been through.
  */
 export function verifyWebhookSignature(
   payload: string,
@@ -324,10 +337,17 @@ export function verifyWebhookSignature(
   secret?: string
 ): boolean {
   const webhookSecret = secret || process.env.PAYSTACK_WEBHOOK_SECRET || process.env.PAYSTACK_SECRET_KEY;
-  
+
   if (!webhookSecret) {
-    console.warn('No Paystack signing secret is set - skipping signature verification');
-    return true; // In development, allow without verification
+    if (process.env.NODE_ENV === 'production') {
+      logOpsEvent('paystack-signature', 'error', 'No Paystack signing secret is set - rejecting the request', {
+        hint: 'Set PAYSTACK_WEBHOOK_SECRET (or PAYSTACK_SECRET_KEY). Until then every webhook and transfer approval is refused.',
+      });
+      return false;
+    }
+
+    console.warn('No Paystack signing secret is set - skipping signature verification (development only)');
+    return true;
   }
 
   const hash = crypto
@@ -335,7 +355,19 @@ export function verifyWebhookSignature(
     .update(payload)
     .digest('hex');
 
-  return hash === signature;
+  // Length first: timingSafeEqual throws on mismatched buffers, and a wrong
+  // length is public information anyway (SHA-512 hex is always 128 chars).
+  if (typeof signature !== 'string' || signature.length !== hash.length) {
+    return false;
+  }
+
+  // Compare the hex text rather than decoded bytes: Buffer.from(x, 'hex')
+  // silently drops invalid characters, so a malformed signature could decode to
+  // a shorter buffer and compare equal to a truncated expectation.
+  return crypto.timingSafeEqual(
+    Buffer.from(hash, 'utf8'),
+    Buffer.from(signature, 'utf8')
+  );
 }
 
 // =====================================================
