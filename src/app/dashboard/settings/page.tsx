@@ -230,23 +230,38 @@ function SettingsPageInner() {
     }
     setAvatarUploading(true)
     try {
-      const ext = file.name.split('.').pop()
-      const path = `avatars/${user.id}.${ext}`
+      const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+
+      // The storage policy authorises uploads by matching the SECOND path
+      // segment against auth.uid(). A flat "avatars/<id>.jpg" has no second
+      // segment, so the check evaluated to null and every avatar upload was
+      // silently denied — which is why no profile on the platform had one.
+      // Nesting under the user's own folder matches how event media and
+      // verification documents are already stored.
+      // Cache-busting suffix: the public URL is stable per user otherwise, so
+      // browsers would keep serving the previous picture after a change.
+      const path = `avatars/${user.id}/avatar-${Date.now()}.${ext}`
+
       const { error: uploadError } = await supabase.storage
         .from('media')
         .upload(path, file, { upsert: true, contentType: file.type })
       if (uploadError) throw uploadError
+
       const { data: urlData } = supabase.storage.from('media').getPublicUrl(path)
-      const avatarUrl = urlData.publicUrl || `https://qkqdhwrneqfmbiwdsthw.supabase.co/storage/v1/object/public/media/${encodeURIComponent(path)}`
+      if (!urlData?.publicUrl) throw new Error('Could not resolve the uploaded image URL')
+
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ avatar_url: avatarUrl })
+        .update({ avatar_url: urlData.publicUrl })
         .eq('id', profile.id)
       if (updateError) throw updateError
+
       await refreshProfile()
       toast.success('Avatar updated')
-    } catch {
-      toast.error('Failed to upload avatar')
+    } catch (error) {
+      // Surface the reason — a bare catch here hid an RLS denial indefinitely.
+      console.error('Avatar upload failed:', error)
+      toast.error(error instanceof Error ? `Failed to upload avatar: ${error.message}` : 'Failed to upload avatar')
     } finally {
       setAvatarUploading(false)
     }
