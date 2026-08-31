@@ -55,6 +55,8 @@ export interface ReleaseResult {
   released: number
   skipped: number
   failures: Array<{ reference: string; reason: string }>
+  /** Ticket revenue held back because the event still owes artists or crew. */
+  blockedByObligations: Array<{ reference: string; eventTitle: string; reasons: string[] }>
 }
 
 function roundCurrency(value: number) {
@@ -267,6 +269,44 @@ function canReleaseEventTransaction(event: EventReleaseCandidate, tx: HeldTransa
   return true
 }
 
+/**
+ * Ticket revenue acts as cover for what an organizer still owes on that event,
+ * so it is not released while artists or crew remain unsettled.
+ *
+ * A booking counts as an outstanding obligation when it is:
+ *   - `accepted`  — the artist/crew agreed to perform but has not been paid, so
+ *                   the organizer still owes them and the revenue backs it.
+ *   - `disputed`  — money is contested; an admin should settle it before any of
+ *                   it is paid out.
+ *
+ * Deliberately NOT blocking on:
+ *   - `pending`   — merely requested, not agreed. Blocking here would strand
+ *                   revenue behind stale requests nobody ever answered.
+ *   - `confirmed` — already paid, and that payment is escrowed against the
+ *                   booking itself, so ticket revenue is no longer the cover.
+ *   - `completed` / `declined` / `cancelled` — nothing outstanding.
+ *
+ * Returns the blocking reasons rather than a boolean so the skip is explainable
+ * — money not moving is exactly the thing that needs to be diagnosable.
+ */
+async function outstandingEventObligations(eventId: string): Promise<string[]> {
+  const BLOCKING_STATES = ['accepted', 'disputed']
+
+  const [artistBookings, crewBookings] = await Promise.all([
+    supabaseAdmin.from('bookings').select('id, state').eq('event_id', eventId).in('state', BLOCKING_STATES),
+    supabaseAdmin.from('provider_bookings').select('id, state').eq('event_id', eventId).in('state', BLOCKING_STATES),
+  ])
+
+  const reasons: string[] = []
+  for (const booking of artistBookings.data || []) {
+    reasons.push(`artist booking ${booking.id} is ${booking.state}`)
+  }
+  for (const booking of crewBookings.data || []) {
+    reasons.push(`crew booking ${booking.id} is ${booking.state}`)
+  }
+  return reasons
+}
+
 function canReleaseBookingTransaction(booking: BookingReleaseCandidate, tx: HeldTransaction) {
   if (booking.state !== 'completed') return false
 
@@ -360,6 +400,7 @@ export async function releaseEligibleHeldFunds(options?: {
       released: 0,
       skipped: 0,
       failures: [{ reference: 'query', reason: error.message }],
+      blockedByObligations: [],
     }
   }
 
@@ -368,6 +409,7 @@ export async function releaseEligibleHeldFunds(options?: {
     released: 0,
     skipped: 0,
     failures: [],
+    blockedByObligations: [],
   }
 
   for (const transaction of (transactions || []) as HeldTransaction[]) {
@@ -391,6 +433,18 @@ export async function releaseEligibleHeldFunds(options?: {
 
         if (!canReleaseEventTransaction(event as EventReleaseCandidate, transaction)) {
           result.skipped += 1
+          continue
+        }
+
+        // Hold ticket revenue while this event still owes artists or crew.
+        const obligations = await outstandingEventObligations(event.id)
+        if (obligations.length > 0) {
+          result.skipped += 1
+          result.blockedByObligations.push({
+            reference: transaction.reference,
+            eventTitle: event.title,
+            reasons: obligations,
+          })
           continue
         }
 

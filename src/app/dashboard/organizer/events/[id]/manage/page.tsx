@@ -589,7 +589,18 @@ export default function OrganizerEventManagePage() {
         throw new Error(data.error || 'Failed to complete event')
       }
 
-      toast.success(`Event marked complete. ${data.releaseResult?.released || 0} payout batch${(data.releaseResult?.released || 0) === 1 ? '' : 'es'} released.`)
+      // Explain a zero release rather than leaving the organizer to guess: the
+      // most common reason is their own unsettled artist/crew bookings.
+      const blocked = data.releaseResult?.blockedByObligations || []
+      if (blocked.length > 0) {
+        toast.success(
+          'Event marked complete. Your ticket revenue stays on hold until the artists and crew booked ' +
+          'for this event are settled or their bookings are closed.',
+          { duration: 9000 }
+        )
+      } else {
+        toast.success(`Event marked complete. ${data.releaseResult?.released || 0} payout batch${(data.releaseResult?.released || 0) === 1 ? '' : 'es'} released.`)
+      }
       await loadAttendees()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to complete event')
