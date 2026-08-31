@@ -11,7 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
   Wallet, 
   ArrowUpRight, 
-  ArrowDownLeft, 
   History, 
   Calendar, 
   Music,
@@ -24,8 +23,6 @@ import {
 import { formatCurrency, formatDate } from '@/lib/helpers'
 import { useRouter } from 'next/navigation'
 import { PLATFORM_FEES } from '@/lib/constants'
-import { WalletDepositDialog } from '@/components/payments/wallet-deposit-dialog'
-import { WalletWithdrawDialog } from '@/components/payments/wallet-withdraw-dialog'
 
 interface Transaction {
   id: string
@@ -42,8 +39,6 @@ export default function WalletPage() {
   const router = useRouter()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loadingTx, setLoadingTx] = useState(true)
-  const [depositOpen, setDepositOpen] = useState(false)
-  const [withdrawOpen, setWithdrawOpen] = useState(false)
   const supabase = createClient()
 
   async function fetchTransactions() {
@@ -101,12 +96,6 @@ export default function WalletPage() {
   const availableBalance = profile.wallet_balance || 0
   const heldBalance = profile.held_balance || 0
   const pendingPayoutBalance = profile.pending_payout_balance || 0
-  const minimumWithdrawal = PLATFORM_FEES.wallet.minimumWithdrawal / 100
-
-  const handleWalletRefresh = async () => {
-    await fetchTransactions()
-    router.refresh()
-  }
 
   const handleExportStatement = () => {
     if (transactions.length === 0) {
@@ -194,19 +183,29 @@ export default function WalletPage() {
 
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Button
-              disabled={!hasRoles || availableBalance < minimumWithdrawal}
-              className="flex-1"
-              onClick={() => setWithdrawOpen(true)}
-            >
-              <ArrowUpRight className="h-4 w-4 mr-2" />
-              Request Payout
-            </Button>
-            <Button variant="outline" className="flex-1" onClick={() => setDepositOpen(true)}>
-              <ArrowDownLeft className="h-4 w-4 mr-2" />
-              Add Funds
-            </Button>
+          {/* Payouts are released by an admin, so there is nothing to request
+              here. Explain what happens instead of offering a dead button. */}
+          {availableBalance > 0 ? (
+            <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+              <p className="text-sm font-medium text-green-900">
+                {formatCurrency(availableBalance)} is queued for payout
+              </p>
+              <p className="text-xs text-green-800 mt-1">
+                Our team reviews and releases payouts to your verified bank account. You don&apos;t need to
+                request anything — we&apos;ll email you once it&apos;s on the way.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-lg border bg-muted/40 p-4">
+              <p className="text-sm font-medium">No funds ready for payout yet</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Money from your events becomes available once the event is marked complete. It&apos;s then
+                paid out to your verified bank account automatically, after review.
+              </p>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-3 sm:flex-row mt-3">
             <Button variant="outline" className="flex-1" onClick={handleExportStatement} disabled={loadingTx || transactions.length === 0}>
               <Receipt className="h-4 w-4 mr-2" />
               Download Statement
@@ -215,13 +214,13 @@ export default function WalletPage() {
 
           {!hasRoles && (
             <p className="text-xs text-muted-foreground mt-3 text-center">
-              Become an Organiser, Artist, or Provider to earn and withdraw funds.
+              Become an Organiser, Artist, or Provider to earn on Ziyawa.
             </p>
           )}
 
-          {hasRoles && availableBalance < minimumWithdrawal && (
-            <p className="text-xs text-muted-foreground mt-3 text-center">
-              Minimum payout amount is {formatCurrency(minimumWithdrawal)}.
+          {hasRoles && !profile.is_verified && availableBalance > 0 && (
+            <p className="text-xs text-amber-600 mt-3 text-center">
+              Verify your account in settings so we can pay these funds out to you.
             </p>
           )}
 
@@ -397,18 +396,6 @@ export default function WalletPage() {
         </CardContent>
       </Card>
 
-      <WalletDepositDialog
-        open={depositOpen}
-        onOpenChange={setDepositOpen}
-        currentBalance={availableBalance}
-      />
-
-      <WalletWithdrawDialog
-        open={withdrawOpen}
-        onOpenChange={setWithdrawOpen}
-        currentBalance={availableBalance}
-        onSuccess={() => { void handleWalletRefresh() }}
-      />
     </div>
   )
 }
