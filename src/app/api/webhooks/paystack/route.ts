@@ -4,8 +4,14 @@
  * 
  * Handles all Paystack webhook events:
  * - charge.success: Payment completed
- * - transfer.success: Payout completed
- * - transfer.failed: Payout failed
+ * - transfer.success: Payout landed
+ * - transfer.failed: Payout failed, funds restored
+ * - transfer.reversed: Payout came back after the fact, funds restored
+ *
+ * Each transfer outcome closes out three things: the `transactions` row, the
+ * recipient's balance buckets, and the `payout_requests` row that the admin
+ * approved. The last of those is easy to forget and the most damaging to miss —
+ * see settlePayoutRequest() below.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -554,6 +560,87 @@ async function processBookingPayment(
   }
 }
 
+/** The statuses a payout request can still be moved out of. */
+const OPEN_PAYOUT_STATUSES = ['pending', 'approved', 'processing'] as const
+
+/**
+ * Move a payout request to its terminal state once Paystack confirms what
+ * actually happened to the transfer.
+ *
+ * This is not just bookkeeping. enqueuePayoutRequest() refuses to queue anyone
+ * who already has a request in ('pending','approved','processing'), so a
+ * request left at 'processing' would block that person from ever being queued
+ * again — every later release would land in their available balance and never
+ * reach the admin queue. Closing the request is what makes them payable next
+ * time.
+ *
+ * `settleFrom` names which prior statuses this outcome is allowed to overwrite.
+ * Normally that is only the open ones, so a replayed or out-of-order webhook
+ * cannot reopen a settled payout or overwrite an admin's rejection. A reversal
+ * is the exception: it may also overturn a request already marked 'completed',
+ * because money coming back is a genuine later event, not a replay. Replays of
+ * the reversal itself are still no-ops, since 'failed' is never in the list.
+ *
+ * Never throws: the money has already moved and `transactions` is the record of
+ * that. Failing the webhook over this row would make Paystack retry an event
+ * that already succeeded, which is worse than a stale status we can see and fix.
+ */
+async function settlePayoutRequest(
+  reference: string,
+  outcome: {
+    status: 'completed' | 'failed'
+    failureReason?: string
+    settleFrom?: readonly string[]
+  }
+) {
+  try {
+    const update: Record<string, unknown> = { status: outcome.status }
+
+    if (outcome.status === 'completed') {
+      update.completed_at = new Date().toISOString()
+    } else {
+      update.failure_reason = outcome.failureReason || 'Transfer did not complete'
+    }
+
+    const { data: settled, error } = await supabase
+      .from('payout_requests')
+      .update(update)
+      .eq('reference', reference)
+      .in('status', outcome.settleFrom ?? OPEN_PAYOUT_STATUSES)
+      .select('id, status')
+
+    if (error) {
+      logOpsEvent('paystack-webhook', 'error', 'Could not settle payout request', {
+        reference,
+        status: outcome.status,
+        error: error.message,
+      });
+      return;
+    }
+
+    if (!settled?.length) {
+      // Either a replay of an event we already settled, or a transfer with no
+      // payout request behind it. Worth a line either way — a payout that left
+      // the platform without a queue entry is something to look at.
+      logOpsEvent('paystack-webhook', 'info', 'No open payout request matched this transfer', {
+        reference,
+        status: outcome.status,
+      });
+      return;
+    }
+
+    logOpsEvent('paystack-webhook', 'info', 'Payout request settled', {
+      reference,
+      status: outcome.status,
+    });
+  } catch (error) {
+    logOpsEvent('paystack-webhook', 'error', 'Settling the payout request threw', {
+      reference,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 /**
  * Handle successful transfer (payout)
  */
@@ -603,6 +690,8 @@ async function handleTransferSuccess(data: { reference: string }) {
       settled_at: new Date().toISOString(),
     })
     .eq('reference', reference);
+
+  await settlePayoutRequest(reference, { status: 'completed' });
 
   if (transaction.payer_id) {
     await createNotification({
@@ -713,6 +802,10 @@ async function handleTransferFailed(data: { reference: string; reason: string })
     })
     .eq('reference', reference);
 
+  // Closes the request so the restored balance can be queued again, rather than
+  // stranding the recipient behind a row that never clears.
+  await settlePayoutRequest(reference, { status: 'failed', failureReason: reason });
+
   logOpsEvent('paystack-webhook', 'warn', 'Transfer failed and funds restored', { reference, reason });
 }
 
@@ -790,5 +883,15 @@ async function handleTransferReversed(data: { reference: string }) {
     })
     .eq('reference', reference);
 
-  logOpsEvent('paystack-webhook', 'warn', 'Transfer reversed and wallet updated', { reference, previousState: transaction.state });
+  // A reversal is a payout that did not stick, so the request ends as failed
+  // rather than completed — and the recipient becomes queueable again. This is
+  // the one outcome allowed to overturn an already-'completed' request, since a
+  // reversal can legitimately arrive after transfer.success.
+  await settlePayoutRequest(reference, {
+    status: 'failed',
+    failureReason: 'Transfer reversed by Paystack',
+    settleFrom: [...OPEN_PAYOUT_STATUSES, 'completed'],
+  });
+
+  logOpsEvent('paystack-webhook', 'warn', 'Transfer reversed and balance updated', { reference, previousState: transaction.state });
 }

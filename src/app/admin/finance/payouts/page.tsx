@@ -51,8 +51,10 @@ interface PayoutRow {
   status: string
   reference: string | null
   admin_notes: string | null
+  failure_reason: string | null
   requested_at: string
   processed_at: string | null
+  completed_at: string | null
   recipient: {
     full_name: string | null
     email: string
@@ -260,6 +262,21 @@ export default function AdminPayoutsPage() {
                     )}
                   </div>
                 </div>
+
+                {/* Why a sent payout did not stick. Written by the Paystack
+                    webhook, kept separate from admin_notes so neither
+                    overwrites the other. */}
+                {row.failure_reason && (
+                  <div className="mt-3 p-3 rounded-lg bg-red-50 border border-red-200">
+                    <p className="text-xs font-medium text-red-900 mb-1">
+                      {row.status === 'failed' ? 'Payout failed:' : 'Reported by Paystack:'}
+                    </p>
+                    <p className="text-xs text-red-800">{row.failure_reason}</p>
+                    <p className="text-xs text-red-700 mt-1">
+                      The funds are back in their available balance and will queue again.
+                    </p>
+                  </div>
+                )}
 
                 {/* Why this can't be paid — shown rather than hidden, so a stuck
                     payout is visible and actionable. */}

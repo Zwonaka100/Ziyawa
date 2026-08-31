@@ -213,9 +213,11 @@ export async function POST(
         .from('transactions')
         .update({ state: 'failed', failure_reason: 'Balance reservation failed' })
         .eq('id', transaction.id)
+      // failure_reason, not admin_notes — the latter holds what the approving
+      // admin typed, and overwriting it would destroy their record of why.
       await supabaseAdmin
         .from('payout_requests')
-        .update({ status: 'failed', admin_notes: 'Balance reservation failed' })
+        .update({ status: 'failed', failure_reason: 'Balance reservation failed' })
         .eq('id', payoutId)
 
       return NextResponse.json({ error: 'Could not reserve the funds for payout' }, { status: 500 })
@@ -257,7 +259,10 @@ export async function POST(
 
       await supabaseAdmin
         .from('payout_requests')
-        .update({ status: 'failed', admin_notes: transferResult.message || 'Transfer initiation failed' })
+        .update({
+          status: 'failed',
+          failure_reason: transferResult.message || 'Transfer initiation failed',
+        })
         .eq('id', payoutId)
 
       return NextResponse.json(
@@ -273,8 +278,11 @@ export async function POST(
       .update({ state: 'released', released_at: new Date().toISOString(), gateway_response: transferData })
       .eq('id', transaction.id)
 
-    // Left as 'processing' rather than 'completed': the transfer.success
-    // webhook settles it once Paystack confirms the money actually landed.
+    // Left as 'processing' rather than 'completed': settlePayoutRequest() in
+    // src/app/api/webhooks/paystack/route.ts moves it to completed/failed once
+    // Paystack confirms what actually happened to the money. Nothing else
+    // clears this row, and enqueuePayoutRequest() will not queue this person
+    // again until it is cleared.
     await supabaseAdmin
       .from('payout_requests')
       .update({ gateway_reference: transferData?.transfer_code || null, gateway_response: transferData })
