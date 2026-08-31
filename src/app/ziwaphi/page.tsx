@@ -15,9 +15,12 @@ export default function ZiwaphiPage() {
         <h1 className="text-4xl font-bold mb-2">
           Ziwaphi?
         </h1>
+        <p className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-3">
+          Where The Groovist Finds The Groove
+        </p>
         <p className="text-muted-foreground max-w-xl mx-auto">
-          Discover what is next and explore What Went Down from past sold events.
-          Use filters to switch between upcoming and past events.
+          Everything that&apos;s coming up, and What Went Down at the ones you missed.
+          Switch between upcoming and past events with the filters below.
         </p>
       </div>
 
