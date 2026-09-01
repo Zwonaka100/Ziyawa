@@ -66,20 +66,9 @@ export default async function EventPage({ params }: EventPageProps) {
   const { id } = await params
   const supabase = await createClient()
 
-  // Fetch event with organizer info (including more profile fields)
-  const { data: event, error } = await supabase
+  const { data: eventRow, error } = await supabase
     .from('events')
-    .select(`
-      *,
-      profiles:organizer_id (
-        id,
-        full_name,
-        avatar_url,
-        company_name,
-        location,
-        verified_at
-      )
-    `)
+    .select('*')
     .eq('id', id)
     .single()
 
@@ -87,9 +76,22 @@ export default async function EventPage({ params }: EventPageProps) {
     console.error('Event fetch error:', error)
   }
 
-  if (error || !event) {
+  if (error || !eventRow) {
     notFound()
   }
+
+  // Organizer details come from the public projection, fetched separately
+  // rather than embedded. This page is served to logged-out visitors, and an
+  // embedded `profiles:organizer_id` join reads the profiles table itself —
+  // which carries email, phone, balances and admin flags. PostgREST cannot
+  // embed a view through a foreign key, so this is a second read by design.
+  const { data: organizer } = await supabase
+    .from('v_public_organizers')
+    .select('id, full_name, avatar_url, company_name, location, verified_at')
+    .eq('id', eventRow.organizer_id)
+    .maybeSingle()
+
+  const event = { ...eventRow, profiles: organizer ?? null }
 
   // Fetch organizer stats
   const organizerId = event.organizer_id

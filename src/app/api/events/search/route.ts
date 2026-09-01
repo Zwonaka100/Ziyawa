@@ -24,16 +24,15 @@ export async function GET(request: NextRequest) {
 
     const offset = (page - 1) * limit;
 
-    // Build the query
+    // The organizer is NOT embedded here. This endpoint serves logged-out
+    // visitors, and a PostgREST embed of `profiles` needs table-level SELECT on
+    // that table — which would hand anonymous callers every column on it,
+    // including email, phone and balances. Organizer names are attached below
+    // from the public identity view instead.
     let dbQuery = supabase
       .from('events')
       .select(`
         *,
-        profiles:organizer_id (
-          id,
-          full_name,
-          avatar_url
-        ),
         event_rating_summaries (
           average_rating,
           total_reviews
@@ -173,8 +172,28 @@ export async function GET(request: NextRequest) {
     const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
     const maxPrice = prices.length > 0 ? Math.max(...prices) : 1000;
 
+    // Attach organizer identity from the public view, preserving the `profiles`
+    // shape callers already consume so nothing downstream has to change.
+    const organizerIds = [...new Set((events || []).map((e) => e.organizer_id).filter(Boolean))];
+
+    const { data: organizers } = organizerIds.length
+      ? await supabase
+          .from('v_public_profiles')
+          .select('id, full_name, avatar_url')
+          .in('id', organizerIds)
+      : { data: [] };
+
+    const organizerById = new Map(
+      (organizers || []).map((o: { id: string }) => [o.id, o])
+    );
+
+    const eventsWithOrganizer = (events || []).map((event) => ({
+      ...event,
+      profiles: organizerById.get(event.organizer_id) ?? null,
+    }));
+
     return NextResponse.json({
-      events: events || [],
+      events: eventsWithOrganizer,
       pagination: {
         page,
         limit,

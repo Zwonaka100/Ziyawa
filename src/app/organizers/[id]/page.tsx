@@ -11,16 +11,18 @@ export default async function OrganizerPage({ params }: OrganizerPageProps) {
   const { id } = await params;
   const supabase = await createClient();
 
-  // Fetch organizer profile
+  // Read the public projection, not the profiles table. This page is served to
+  // logged-out visitors, and profiles carries email, phone, balances and admin
+  // flags that must never reach them. The view exposes display columns only and
+  // already filters to is_organizer = true, so a non-organizer id 404s here.
   const { data: profile, error: _error } = await supabase
-    .from('profiles')
+    .from('v_public_organizers')
     .select(`
       id,
       full_name,
       avatar_url,
       location,
       company_name,
-      is_organizer,
       verified_at,
       created_at
     `)
@@ -113,10 +115,10 @@ export async function generateMetadata({ params }: OrganizerPageProps) {
   const supabase = await createClient();
   
   const { data: profile } = await supabase
-    .from('profiles')
+    .from('v_public_organizers')
     .select('full_name, company_name')
     .eq('id', id)
-    .single();
+    .maybeSingle();
 
   const name = profile?.company_name || profile?.full_name || 'Organizer';
 

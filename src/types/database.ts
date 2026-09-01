@@ -164,9 +164,9 @@ export interface Profile {
   wallet_balance: number;
   held_balance?: number;
   pending_payout_balance?: number;
-  bank_name: string | null;
-  bank_account_number: string | null;
-  bank_account_holder: string | null;
+  // Bank details live on payout_accounts, not here. The columns that used to
+  // sit on profiles were dropped in 026 — they were empty on every row and
+  // exposed to anyone with the publishable key.
   is_verified: boolean;
   verified_at: string | null;
   // Organizer-specific fields

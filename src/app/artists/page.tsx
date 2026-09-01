@@ -93,12 +93,13 @@ async function ArtistsContent({
 }) {
   const supabase = await createClient()
 
+  // Identity only. `email` used to be selected here and was never rendered —
+  // a directory listing has no reason to carry anyone's email address.
   const selectClause = `
     *,
     profiles:profile_id (
       id,
       full_name,
-      email,
       avatar_url
     )
   `
