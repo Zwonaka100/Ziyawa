@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAdminApi } from '@/lib/admin-auth'
 import { createClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email'
 import { emailWrapper } from '@/lib/email-templates'
@@ -27,20 +28,15 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
     
-    // Check if user is admin
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const gate = await requireAdminApi()
+    if ('response' in gate) return gate.response
+    const { admin } = gate
+    const user = { id: admin.userId }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    // Sending mail from the platform requires an explicit admin role, matching
+    // /api/admin/bulk-email. This route used to accept is_admin alone.
+    if (!['super_admin', 'admin'].includes(admin.adminRole || '')) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
     const { to, toUserId, toName, subject, body, fromEmail = 'support' } = await request.json()

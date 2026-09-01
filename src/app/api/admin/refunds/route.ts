@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAdminApi } from '@/lib/admin-auth'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
-import { createClient } from '@/lib/supabase/server'
 
 const supabaseAdmin = createServiceClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,25 +8,9 @@ const supabaseAdmin = createServiceClient(
 )
 
 async function assertAdmin() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { user: null, error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
-  }
-
-  const { data: profile } = await supabaseAdmin
-    .from('profiles')
-    .select('id, is_admin, admin_role')
-    .eq('id', user.id)
-    .single()
-
-  const isAdmin = Boolean(profile?.is_admin || profile?.admin_role === 'super_admin' || profile?.admin_role === 'admin')
-  if (!isAdmin) {
-    return { user: null, error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
-  }
-
-  return { user, error: null }
+  const gate = await requireAdminApi()
+  if ('response' in gate) return { user: null, error: gate.response }
+  return { user: { id: gate.admin.userId }, error: null }
 }
 
 export async function GET(request: NextRequest) {

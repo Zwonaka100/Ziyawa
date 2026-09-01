@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { requireAdminApi } from '@/lib/admin-auth'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 
 const supabaseAdmin = createServiceClient(
@@ -14,15 +14,6 @@ const OPTIONAL_EVENT_COLUMNS = [
   'updated_at',
 ] as const
 
-async function isAdminUser(userId: string) {
-  const { data: profile } = await supabaseAdmin
-    .from('profiles')
-    .select('is_admin, admin_role')
-    .eq('id', userId)
-    .single()
-
-  return Boolean(profile?.is_admin || profile?.admin_role === 'admin' || profile?.admin_role === 'super_admin')
-}
 
 function toOptionalString(value: unknown) {
   if (value === null || value === undefined) return null
@@ -74,17 +65,9 @@ export async function PATCH(
 ) {
   try {
     const { id: eventId } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const isAdmin = await isAdminUser(user.id)
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const gate = await requireAdminApi()
+    if ('response' in gate) return gate.response
+    const user = { id: gate.admin.userId }
 
     const body = await request.json().catch(() => ({})) as {
       adminAction?: 'approve' | 'reject' | 'suspend' | 'lock'

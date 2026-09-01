@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAdminApi } from '@/lib/admin-auth'
 import { createClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email'
 import { emailWrapper } from '@/lib/email-templates'
@@ -27,25 +28,23 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
     
-    // Check if user is admin
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_admin, admin_role, email')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.is_admin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const gate = await requireAdminApi()
+    if ('response' in gate) return gate.response
+    const { admin } = gate
+    const user = { id: admin.userId }
 
     // Only super_admin and admin can send bulk emails
-    if (!['super_admin', 'admin'].includes(profile.admin_role || '')) {
+    if (!['super_admin', 'admin'].includes(admin.adminRole || '')) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    }
+
+    // Test mode sends the preview to the admin's own inbox, so there has to be
+    // one. Better to say so than to hand a null address to the mail provider.
+    if (!admin.email) {
+      return NextResponse.json(
+        { error: 'Your admin account has no email address on file' },
+        { status: 400 }
+      )
     }
 
     const { subject, body, fromEmail = 'info', testMode, recipients } = await request.json()
@@ -58,7 +57,7 @@ export async function POST(request: NextRequest) {
       const emailResult = await sendEmail({
         from: emailConfig.from,
         replyTo: emailConfig.replyTo,
-        to: profile.email,
+        to: admin.email,
         subject: `[TEST] ${subject}`,
         html: emailWrapper(`
           <h1>Test email preview</h1>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { requireAdminApi } from '@/lib/admin-auth'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { createBulkNotifications, createNotification } from '@/lib/notifications'
 import { getEventEmailAudience } from '@/lib/event-email-audience'
@@ -66,24 +66,9 @@ export async function POST(
 ) {
   try {
     const { id: eventId } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('id, is_admin, admin_role')
-      .eq('id', user.id)
-      .single()
-
-    const isAdmin = Boolean(profile?.is_admin || profile?.admin_role === 'admin' || profile?.admin_role === 'super_admin')
-
-    if (!isAdmin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const gate = await requireAdminApi()
+    if ('response' in gate) return gate.response
+    const user = { id: gate.admin.userId }
 
     const body = await request.json().catch(() => ({})) as {
       publish?: boolean

@@ -15,7 +15,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { requireAdminApi } from '@/lib/admin-auth'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { adjustProfileBalanceBuckets } from '@/lib/payments/escrow'
 import { createNotification } from '@/lib/notifications'
@@ -28,20 +28,10 @@ const supabaseAdmin = createServiceClient(
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
 
-    // Admin gate
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_admin, admin_role')
-      .eq('id', user.id)
-      .single()
-
-    const isAdmin = Boolean(profile?.is_admin || profile?.admin_role === 'super_admin' || profile?.admin_role === 'admin')
-    if (!isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const gate = await requireAdminApi()
+    if ('response' in gate) return gate.response
+    const user = { id: gate.admin.userId }
 
     const body = await request.json() as {
       bookingId: string
