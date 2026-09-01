@@ -55,12 +55,13 @@ export default async function HomePage() {
     <div className="flex flex-col">
       {/* Hero Section */}
       <section className="relative min-h-[80vh] md:min-h-screen flex items-center justify-center overflow-hidden bg-black">
-        {/* Background: a still on small screens, video from md up.
-            `hidden md:block` on the <video> is not enough on its own — the
-            browser still fetches a display:none video that has autoPlay — so
-            the element itself must not render below the breakpoint. Hence the
-            poster image carrying the mobile case, and the video mounted only
-            for wider viewports by MediaQueryHero. */}
+        {/* Background: a still on small screens, the full-quality video from md up.
+            The video is deliberately left at its original 1920x1080 bitrate —
+            this is the first thing anyone sees and it is not a place to save
+            bytes. What changes is who pays for it: `hidden md:block` would not
+            help, because a browser fetches an autoplaying video even when CSS
+            hides it, so the element must genuinely not render on small screens.
+            Mobile gets the poster alone; desktop gets the video, uncompromised. */}
         <Image
           src="/hero-poster.jpg"
           alt=""

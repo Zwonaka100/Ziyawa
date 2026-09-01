@@ -15,6 +15,10 @@ import { useEffect, useState } from 'react'
  *
  * The poster image underneath is what mobile gets, and what everyone sees
  * until the video has enough data to paint.
+ *
+ * The video is deliberately left at its original 1920x1080 quality. It is the
+ * first thing anyone sees, so it is not a place to save bytes — the saving
+ * comes from who downloads it, never from degrading it.
  */
 export function HeroVideo() {
   const [show, setShow] = useState(false)
