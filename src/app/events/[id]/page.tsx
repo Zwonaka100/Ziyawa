@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { EventDetails } from '@/components/events/event-details'
@@ -13,15 +14,18 @@ interface EventPageProps {
   }>
 }
 
+// generateMetadata and the page component both need the event row. Next dedupes
+// native fetch() but not Supabase calls, so without this the same row was read
+// twice per page view — two round trips to Ireland for identical data.
+const getEvent = cache(async (id: string) => {
+  const supabase = await createClient()
+  return supabase.from('events').select('*').eq('id', id).single()
+})
+
 export async function generateMetadata({ params }: EventPageProps): Promise<Metadata> {
   const { id } = await params
-  const supabase = await createClient()
-  
-  const { data: event } = await supabase
-    .from('events')
-    .select('title, description, cover_image, event_date, venue, location, ticket_price')
-    .eq('id', id)
-    .single()
+
+  const { data: event } = await getEvent(id)
 
   if (!event) {
     return { title: 'Event Not Found' }
@@ -66,11 +70,44 @@ export default async function EventPage({ params }: EventPageProps) {
   const { id } = await params
   const supabase = await createClient()
 
-  const { data: eventRow, error } = await supabase
-    .from('events')
-    .select('*')
-    .eq('id', id)
-    .single()
+  // ── Wave 1: everything that needs only the route param ───────────────────
+  // These were sequential awaits. Nothing among them depends on another's
+  // result, so each one was pure waiting — a separate round trip from the
+  // Vercel function to the database for data that could have been asked for
+  // at the same time.
+  const [
+    { data: eventRow, error },
+    { data: bookings },
+    { data: eventMedia },
+    { data: ticketTiers, error: ticketTierError },
+    { data: { user } },
+  ] = await Promise.all([
+    getEvent(id),
+    supabase
+      .from('bookings')
+      .select(`
+        *,
+        artists (
+          id,
+          stage_name,
+          genre,
+          profile_image
+        )
+      `)
+      .eq('event_id', id)
+      .in('status', ['accepted', 'paid', 'completed']),
+    supabase
+      .from('event_media')
+      .select('*')
+      .eq('event_id', id)
+      .order('display_order'),
+    supabase
+      .from('event_ticket_types')
+      .select('*')
+      .eq('event_id', id)
+      .order('sort_order', { ascending: true }),
+    supabase.auth.getUser(),
+  ])
 
   if (error) {
     console.error('Event fetch error:', error)
@@ -80,47 +117,61 @@ export default async function EventPage({ params }: EventPageProps) {
     notFound()
   }
 
-  // Organizer details come from the public projection, fetched separately
-  // rather than embedded. This page is served to logged-out visitors, and an
-  // embedded `profiles:organizer_id` join reads the profiles table itself —
-  // which carries email, phone, balances and admin flags. PostgREST cannot
-  // embed a view through a foreign key, so this is a second read by design.
-  const { data: organizer } = await supabase
-    .from('v_public_organizers')
-    .select('id, full_name, avatar_url, company_name, location, verified_at')
-    .eq('id', eventRow.organizer_id)
-    .maybeSingle()
+  if (ticketTierError && ticketTierError.code !== 'PGRST205') {
+    console.error('Ticket tiers fetch error:', ticketTierError)
+  }
+
+  const organizerId = eventRow.organizer_id
+
+  // ── Wave 2: needs organizerId from the event, or the signed-in user ──────
+  const [
+    { data: organizer },
+    { count: totalEvents },
+    { count: upcomingEvents },
+    { data: ratingData },
+    { data: ticket },
+  ] = await Promise.all([
+    // Organizer details come from the public projection rather than an embed.
+    // This page is served to logged-out visitors, and an embedded
+    // `profiles:organizer_id` join reads the profiles table itself — which
+    // carries email, phone, balances and admin flags. PostgREST cannot embed a
+    // view through a foreign key, so this is a separate read by design.
+    supabase
+      .from('v_public_organizers')
+      .select('id, full_name, avatar_url, company_name, location, verified_at')
+      .eq('id', organizerId)
+      .maybeSingle(),
+    supabase
+      .from('events')
+      .select('*', { count: 'exact', head: true })
+      .eq('organizer_id', organizerId)
+      .in('state', ['published', 'locked', 'completed']),
+    supabase
+      .from('events')
+      .select('*', { count: 'exact', head: true })
+      .eq('organizer_id', organizerId)
+      .in('state', ['published', 'locked'])
+      .gte('event_date', new Date().toISOString().split('T')[0]),
+    // One round trip, not two. This previously nested an `await` inside its own
+    // `.in()` argument to collect the organizer's event ids, then filtered by
+    // that list — a join done in application code. event_rating_summaries has a
+    // foreign key to events, so the join belongs in the query.
+    supabase
+      .from('event_rating_summaries')
+      .select('average_rating, total_reviews, events!inner(organizer_id)')
+      .eq('events.organizer_id', organizerId),
+    user
+      ? supabase
+          .from('tickets')
+          .select('id')
+          .eq('event_id', id)
+          .eq('user_id', user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null as { id: string } | null }),
+  ])
 
   const event = { ...eventRow, profiles: organizer ?? null }
-
-  // Fetch organizer stats
-  const organizerId = event.organizer_id
-  
-  // Count total events by this organizer
-  const { count: totalEvents } = await supabase
-    .from('events')
-    .select('*', { count: 'exact', head: true })
-    .eq('organizer_id', organizerId)
-    .in('state', ['published', 'locked', 'completed'])
-
-  // Count upcoming events
-  const { count: upcomingEvents } = await supabase
-    .from('events')
-    .select('*', { count: 'exact', head: true })
-    .eq('organizer_id', organizerId)
-    .in('state', ['published', 'locked'])
-    .gte('event_date', new Date().toISOString().split('T')[0])
-
-  // Get organizer's event rating summary (aggregate from all their events)
-  const { data: ratingData } = await supabase
-    .from('event_rating_summaries')
-    .select('average_rating, total_reviews, event_id')
-    .in('event_id', (
-      await supabase
-        .from('events')
-        .select('id')
-        .eq('organizer_id', organizerId)
-    ).data?.map(e => e.id) || [])
+  const hasTicket = Boolean(ticket)
 
   // Calculate average rating across all events
   let totalReviews = 0
@@ -136,54 +187,6 @@ export default async function EventPage({ params }: EventPageProps) {
     upcomingEvents: upcomingEvents || 0,
     rating: averageRating,
     totalReviews: totalReviews
-  }
-
-  // Fetch booked artists for this event
-  const { data: bookings } = await supabase
-    .from('bookings')
-    .select(`
-      *,
-      artists (
-        id,
-        stage_name,
-        genre,
-        profile_image
-      )
-    `)
-    .eq('event_id', id)
-    .in('status', ['accepted', 'paid', 'completed'])
-
-  // Fetch event media (gallery and promo videos)
-  const { data: eventMedia } = await supabase
-    .from('event_media')
-    .select('*')
-    .eq('event_id', id)
-    .order('display_order')
-
-  // Fetch ticket tiers / releases
-  const { data: ticketTiers, error: ticketTierError } = await supabase
-    .from('event_ticket_types')
-    .select('*')
-    .eq('event_id', id)
-    .order('sort_order', { ascending: true })
-
-  if (ticketTierError && ticketTierError.code !== 'PGRST205') {
-    console.error('Ticket tiers fetch error:', ticketTierError)
-  }
-
-  // Check if current user has a ticket for this event
-  const { data: { user } } = await supabase.auth.getUser()
-  let hasTicket = false
-  
-  if (user) {
-    const { data: ticket } = await supabase
-      .from('tickets')
-      .select('id')
-      .eq('event_id', id)
-      .eq('user_id', user.id)
-      .maybeSingle()
-
-    hasTicket = Boolean(ticket)
   }
 
   // Check if event has ended using the event date that exists in the live schema

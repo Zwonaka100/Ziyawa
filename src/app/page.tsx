@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Calendar, Music, Ticket, ArrowRight, MapPin, Wrench, Star, Shield, CreditCard } from 'lucide-react'
 import { TypewriterHero } from '@/components/home/typewriter-hero'
+import { HeroVideo } from '@/components/home/hero-video'
 import { createClient } from '@/lib/supabase/server'
 import { formatDate, formatCurrency } from '@/lib/helpers'
 import Image from 'next/image'
@@ -11,53 +12,64 @@ export default async function HomePage() {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  let canBrowseArtists = false
-  if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_organizer, is_artist, is_admin')
-      .eq('id', user.id)
-      .single()
-    canBrowseArtists = Boolean(profile?.is_organizer || profile?.is_artist || profile?.is_admin)
-  }
 
-  // Fetch upcoming events only (limit 12)
-  const { data: events } = await supabase
-    .from('events')
-    .select(`
-      id,
-      title,
-      event_date,
-      venue,
-      location,
-      ticket_price,
-      cover_image,
-      profiles:organizer_id (
-        full_name
-      )
-    `)
-    .eq('is_published', true)
-    .gte('event_date', new Date().toISOString().split('T')[0])
-    .order('event_date', { ascending: true })
-    .limit(12)
+  // The events list doesn't depend on the profile lookup, so the two run
+  // together. Previously the landing page waited for the profile round trip
+  // before it even asked for the events it exists to show.
+  const [profileResult, eventsResult] = await Promise.all([
+    user
+      ? supabase
+          .from('profiles')
+          .select('is_organizer, is_artist, is_admin')
+          .eq('id', user.id)
+          .single()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from('events')
+      // The organizer embed that used to be here was never rendered. It cost a
+      // join into `profiles` — the table carrying email, phone and balances —
+      // on the landing page, for a value nothing displayed.
+      .select(`
+        id,
+        title,
+        event_date,
+        venue,
+        location,
+        ticket_price,
+        cover_image
+      `)
+      .eq('is_published', true)
+      .gte('event_date', new Date().toISOString().split('T')[0])
+      .order('event_date', { ascending: true })
+      .limit(12),
+  ])
+
+  const profile = profileResult.data
+  const canBrowseArtists = Boolean(
+    profile?.is_organizer || profile?.is_artist || profile?.is_admin
+  )
+  const events = eventsResult.data
 
 
   return (
     <div className="flex flex-col">
       {/* Hero Section */}
       <section className="relative min-h-[80vh] md:min-h-screen flex items-center justify-center overflow-hidden bg-black">
-        {/* Background Video */}
-        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-        <video
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="auto"
+        {/* Background: a still on small screens, video from md up.
+            `hidden md:block` on the <video> is not enough on its own — the
+            browser still fetches a display:none video that has autoPlay — so
+            the element itself must not render below the breakpoint. Hence the
+            poster image carrying the mobile case, and the video mounted only
+            for wider viewports by MediaQueryHero. */}
+        <Image
+          src="/hero-poster.jpg"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
           className="absolute inset-0 w-full h-full object-cover"
-        >
-          <source src="/hero.mp4" type="video/mp4" />
-        </video>
+        />
+        <HeroVideo />
         {/* Dark Overlay */}
         <div className="absolute inset-0 bg-black/55" />
         
