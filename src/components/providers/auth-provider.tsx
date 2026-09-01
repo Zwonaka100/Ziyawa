@@ -1,9 +1,34 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import type { Profile } from '@/types/database'
+
+// The columns useAuth() consumers actually read, verified across all 30 files
+// that call it. Replaces select('*'), which pulled all 39 columns of the row on
+// the hottest path in the app.
+//
+// Do not trim this to "the obvious identity fields" without re-checking those
+// consumers — email, admin_role and the three balances are all genuinely read,
+// and a missing column here fails silently as `undefined` rather than erroring.
+const PROFILE_COLUMNS = [
+  'id',
+  'full_name',
+  'avatar_url',
+  'email',
+  'phone',
+  'is_admin',
+  'admin_role',
+  'is_artist',
+  'is_organizer',
+  'is_provider',
+  'is_verified',
+  'verified_entity_type',
+  'wallet_balance',
+  'held_balance',
+  'pending_payout_balance',
+].join(', ')
 
 interface AuthContextType {
   user: User | null
@@ -25,13 +50,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
-  const supabase = createClient()
+  // Was `createClient()` on every render — a fresh Supabase client instance each
+  // time this provider re-rendered, which is every navigation in the app.
+  const supabase = useMemo(() => createClient(), [])
+  // Which user's profile we have already loaded, so routine auth events
+  // (TOKEN_REFRESHED fires on a timer) don't re-query for data we hold.
+  const loadedProfileFor = useRef<string | null>(null)
 
   // Fetch user profile from database, create if doesn't exist
   const fetchProfile = async (userId: string, userEmail?: string) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('*')
+      .select(PROFILE_COLUMNS)
       .eq('id', userId)
       .single()
 
@@ -81,17 +111,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    // Get initial session
+    // `loading` releases as soon as the session is known — it does NOT wait for
+    // the profile. This is the fix for "buttons don't respond": the navbar and
+    // every client page read useAuth() and sat inert until a second round trip
+    // to the database in Ireland came back. Who you are is enough to make the
+    // UI interactive; what your balance is can arrive a moment later.
+    const loadProfile = async (sessionUser: User) => {
+      if (loadedProfileFor.current === sessionUser.id) return
+      loadedProfileFor.current = sessionUser.id
+      const profileData = await fetchProfile(sessionUser.id, sessionUser.email)
+      setProfile(profileData)
+    }
+
     const getInitialSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      
+
       if (session?.user) {
         setUser(session.user)
-        const profileData = await fetchProfile(session.user.id, session.user.email)
-        setProfile(profileData)
+        setLoading(false)
+        void loadProfile(session.user)
+      } else {
+        setLoading(false)
       }
-      
-      setLoading(false)
     }
 
     getInitialSession()
@@ -101,13 +142,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, session) => {
         if (session?.user) {
           setUser(session.user)
-          const profileData = await fetchProfile(session.user.id, session.user.email)
-          setProfile(profileData)
+          setLoading(false)
+          // Only refetch when the identity actually changed. TOKEN_REFRESHED
+          // fires periodically for a signed-in user and used to trigger a full
+          // profile read every time.
+          void loadProfile(session.user)
         } else {
+          loadedProfileFor.current = null
           setUser(null)
           setProfile(null)
+          setLoading(false)
         }
-        setLoading(false)
       }
     )
 

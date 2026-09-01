@@ -1,18 +1,31 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { X, MessageCircle, Sparkles } from 'lucide-react';
-import { ZiwaphiChat } from './ziwaphi-chat';
 import { cn } from '@/lib/utils';
+
+// This button lives in the root layout, so anything it imports statically ends
+// up in every page's JavaScript bundle. The chat was imported at the top and
+// mounted permanently, merely hidden with a CSS transform — so every visitor on
+// every page downloaded and hydrated a chat almost nobody opens.
+const ZiwaphiChat = dynamic(
+  () => import('./ziwaphi-chat').then((m) => m.ZiwaphiChat),
+  { ssr: false }
+);
 
 export function ZiwaphiFloatingButton() {
   const [isOpen, setIsOpen] = useState(false);
   const [showPulse, setShowPulse] = useState(true);
+  // Latches on first open. Keeps the chat mounted afterwards so the close
+  // animation still plays, while never loading it for someone who never opens it.
+  const [hasOpened, setHasOpened] = useState(false);
 
   const handleOpen = () => {
     setShowPulse(false);
+    setHasOpened(true);
     setIsOpen(true);
   };
 
@@ -55,8 +68,8 @@ export function ZiwaphiFloatingButton() {
             <X className="h-4 w-4" />
           </Button>
 
-          {/* Chat component */}
-          <ZiwaphiChat />
+          {/* Chat component — only ever mounted once the user has opened it */}
+          {hasOpened && <ZiwaphiChat />}
         </Card>
       </div>
 

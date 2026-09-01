@@ -2,10 +2,17 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { useState } from 'react'
 import { useAuth } from '@/components/providers/auth-provider'
 import { ZiyawaLogo } from '@/components/brand/ziyawa-logo'
-import { NotificationCenter } from '@/components/notifications'
+// The navbar is in the root layout and renders on every page. The notification
+// centre is only ever visible to a signed-in user, so it loads on demand rather
+// than riding along in the bundle for every visitor.
+const NotificationCenter = dynamic(
+  () => import('@/components/notifications').then((m) => m.NotificationCenter),
+  { ssr: false }
+)
 import { useUnreadMessages } from '@/hooks/use-unread-messages'
 import { useEventWork } from '@/hooks/use-event-work'
 import { Button } from '@/components/ui/button'
