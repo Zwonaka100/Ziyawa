@@ -53,8 +53,9 @@ Your ticket is valid once you show the QR code at the venue! 🎫`,
     answer: `Refund policy depends on the event:
 
 **If the event is cancelled:**
-- You get a **full refund** automatically to your Ziyawa wallet
-- You can withdraw to your bank account
+- You get the **ticket price back in full**, returned to the card you paid with
+- Banks usually take a few working days to show it
+- The booking fee is not refunded — it covers the cost of processing the payment
 
 **If you can't attend:**
 - Refunds depend on the organizer's policy

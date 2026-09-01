@@ -165,31 +165,33 @@ export default function TermsPage() {
           </p>
           <h3 className="font-medium mt-3 mb-1">9.1 Fee Structure</h3>
           <ul className="list-disc pl-5 mt-2 space-y-1">
-            <li><strong>Ticket sales:</strong> 5% commission + 5% platform fee deducted from the organizer&apos;s revenue, plus a booking fee (R5–R10, tiered by ticket price) paid by the buyer.</li>
+            <li><strong>Ticket sales:</strong> 5% commission + 5% platform fee deducted from the organizer&apos;s revenue, plus a booking fee paid by the buyer.</li>
+            <li><strong>Booking fee:</strong> Calculated from the ticket price and shown as a separate line before you pay. It covers the cost of processing the card payment and is <strong>non-refundable</strong>, because our payment provider charges that cost when the payment is taken and does not return it if the payment is later reversed.</li>
             <li><strong>Artist bookings:</strong> 10%–20% commission (tiered by booking amount), deducted from the booking payment.</li>
             <li><strong>Crew bookings:</strong> 5%–10% commission (tiered by booking amount), deducted from the booking payment.</li>
-            <li><strong>Wallet deposits:</strong> 2.5% + R3 processing fee.</li>
-            <li><strong>Wallet withdrawals:</strong> R20 flat fee, minimum withdrawal R100.</li>
           </ul>
           <p className="mt-2">
             All fees are displayed before you confirm any transaction. Fees are non-refundable
             unless otherwise stated in our <Link href="/refunds" className="underline underline-offset-2">Refund Policy</Link>.
           </p>
 
-          <h3 className="font-medium mt-3 mb-1">9.2 Wallet and Escrow</h3>
+          <h3 className="font-medium mt-3 mb-1">9.2 How Money Is Held</h3>
           <p>
-            The Platform uses a three-bucket wallet system: available balance (withdrawable),
-            held balance (escrowed funds awaiting conditions), and pending payout balance
-            (withdrawal in progress). Event ticket revenue is held for 48 hours after event
-            completion before release. Booking payouts are held for 24 hours after dual
-            confirmation.
+            Ziyawa does not offer a stored-value account. You cannot deposit money into the
+            Platform, and no balance is redeemable on demand. Money owed to you from ticket
+            sales or bookings is recorded against your account and held until it becomes
+            payable: ticket revenue for 48 hours after the event is marked complete, booking
+            payments for 24 hours after both parties confirm. Revenue for a cancelled event is
+            never released and remains available to refund ticket holders.
           </p>
 
-          <h3 className="font-medium mt-3 mb-1">9.3 Withdrawals</h3>
+          <h3 className="font-medium mt-3 mb-1">9.3 Getting Paid</h3>
           <p>
-            To withdraw funds, you must complete identity verification (see Section 11).
-            Withdrawals are processed via bank transfer through Paystack. Processing times
-            depend on your bank but are typically 1–3 business days.
+            You do not request payment. Once your earnings become payable they are queued
+            automatically, reviewed by our team, and paid by bank transfer to the verified
+            account in your own name. Identity verification (see Section 11) must be complete
+            before any payment can be made. Bank processing times are typically 1–3 business
+            days. We charge no fee to pay you.
           </p>
         </section>
 
@@ -215,7 +217,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-lg font-semibold mb-3">11. Identity Verification</h2>
           <p>
-            Users who wish to withdraw funds must complete identity verification. We offer
+            Users who wish to be paid must complete identity verification. We offer
             two verification paths:
           </p>
           <ul className="list-disc pl-5 mt-2 space-y-1">
@@ -290,7 +292,7 @@ export default function TermsPage() {
             Ziyawa will review disputes and may request additional information from both
             parties. We will make a determination based on the evidence available. Outcomes
             may include releasing funds to the service provider, returning funds to the
-            organizer&apos;s wallet, or a partial resolution. Our decision is final.
+            organizer&apos;s available balance, or a partial resolution. Our decision is final.
           </p>
           <p className="mt-2">
             For disputes between you and Ziyawa (the company), South African law applies.

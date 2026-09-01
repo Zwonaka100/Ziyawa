@@ -1,4 +1,16 @@
--- Launch hardening baseline for refunds, wallet auditability, payroll, and door audit logs
+-- Launch hardening baseline for refunds, balance auditability, payroll, and door audit logs
+--
+-- 2026-09-01: this migration had never actually been applied. The final view
+-- referenced `transaction_type = 'wallet_deposit'`, which is not a member of
+-- that enum (valid: ticket_purchase, artist_booking, vendor_service, payout,
+-- refund, platform_fee), so Postgres aborted the whole migration and silently
+-- left every object below uncreated — including balance_ledger_entries, which
+-- meant no balance movement was ever audited, and refund_work_items, without
+-- which cancelling an event queued no refunds at all.
+--
+-- The deposit column is replaced with ticket sales, which is what this platform
+-- actually takes money for; self-service deposits were retired.
+--
 -- Rollback notes:
 -- 1) Drop view finance_daily_reconciliation
 -- 2) Drop tables checkin_scan_logs, balance_ledger_entries, refund_work_items
@@ -82,7 +94,7 @@ CREATE INDEX IF NOT EXISTS idx_checkin_scan_logs_result
 CREATE OR REPLACE VIEW finance_daily_reconciliation AS
 SELECT
   DATE(COALESCE(t.settled_at, t.released_at, t.refunded_at, t.failed_at, t.created_at)) AS day,
-  ROUND(SUM(CASE WHEN t.type = 'wallet_deposit' AND t.state IN ('settled', 'released') THEN t.net_amount ELSE 0 END) / 100.0, 2) AS wallet_deposits_rands,
+  ROUND(SUM(CASE WHEN t.type = 'ticket_purchase' AND t.state IN ('held', 'released', 'settled') THEN t.amount ELSE 0 END) / 100.0, 2) AS ticket_sales_rands,
   ROUND(SUM(CASE WHEN t.type = 'payout' AND t.state IN ('initiated', 'released', 'settled') THEN t.amount ELSE 0 END) / 100.0, 2) AS payout_requests_rands,
   ROUND(SUM(CASE WHEN t.type = 'refund' AND t.state IN ('settled', 'refunded') THEN t.amount ELSE 0 END) / 100.0, 2) AS refunds_rands,
   ROUND(SUM(CASE WHEN t.state = 'held' THEN t.net_amount ELSE 0 END) / 100.0, 2) AS held_value_rands,

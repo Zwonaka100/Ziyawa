@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Calendar, Users, BarChart3, CreditCard, Shield, Ticket } from 'lucide-react'
-import { PLATFORM_FEES } from '@/lib/constants'
+import { PLATFORM_FEES, calculateBookingFee } from '@/lib/constants'
 import { useAuth } from '@/components/providers/auth-provider'
 
 function TicketFeeCalculator() {
@@ -23,10 +23,9 @@ function TicketFeeCalculator() {
   const totalFeesPerTicket = commission + platformFee
   const youReceivePerTicket = ticketPrice - totalFeesPerTicket
 
-  const bookingFeeTier = PLATFORM_FEES.ticketing.bookingFeeTiers.find(
-    t => priceCents <= t.maxPrice
-  )
-  const bookingFee = (bookingFeeTier?.fee || 1000) / 100
+  // Use the real calculation rather than a copy of it, so what an organizer is
+  // quoted here is exactly what a buyer is charged at checkout.
+  const bookingFee = calculateBookingFee(priceCents) / 100
   const buyerPays = ticketPrice + bookingFee
 
   const totalRevenue = ticketPrice * ticketsSold

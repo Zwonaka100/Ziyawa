@@ -34,7 +34,7 @@ const faqs = [
       },
       {
         q: 'Can I get a refund on my ticket?',
-        a: 'Refund eligibility depends on the event\'s cancellation policy. If the organizer cancels the event, you\'ll receive a full refund. For voluntary cancellations, see our Refund Policy for details.',
+        a: 'If the organizer cancels the event, you get the ticket price back in full, returned to the card you paid with. The booking fee isn\'t refunded — it covers the cost of processing your payment. For voluntary cancellations, refunds depend on the event\'s own policy; see our Refund Policy for details.',
       },
       {
         q: 'How do I check in at the event?',

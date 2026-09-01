@@ -279,6 +279,46 @@ export async function initiateTransfer(params: {
   });
 }
 
+export interface PaystackRefundResponse {
+  status: boolean;
+  message: string;
+  data: {
+    transaction?: { reference?: string };
+    amount: number;
+    status: string;
+  };
+}
+
+/**
+ * Reverse a charge back to the card it came from.
+ *
+ * This is deliberately NOT a transfer. A transfer moves money to a bank account
+ * and costs about R3 every time, charged even when it fails; crediting a buyer's
+ * balance and paying it out later would incur exactly that, per person, for no
+ * reason. A refund reverses the original authorization and Paystack charges
+ * nothing extra for it.
+ *
+ * Omit `amount` for a full refund. Pass it — in cents — for a partial one,
+ * which is how we return the ticket price while retaining the booking fee that
+ * already paid for the processing.
+ *
+ * What we do NOT get back either way is Paystack's original fee: "if you have
+ * to refund a customer, we will not return what we charged to process that
+ * transaction." Covering that is the booking fee's job, see calculateBookingFee.
+ */
+export async function refundPayment(params: {
+  reference: string;
+  amount?: number; // in cents; omit to refund the full original charge
+}): Promise<PaystackRefundResponse> {
+  return paystackRequest<PaystackRefundResponse>('/refund', {
+    method: 'POST',
+    body: JSON.stringify({
+      transaction: params.reference,
+      ...(params.amount != null ? { amount: params.amount } : {}),
+    }),
+  });
+}
+
 /**
  * Get transfer status
  */

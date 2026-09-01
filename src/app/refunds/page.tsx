@@ -32,11 +32,17 @@ export default function RefundsPage() {
           <h2 className="text-lg font-semibold mb-3">2. Ticket Refunds</h2>
           <h3 className="font-medium mt-3 mb-1">2.1 Event Cancellation by Organizer</h3>
           <p>
-            If an event is cancelled by the organizer, all ticket holders are entitled to a
-            full refund work item review. Refunds are never automatic. Admin or super admin
-            approval is required, and approved refunds are credited to the user&apos;s Ziyawa wallet.
-            Users can withdraw refunded funds through the standard wallet withdrawal flow,
-            with normal withdrawal fees applied.
+            If an event is cancelled by the organizer, all ticket holders are entitled to the
+            <strong> ticket price in full</strong>, returned to the card used to pay. Refunds are
+            never automatic — each one is reviewed and approved by an administrator first. Once
+            approved, the reversal is sent to your bank immediately; most banks take a few
+            working days to show it.
+          </p>
+          <p className="mt-2">
+            The <strong>booking fee is not refunded</strong>. It covers the cost of processing
+            your payment, which our payment provider charges when the payment is taken and does
+            not return when a payment is reversed. No other fee or deduction is applied to your
+            refund.
           </p>
 
           <h3 className="font-medium mt-3 mb-1">2.2 Voluntary Cancellation by Ticket Holder</h3>
@@ -60,8 +66,9 @@ export default function RefundsPage() {
           <h3 className="font-medium mt-3 mb-1">2.4 Duplicate or Erroneous Purchases</h3>
           <p>
             If you were charged multiple times for the same ticket due to a technical error,
-            contact support@ziyawa.com with proof of duplicate charges. Duplicate charges will
-            be refunded in full.
+            contact support@ziyawa.com with proof of duplicate charges. A duplicate charge is
+            reversed in its entirety, booking fee included — you should never pay a booking fee
+            twice for the same ticket.
           </p>
         </section>
 
@@ -91,12 +98,12 @@ export default function RefundsPage() {
             <li>
               <strong>Organizer cancels:</strong> The organizer forfeits the Ziyawa commission
               (non-refundable). The remaining escrowed amount may be refunded to the
-              organizer&apos;s wallet, less any applicable fees. The artist/crew member will
+              organizer&apos;s available balance, less any applicable fees. The artist/crew member will
               not receive payment.
             </li>
             <li>
               <strong>Artist/crew cancels:</strong> The escrowed amount (minus the Ziyawa
-              commission) is returned to the organizer&apos;s wallet. The artist/crew member
+              commission) is returned to the organizer&apos;s available balance. The artist/crew member
               may be subject to account review for repeated cancellations.
             </li>
           </ul>
@@ -111,26 +118,29 @@ export default function RefundsPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-3">4. Wallet Transactions</h2>
-          <h3 className="font-medium mt-3 mb-1">4.1 Deposits</h3>
+          <h2 className="text-lg font-semibold mb-3">4. Fees</h2>
+          <h3 className="font-medium mt-3 mb-1">4.1 Booking Fee</h3>
           <p>
-            Wallet deposit processing fees (2.5% + R3) are <strong>non-refundable</strong>.
-            If you deposit funds into your wallet, the full deposited amount (minus the fee)
-            is available for use on the Platform.
+            The booking fee added to your ticket at checkout is <strong>non-refundable</strong>.
+            It covers the cost of processing your card payment, which our payment provider
+            charges when the payment is taken and does not return if the payment is later
+            reversed. The fee is shown separately before you pay.
           </p>
 
-          <h3 className="font-medium mt-3 mb-1">4.2 Withdrawals</h3>
+          <h3 className="font-medium mt-3 mb-1">4.2 Getting Paid</h3>
           <p>
-            Withdrawal fees (R20 flat fee) are <strong>non-refundable</strong>. Minimum
-            withdrawal is R100. Withdrawals require completed identity verification.
-            Once a withdrawal is processed, it cannot be reversed.
+            The Platform does not hold deposits and does not offer a stored balance you can
+            top up. Money you earn from ticket sales or bookings is held until the event is
+            complete, then reviewed and paid to your verified bank account. We charge no fee
+            to pay you — our commission is taken when the ticket is sold.
           </p>
 
           <h3 className="font-medium mt-3 mb-1">4.3 Platform Fees and Commissions</h3>
           <p>
             Platform fees and commissions (ticketing commission, booking commission) are
             generally <strong>non-refundable</strong>, except in cases of event cancellation
-            by the organizer or disputes resolved in the payer&apos;s favour.
+            by the organizer or disputes resolved in the payer&apos;s favour, where the
+            commission is not charged because no event took place.
           </p>
         </section>
 
@@ -152,7 +162,7 @@ export default function RefundsPage() {
               <strong>Resolution:</strong> Based on the evidence, we may:
               <ul className="list-disc pl-5 mt-1 space-y-1">
                 <li>Release funds to the service provider (if service was delivered).</li>
-                <li>Return funds to the organizer&apos;s wallet (if service was not delivered).</li>
+                <li>Return funds to the organizer&apos;s available balance (if service was not delivered).</li>
                 <li>Apply a partial resolution.</li>
               </ul>
             </li>
@@ -165,25 +175,22 @@ export default function RefundsPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold mb-3">6. Escrow and Fund Release Timeline</h2>
+          <h2 className="text-lg font-semibold mb-3">6. How Long Money Is Held</h2>
           <ul className="list-disc pl-5 mt-2 space-y-1">
-            <li><strong>Ticket revenue:</strong> Held in escrow until 48 hours after event completion, then released to the organizer&apos;s wallet.</li>
-            <li><strong>Booking payments:</strong> Held in escrow until dual confirmation (both parties confirm completion) + 24-hour holding period.</li>
+            <li><strong>Ticket revenue:</strong> Held until 48 hours after the event is marked complete, then reviewed and paid to the organizer&apos;s verified bank account.</li>
+            <li><strong>Booking payments:</strong> Held until both parties confirm completion, plus a 24-hour review period.</li>
             <li><strong>Large amounts (R5,000+):</strong> May require additional administrative review before release.</li>
-            <li><strong>Eligible funds release:</strong> Automated daily processing releases eligible funds.</li>
+            <li><strong>Cancelled events:</strong> Revenue is never released. It stays available to refund ticket holders.</li>
           </ul>
         </section>
 
         <section>
           <h2 className="text-lg font-semibold mb-3">7. Refund Processing Times</h2>
-          <p>Refunds are processed as follows:</p>
-          <ul className="list-disc pl-5 mt-2 space-y-1">
-            <li><strong>To wallet balance:</strong> Instant (available immediately on the Platform).</li>
-            <li><strong>To original payment method (card):</strong> 7–14 business days, depending on your bank and card issuer.</li>
-          </ul>
-          <p className="mt-2">
-            Ziyawa initiates refunds promptly but cannot control processing times imposed by
-            banks or payment processors.
+          <p>
+            Approved refunds are reversed to the card you paid with. Ziyawa sends the reversal
+            as soon as an administrator approves it, but the time it takes to appear on your
+            statement is set by your bank and card issuer — usually a few working days, and up
+            to 14 in some cases. We cannot speed that up.
           </p>
         </section>
 

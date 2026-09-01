@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { createNotification } from '@/lib/notifications'
 import { recordBalanceLedgerEntries, type BalanceLedgerContext } from '@/lib/payments/balance-ledger'
+import { logOpsEvent } from '@/lib/monitoring'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -199,7 +200,7 @@ export async function adjustProfileBalanceBuckets(
 
   if (!updateError) {
     if (context) {
-      await recordBalanceLedgerEntries([
+      const ledger = await recordBalanceLedgerEntries([
         {
           userId,
           bucket: 'wallet',
@@ -222,6 +223,22 @@ export async function adjustProfileBalanceBuckets(
           context,
         },
       ])
+
+      // The balance change stands either way — money must not roll back over a
+      // failed log write. But this result used to be discarded entirely, and
+      // because the ledger table had never actually been created, every balance
+      // movement on the platform went unaudited while this function kept
+      // reporting success. An unaudited money move has to be visible.
+      if (!ledger.success) {
+        logOpsEvent('balance-ledger', 'error', 'Balance moved but was not recorded in the audit ledger', {
+          userId,
+          reasonCode: context.reasonCode,
+          walletDelta,
+          heldDelta,
+          pendingPayoutDelta,
+          error: ledger.error,
+        })
+      }
     }
 
     return { success: true }

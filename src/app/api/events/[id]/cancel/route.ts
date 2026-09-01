@@ -73,7 +73,7 @@ export async function POST(
 
     const { data: ticketTransactions, error: txError } = await supabaseAdmin
       .from('transactions')
-      .select('id, payer_id, amount')
+      .select('id, payer_id, amount, gateway_response')
       .eq('event_id', eventId)
       .eq('type', 'ticket_purchase')
       .in('state', ['authorized', 'held', 'released', 'settled'])
@@ -82,26 +82,70 @@ export async function POST(
       return NextResponse.json({ error: 'Event cancelled, but failed to create refund work queue' }, { status: 500 })
     }
 
+    /**
+     * Refund the ticket price, never the booking fee.
+     *
+     * `txn.amount` is what the buyer was charged — ticket price PLUS booking
+     * fee. The booking fee is non-refundable: it is what already paid Paystack
+     * to process the charge, and Paystack does not give that back when we
+     * reverse it. Refunding it would put Ziyawa out of pocket on every single
+     * cancelled ticket.
+     */
+    const refundableCents = (txn: { amount: number | null; gateway_response: unknown }) => {
+      const response = (txn.gateway_response || {}) as {
+        ticket_price_cents?: number
+        quantity?: number
+        booking_fee_cents?: number
+      }
+
+      const ticketPrice = Number(response.ticket_price_cents || 0)
+      const quantity = Math.max(1, Number(response.quantity || 1))
+
+      if (ticketPrice > 0) return ticketPrice * quantity
+
+      // Older charges predate the stored breakdown. Back it out of the total
+      // instead of falling back to the full amount, which would refund the fee.
+      const bookingFee = Number(response.booking_fee_cents || 0)
+      return Math.max(0, Number(txn.amount || 0) - bookingFee * quantity)
+    }
+
     const refundRows = (ticketTransactions || [])
-      .filter((txn) => txn.payer_id && Number(txn.amount || 0) > 0)
-      .map((txn) => ({
+      .map((txn) => ({ txn, amount_cents: refundableCents(txn) }))
+      .filter(({ txn, amount_cents }) => txn.payer_id && amount_cents > 0)
+      .map(({ txn, amount_cents }) => ({
         event_id: eventId,
         source_transaction_id: txn.id,
         user_id: txn.payer_id,
-        amount_cents: Number(txn.amount || 0),
+        amount_cents,
         reason_code: 'event_cancelled',
         status: 'new',
         requested_by: user.id,
         metadata: {
           source: 'organizer_event_cancel',
           reason,
+          charged_cents: Number(txn.amount || 0),
+          booking_fee_retained_cents: Number(txn.amount || 0) - amount_cents,
         },
       }))
 
     if (refundRows.length > 0) {
-      await supabaseAdmin
+      const { error: queueError } = await supabaseAdmin
         .from('refund_work_items')
         .upsert(refundRows, { onConflict: 'source_transaction_id', ignoreDuplicates: true })
+
+      // Previously discarded. A silent failure here means the event is
+      // cancelled and nobody is ever refunded, which is the worst outcome
+      // available, so it has to be loud.
+      if (queueError) {
+        console.error('Failed to queue refunds for cancelled event:', { eventId, error: queueError })
+        return NextResponse.json(
+          {
+            error: 'The event was cancelled, but the refunds could not be queued. ' +
+              'Contact an admin before notifying ticket holders.',
+          },
+          { status: 500 }
+        )
+      }
     }
 
     const { data: admins } = await supabaseAdmin

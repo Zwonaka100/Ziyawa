@@ -52,7 +52,7 @@ export default function PrivacyPage() {
             <li><strong>Account data:</strong> Name, email address, phone number (optional), password (hashed).</li>
             <li><strong>Profile data:</strong> Display name, bio, province, profile photo, genres (artists), services offered (crew/vendors).</li>
             <li><strong>Identity verification:</strong> South African ID number or passport number, CIPC registration number (businesses), uploaded ID or registration documents.</li>
-            <li><strong>Financial data:</strong> Bank account details (for withdrawals), transaction history. Card details are processed by Paystack and never stored on our servers.</li>
+            <li><strong>Financial data:</strong> Bank account details (so we can pay you), transaction history. Card details are processed by Paystack and never stored on our servers.</li>
             <li><strong>Event data:</strong> Event details, ticket types, pricing, venue information.</li>
             <li><strong>Communications:</strong> In-app messages between users (booking-gated), support tickets.</li>
             <li><strong>Reviews:</strong> Written reviews and star ratings you submit.</li>
@@ -77,7 +77,7 @@ export default function PrivacyPage() {
           <h2 className="text-lg font-semibold mb-3">4. Purpose of Processing</h2>
           <p>We process your personal information for the following purposes, each with a lawful basis under POPIA:</p>
           <ul className="list-disc pl-5 mt-2 space-y-2">
-            <li><strong>Contract performance (Section 11(1)(b)):</strong> To provide the Platform services — account management, event listing, ticket sales, bookings, payments, messaging, and wallet operations.</li>
+            <li><strong>Contract performance (Section 11(1)(b)):</strong> To provide the Platform services — account management, event listing, ticket sales, bookings, payments, messaging, and payouts.</li>
             <li><strong>Legal obligation (Section 11(1)(c)):</strong> To comply with financial regulations, tax reporting, anti-fraud requirements, and consumer protection laws.</li>
             <li><strong>Legitimate interest (Section 11(1)(f)):</strong> To improve the Platform, detect fraud, prevent abuse, and maintain security. We balance our interests against your rights.</li>
             <li><strong>Consent (Section 11(1)(a)):</strong> Where applicable, for optional marketing communications. You may withdraw consent at any time.</li>

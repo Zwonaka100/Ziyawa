@@ -59,7 +59,8 @@ export default function ForGroovistsPage() {
                 </div>
                 <h3 className="font-semibold mb-2">Secure Payments</h3>
                 <p className="text-sm text-muted-foreground">
-                  Pay with your card via Paystack. Your money is held safely — if the event is cancelled, you get a full refund.
+                  Pay with your card via Paystack. Your money is held safely — if the event is cancelled,
+                  the ticket price goes straight back to your card.
                 </p>
               </CardContent>
             </Card>

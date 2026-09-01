@@ -204,13 +204,20 @@ export const PLATFORM_FEES = {
     commissionPercent: 5,
     // 5% platform service fee
     platformFeePercent: 5,
-    // Booking fee tiers (paid by buyer, added to ticket price)
-    // Amounts in cents
-    bookingFeeTiers: [
-      { maxPrice: 10000, fee: 500 },    // R0-R100 ticket = R5 fee
-      { maxPrice: 30000, fee: 700 },    // R101-R300 ticket = R7 fee
-      { maxPrice: Infinity, fee: 1000 }, // R301+ ticket = R10 fee
-    ],
+    // The booking fee (paid by the buyer, added to the ticket price) is
+    // calculated, not looked up — see calculateBookingFee below. Tiers used to
+    // cap it at R10, which a percentage-based gateway cost outgrows: a R5,000
+    // ticket cost R168 to process against a R10 fee.
+    bookingFee: {
+      // Guaranteed margin per ticket on top of the real gateway cost, in rands.
+      // Zero by design: the fee covers the cost and rounds up, nothing more.
+      smallWinRands: 0,
+      // Floor for cheap and free tickets, in cents.
+      minimumFeeCents: 500,
+      // Round the fee up to a whole rand. Rounding up can only strengthen the
+      // guarantee, never weaken it.
+      roundToCents: 100,
+    },
   },
 
   // -------------------------------------------------
@@ -252,11 +259,21 @@ export const PLATFORM_FEES = {
   // -------------------------------------------------
   // E. PAYSTACK FEES (for reference)
   // -------------------------------------------------
+  // Paystack South Africa's real pricing, confirmed against a live charge on
+  // this account: R250.00 cost R9.49, which is exactly (2.9% + R1) x 1.15 VAT.
+  //
+  // There is NO fee cap in South Africa — the cap people remember is Nigeria's,
+  // in naira. The booking fee formula below relies on that being true, so if
+  // this block ever changes, re-run the guarantee test in
+  // tests/smoke/booking-fee.test.mjs.
   paystack: {
-    localCardPercent: 1.5,
-    localCardCap: 200000, // R2000 cap
-    internationalPercent: 3.9,
-    transferFee: 1000, // R10 per transfer
+    localCardPercent: 2.9,
+    // The card type is unknown when the booking fee is displayed, so the fee is
+    // sized on this, the more expensive of the two.
+    internationalCardPercent: 3.1,
+    flatFeeCents: 100, // R1, ex VAT, per transaction
+    vatPercent: 15, // added on top of both the percentage and the flat fee
+    transferFeeCents: 300, // R3 ex VAT per bank transfer, charged even when it fails
   },
 } as const
 
@@ -265,13 +282,53 @@ export const PLATFORM_FEES = {
 // =====================================================
 
 /**
- * Calculate booking fee based on ticket price (in cents)
+ * What Paystack actually costs us to process a charge, in cents.
+ *
+ * `rate` defaults to the INTERNATIONAL card rate on purpose. We show the buyer
+ * a booking fee before we know what card they will use, so the one number we
+ * display has to cover the more expensive case. Sizing on the local rate leaves
+ * every international sale underwater, and the shortfall scales with the ticket
+ * price — R11.60 on a R5,000 ticket, R46.82 on a R20,000 one.
+ */
+export function paystackCostCents(
+  chargedCents: number,
+  rate: number = PLATFORM_FEES.paystack.internationalCardPercent
+): number {
+  const vat = 1 + PLATFORM_FEES.paystack.vatPercent / 100;
+  return (rate / 100) * vat * chargedCents + PLATFORM_FEES.paystack.flatFeeCents * vat;
+}
+
+/**
+ * Calculate the buyer's booking fee for a ticket price (both in cents).
+ *
+ * The fee must cover what Paystack charges us on the FULL amount the buyer
+ * pays — which includes the fee itself. That circularity is why this is solved
+ * rather than guessed:
+ *
+ *   fee - cost(price + fee) >= win
+ *   fee - r(price + fee) - flat >= win
+ *   fee >= (r*price + flat + win) / (1 - r)
+ *
+ * The booking fee is never refunded, so this is also what guarantees a refund
+ * or a cancelled event can never cost Ziyawa money: the gateway fee is gone the
+ * moment the charge succeeds, and the retained booking fee has already covered
+ * it at every price.
+ *
+ * Signature is unchanged from the tier lookup it replaces — cents in, cents
+ * out — so every caller keeps working.
  */
 export function calculateBookingFee(ticketPriceCents: number): number {
-  const tier = PLATFORM_FEES.ticketing.bookingFeeTiers.find(
-    t => ticketPriceCents <= t.maxPrice
-  );
-  return tier?.fee || PLATFORM_FEES.ticketing.bookingFeeTiers[2].fee;
+  const { smallWinRands, minimumFeeCents, roundToCents } = PLATFORM_FEES.ticketing.bookingFee;
+  const vat = 1 + PLATFORM_FEES.paystack.vatPercent / 100;
+
+  const rate = (PLATFORM_FEES.paystack.internationalCardPercent / 100) * vat;
+  const flatCents = PLATFORM_FEES.paystack.flatFeeCents * vat;
+  const winCents = smallWinRands * 100;
+
+  const rawCents = (rate * ticketPriceCents + flatCents + winCents) / (1 - rate);
+  const roundedCents = Math.ceil(rawCents / roundToCents) * roundToCents;
+
+  return Math.max(roundedCents, minimumFeeCents);
 }
 
 /**
