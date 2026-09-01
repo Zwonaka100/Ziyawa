@@ -117,3 +117,49 @@ export async function requireAdminPage(redirectTo = '/admin'): Promise<AdminCont
   }
   return outcome.admin
 }
+
+/**
+ * Admin check for the proxy/middleware, where next/headers and next/navigation
+ * are unavailable and the bundle needs to stay small - hence a plain REST call
+ * rather than the Supabase client.
+ *
+ * This exists because gating in the layout is not sufficient on its own. Next
+ * renders a layout and the page beneath it CONCURRENTLY; it does not wait for
+ * the layout to resolve before rendering the page. So a redirect from the
+ * layout still leaves a server-rendered admin page free to run its queries and
+ * stream its output into the same response. Measured, not assumed: a signed-in
+ * non-admin requesting /admin received a body containing the dashboard's own
+ * RSC payload alongside the redirect instruction.
+ *
+ * The middleware runs before any of that, so it is the only place a gate can
+ * stop the page from rendering at all.
+ */
+export async function isAdminUserId(userId: string): Promise<boolean> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !serviceKey) {
+    // Fail closed: without the means to check, nobody is an admin.
+    console.error('Admin check cannot run - Supabase env vars are missing')
+    return false
+  }
+
+  try {
+    const response = await fetch(
+      `${url}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=is_admin,admin_role`,
+      {
+        headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+        cache: 'no-store',
+      }
+    )
+    if (!response.ok) return false
+
+    const rows = (await response.json()) as Array<{ is_admin: boolean | null; admin_role: string | null }>
+    const profile = rows?.[0]
+    if (!profile) return false
+
+    return profile.is_admin === true || ADMIN_ROLES.includes(profile.admin_role ?? '')
+  } catch (error) {
+    console.error('Admin check failed:', error)
+    return false
+  }
+}

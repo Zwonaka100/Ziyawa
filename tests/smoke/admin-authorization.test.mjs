@@ -107,3 +107,30 @@ test('the gate distinguishes signed-out from not-an-admin', async () => {
     'the check should read the profile through the service client, not the caller\'s own access'
   )
 })
+
+test('the admin gate runs in the proxy, before anything renders', async () => {
+  const proxy = await readFile(join(root, 'src', 'proxy.ts'), 'utf8')
+
+  assert.ok(
+    proxy.includes('isAdminUserId'),
+    'src/proxy.ts does not check admin status. Gating only in admin/layout.tsx is ' +
+    'not enough: Next renders a layout and the page beneath it concurrently, so a ' +
+    'redirect from the layout still lets a server-rendered admin page run its ' +
+    'queries and stream its output into the same response.'
+  )
+})
+
+test('the middleware admin check fails closed', async () => {
+  const helper = await readFile(join(root, 'src', 'lib', 'admin-auth.ts'), 'utf8')
+  const fn = helper.slice(helper.indexOf('export async function isAdminUserId'))
+
+  assert.ok(fn.includes('return false'), 'isAdminUserId has no denying path')
+  assert.ok(
+    /if \(!url \|\| !serviceKey\)[\s\S]{0,220}return false/.test(fn),
+    'isAdminUserId should deny when its Supabase env vars are missing, not allow'
+  )
+  assert.ok(
+    /catch[\s\S]{0,160}return false/.test(fn),
+    'isAdminUserId should deny when the check itself throws'
+  )
+})
