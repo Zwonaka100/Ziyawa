@@ -67,7 +67,26 @@ export async function POST(
       .eq('id', id)
 
     if (updateError) {
-      return NextResponse.json({ error: 'Failed to update event status' }, { status: 500 })
+      // The reason used to be discarded here, which is how a database trigger
+      // rejecting published -> completed went unnoticed: every organiser saw
+      // "Failed to update event status" and nothing said why.
+      console.error('Event completion failed', {
+        eventId: id,
+        userId: user.id,
+        fromState: event.state,
+        toState: 'completed',
+        code: updateError.code,
+        message: updateError.message,
+        details: updateError.details,
+      })
+
+      return NextResponse.json(
+        {
+          error: 'Could not complete this event. Our team has been notified.',
+          reason: updateError.message,
+        },
+        { status: 500 }
+      )
     }
 
     const releaseResult = await releaseEligibleHeldFunds({ eventId: id })
@@ -80,6 +99,12 @@ export async function POST(
     })
   } catch (error) {
     console.error('Event completion error:', error)
-    return NextResponse.json({ error: 'Failed to complete event' }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: 'Could not complete this event. Our team has been notified.',
+        reason: error instanceof Error ? error.message : undefined,
+      },
+      { status: 500 }
+    )
   }
 }
