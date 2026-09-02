@@ -62,6 +62,7 @@ import {
 import { format } from 'date-fns'
 import { formatCurrency } from '@/lib/helpers'
 import { toast } from 'sonner'
+import { CompletionDialog } from '@/components/admin/completion-dialog'
 
 interface EventDetail {
   id: string
@@ -165,6 +166,7 @@ export function AdminEventDetail({
   const [savingChanges, setSavingChanges] = useState(false)
   const [uploadingCover, setUploadingCover] = useState(false)
   const [publishLoading, setPublishLoading] = useState(false)
+  const [completionOpen, setCompletionOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   // Primed from the server render. The old code filled this inside the mount
   // fetch; without that, opening Edit would have shown an empty form.
@@ -445,11 +447,15 @@ export function AdminEventDetail({
     }
   }
 
-  const handleCompleteEvent = async () => {
+  // Opens the breakdown instead of completing straight away. A bare confirm
+  // asked an admin to release money without showing them any of it.
+  const handleCompleteEvent = () => {
     if (!event) return
+    setCompletionOpen(true)
+  }
 
-    const confirmed = window.confirm('Mark this event as completed? This will update the lifecycle state for the event.')
-    if (!confirmed) return
+  const confirmCompleteEvent = async () => {
+    if (!event) return
 
     setPublishLoading(true)
 
@@ -462,6 +468,7 @@ export function AdminEventDetail({
       }
 
       toast.success(data.message || 'Event marked complete')
+      setCompletionOpen(false)
       void fetchEvent()
     } catch (error) {
       console.error('Complete error:', error)
@@ -1090,6 +1097,14 @@ export function AdminEventDetail({
           </div>
         </DialogContent>
       </Dialog>
+
+      <CompletionDialog
+        open={completionOpen}
+        eventId={eventId}
+        onOpenChange={setCompletionOpen}
+        onConfirm={confirmCompleteEvent}
+        confirming={publishLoading}
+      />
     </div>
   )
 }

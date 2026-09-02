@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createNotification } from '@/lib/notifications'
 import { recordBalanceLedgerEntries, type BalanceLedgerContext } from '@/lib/payments/balance-ledger'
 import { logOpsEvent } from '@/lib/monitoring'
+import { PLATFORM_FEES } from '@/lib/constants'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -110,6 +111,13 @@ export async function enqueuePayoutRequest(profileId: string): Promise<void> {
 
     const availableRands = Number(profile?.wallet_balance || 0)
     if (!profile?.is_verified || availableRands <= 0) return
+
+    // Every transfer costs roughly R3.45 whether or not it succeeds, and Ziyawa
+    // absorbs it rather than deducting it from the recipient. Queueing on any
+    // balance above zero would spend R3.45 to move R5. Below the floor the
+    // balance simply accumulates until the next release makes it worth paying.
+    const minimumRands = PLATFORM_FEES.wallet.minimumWithdrawal / 100
+    if (availableRands < minimumRands) return
 
     const { data: payoutAccount } = await supabaseAdmin
       .from('payout_accounts')

@@ -43,7 +43,7 @@ import {
   Download,
   type LucideIcon,
 } from 'lucide-react'
-import { formatCurrency } from '@/lib/helpers'
+import { formatCurrency, formatMoneyExact } from '@/lib/helpers'
 import { format } from 'date-fns'
 
 interface Transaction {
@@ -53,6 +53,8 @@ interface Transaction {
   state: string
   amount: number
   platform_fee: number
+  /** What the gateway charged, in cents. Null on rows predating fee capture. */
+  gateway_fee_cents: number | null
   net_amount: number
   payer_id: string
   recipient_id: string | null
@@ -102,6 +104,8 @@ export function AdminTransactionsTable({
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  // Abandoned checkouts are hidden until asked for.
+  const [includeIncomplete, setIncludeIncomplete] = useState(false)
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(initialTotalCount)
 
@@ -114,6 +118,7 @@ export function AdminTransactionsTable({
       const params = new URLSearchParams({
         type: typeFilter,
         status: statusFilter,
+        includeIncomplete: String(includeIncomplete),
         page: String(page),
       })
       if (searchQuery) params.set('q', searchQuery)
@@ -130,7 +135,7 @@ export function AdminTransactionsTable({
     } finally {
       setLoading(false)
     }
-  }, [page, typeFilter, statusFilter, searchQuery])
+  }, [page, typeFilter, statusFilter, searchQuery, includeIncomplete])
 
   useEffect(() => {
     if (hydratedFromServer.current) {
@@ -187,7 +192,7 @@ export function AdminTransactionsTable({
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Transactions</p>
@@ -197,25 +202,31 @@ export function AdminTransactionsTable({
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Volume</p>
-            <p className="text-2xl font-bold">{formatCurrency(stats.totalVolume / 100)}</p>
+            <p className="text-2xl font-bold">{formatMoneyExact(stats.totalVolume / 100)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Platform Fees</p>
-            <p className="text-2xl font-bold text-green-600">{formatCurrency(stats.platformFees / 100)}</p>
+            <p className="text-sm text-muted-foreground">Booking fees charged</p>
+            <p className="text-2xl font-bold">{formatMoneyExact(stats.platformFees / 100)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Pending</p>
-            <p className="text-2xl font-bold text-yellow-600">{stats.pendingCount}</p>
+            <p className="text-sm text-muted-foreground">Paid to Paystack</p>
+            <p className="text-2xl font-bold text-red-600">{formatMoneyExact(stats.gatewayFees / 100)}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-primary/40">
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">Ziyawa net after Paystack</p>
+            <p className="text-2xl font-bold text-green-600">{formatMoneyExact(stats.netAfterGateway / 100)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Held in Escrow</p>
-            <p className="text-2xl font-bold text-primary">{formatCurrency(stats.heldVolume / 100)}</p>
+            <p className="text-2xl font-bold text-primary">{formatMoneyExact(stats.heldVolume / 100)}</p>
           </CardContent>
         </Card>
         <Card>
@@ -254,6 +265,15 @@ export function AdminTransactionsTable({
                 <SelectItem value="booking_payment">Booking Payments</SelectItem>
               </SelectContent>
             </Select>
+            <label className="flex items-center gap-2 text-sm whitespace-nowrap cursor-pointer">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-input"
+                checked={includeIncomplete}
+                onChange={(e) => { setIncludeIncomplete(e.target.checked); setPage(1) }}
+              />
+              Show abandoned &amp; failed
+            </label>
             <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Status" />
@@ -285,7 +305,9 @@ export function AdminTransactionsTable({
                 <TableHead>Recipient</TableHead>
                 <TableHead>Event</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="text-right">Fee</TableHead>
+                <TableHead className="text-right">Booking fee</TableHead>
+                <TableHead className="text-right">Paystack</TableHead>
+                <TableHead className="text-right">Ziyawa net</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
               </TableRow>
@@ -344,10 +366,20 @@ export function AdminTransactionsTable({
                         ) : '-'}
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        {formatCurrency(tx.amount / 100)}
+                        {formatMoneyExact(tx.amount / 100)}
                       </TableCell>
                       <TableCell className="text-right text-sm text-muted-foreground">
-                        {formatCurrency(tx.platform_fee / 100)}
+                        {formatMoneyExact(tx.platform_fee / 100)}
+                      </TableCell>
+                      <TableCell className="text-right text-sm text-red-600">
+                        {tx.gateway_fee_cents == null
+                          ? '—'
+                          : formatMoneyExact(tx.gateway_fee_cents / 100)}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-medium">
+                        {tx.gateway_fee_cents == null
+                          ? '—'
+                          : formatMoneyExact((tx.platform_fee - tx.gateway_fee_cents) / 100)}
                       </TableCell>
                       <TableCell>
                         <Badge className={statusConfig.color}>

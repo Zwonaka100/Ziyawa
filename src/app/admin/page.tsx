@@ -185,12 +185,16 @@ export default async function AdminDashboard({
 
         {/* Six tiles: three columns keeps them as two even rows. */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* The honest revenue line leads. Gross sits beside it, because the
+              difference between the two is what Paystack takes. */}
           <TradingTile
-            label="Ziyawa earned (booking fees)"
-            figure={trading.feeEarnedRands}
+            label="Ziyawa net (after Paystack)"
+            figure={trading.netEarnedRands}
             money
             emphasis
           />
+          <TradingTile label="Booking fees charged" figure={trading.feeEarnedRands} money />
+          <TradingTile label="Paid to Paystack" figure={trading.gatewayFeesRands} money />
           <TradingTile label="Gross ticket sales" figure={trading.grossSalesRands} money />
           <TradingTile label="Tickets sold" figure={trading.ticketsSold} />
           <Card>

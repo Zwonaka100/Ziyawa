@@ -15,6 +15,10 @@ export interface TransactionStats {
   totalTransactions: number
   totalVolume: number
   platformFees: number
+  /** What the gateway actually charged on these transactions, in cents. */
+  gatewayFees: number
+  /** platformFees minus gatewayFees, in cents. What Ziyawa really kept. */
+  netAfterGateway: number
   pendingCount: number
   heldVolume: number
   issueCount: number
@@ -25,13 +29,22 @@ export interface TransactionFilters {
   status?: string
   search?: string
   page?: number
+  /**
+   * Abandoned checkouts ('initiated') and failures are hidden unless asked for.
+   * A started-and-never-paid checkout is not a transaction anyone needs to read
+   * past to find real money.
+   */
+  includeIncomplete?: boolean
 }
+
+const INCOMPLETE_STATES = ['initiated', 'failed']
 
 export async function loadTransactions({
   type = 'all',
   status = 'all',
   search = '',
   page = 1,
+  includeIncomplete = false,
 }: TransactionFilters = {}) {
   const supabaseAdmin = createAdminServiceClient()
 
@@ -48,6 +61,10 @@ export async function loadTransactions({
 
   if (type !== 'all') listQuery = listQuery.eq('type', type)
   if (status !== 'all') listQuery = listQuery.eq('state', status)
+  // An explicit status filter wins - asking for 'initiated' should show them.
+  else if (!includeIncomplete) {
+    listQuery = listQuery.not('state', 'in', `(${INCOMPLETE_STATES.join(',')})`)
+  }
   if (search) listQuery = listQuery.or(`reference.ilike.%${search}%`)
 
   const from = (page - 1) * TRANSACTIONS_PAGE_SIZE
@@ -58,20 +75,29 @@ export async function loadTransactions({
     listQuery,
     supabaseAdmin
       .from('transactions')
-      .select('amount, net_amount, platform_fee, state', { count: 'exact' }),
+      .select('amount, net_amount, platform_fee, gateway_fee_cents, state', { count: 'exact' }),
   ])
 
   if (listResult.error) throw new Error('Failed to load transactions')
 
   const rows = statsResult.data || []
-  const completed = rows.filter((t) => t.state === 'settled' || t.state === 'released')
+  // Money that actually moved. This used to mean 'settled' or 'released' only,
+  // which excluded 'held' - the state every paid ticket sits in until its event
+  // completes. The result was that Total Volume and Booking Fees read R0.00
+  // against R260.00 of real sales, because nothing had reached settlement yet.
+  const completed = rows.filter((t) => !INCOMPLETE_STATES.includes(t.state))
   const held = rows.filter((t) => t.state === 'held')
   const issues = rows.filter((t) => ['failed', 'refunded'].includes(t.state))
 
   const stats: TransactionStats = {
-    totalTransactions: statsResult.count || 0,
+    // Counts what the table shows, not abandoned checkouts alongside it.
+    totalTransactions: completed.length,
     totalVolume: completed.reduce((sum, t) => sum + (t.amount || 0), 0),
     platformFees: completed.reduce((sum, t) => sum + (t.platform_fee || 0), 0),
+    gatewayFees: completed.reduce((sum, t) => sum + (t.gateway_fee_cents || 0), 0),
+    netAfterGateway:
+      completed.reduce((sum, t) => sum + (t.platform_fee || 0), 0) -
+      completed.reduce((sum, t) => sum + (t.gateway_fee_cents || 0), 0),
     pendingCount: rows.filter((t) =>
       ['initiated', 'authorized', 'held', 'released'].includes(t.state)
     ).length,

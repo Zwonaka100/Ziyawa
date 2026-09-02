@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyWebhookSignature, verifyPayment, generateTicketCode } from '@/lib/paystack';
+import { gatewayFeeColumns, extractTransferFee } from '@/lib/payments/gateway-fees'
 import { adjustProfileBalanceBuckets } from '@/lib/payments/escrow';
 import { createNotification } from '@/lib/notifications';
 import { sendBookingPaymentConfirmedEmail, sendPayoutStatusEmail, sendTicketAssignedEmail, sendTicketPurchasedEmail } from '@/lib/email';
@@ -143,6 +144,10 @@ async function handleChargeSuccess(data: {
         ...existingGatewayResponse,
         paystack: verification.data,
       },
+      // What Paystack actually charged us, lifted out of the payload into
+      // columns. It has always been in `fees`; nothing read it, so every
+      // revenue figure was gross of the gateway cost.
+      ...gatewayFeeColumns(verification.data),
       authorized_at: new Date().toISOString(),
       failure_reason: null,
     })
@@ -591,10 +596,21 @@ async function settlePayoutRequest(
     status: 'completed' | 'failed'
     failureReason?: string
     settleFrom?: readonly string[]
+    /**
+     * What the gateway charged to make the transfer, in cents. Recorded even on
+     * a failure: Paystack bills for a failed transfer too, so leaving it off
+     * would understate what payouts actually cost. Ziyawa absorbs it - it is
+     * never deducted from the recipient.
+     */
+    transferFeeCents?: number | null
   }
 ) {
   try {
     const update: Record<string, unknown> = { status: outcome.status }
+
+    if (outcome.transferFeeCents != null) {
+      update.transfer_fee_cents = outcome.transferFeeCents
+    }
 
     if (outcome.status === 'completed') {
       update.completed_at = new Date().toISOString()
@@ -644,8 +660,9 @@ async function settlePayoutRequest(
 /**
  * Handle successful transfer (payout)
  */
-async function handleTransferSuccess(data: { reference: string }) {
+async function handleTransferSuccess(data: { reference: string; fee?: number }) {
   const { reference } = data;
+  const transferFeeCents = extractTransferFee(data);
 
   const { data: transaction } = await supabase
     .from('transactions')
@@ -691,7 +708,7 @@ async function handleTransferSuccess(data: { reference: string }) {
     })
     .eq('reference', reference);
 
-  await settlePayoutRequest(reference, { status: 'completed' });
+  await settlePayoutRequest(reference, { status: 'completed', transferFeeCents });
 
   if (transaction.payer_id) {
     await createNotification({
@@ -726,7 +743,9 @@ async function handleTransferSuccess(data: { reference: string }) {
 /**
  * Handle failed transfer
  */
-async function handleTransferFailed(data: { reference: string; reason: string }) {
+async function handleTransferFailed(data: { reference: string; reason: string; fee?: number }) {
+  // Paystack bills for a failed transfer too, so the cost is recorded either way.
+  const transferFeeCents = extractTransferFee(data);
   const { reference, reason } = data;
 
   const { data: transaction } = await supabase
@@ -804,7 +823,7 @@ async function handleTransferFailed(data: { reference: string; reason: string })
 
   // Closes the request so the restored balance can be queued again, rather than
   // stranding the recipient behind a row that never clears.
-  await settlePayoutRequest(reference, { status: 'failed', failureReason: reason });
+  await settlePayoutRequest(reference, { status: 'failed', failureReason: reason, transferFeeCents });
 
   logOpsEvent('paystack-webhook', 'warn', 'Transfer failed and funds restored', { reference, reason });
 }
@@ -812,7 +831,8 @@ async function handleTransferFailed(data: { reference: string; reason: string })
 /**
  * Handle reversed transfer
  */
-async function handleTransferReversed(data: { reference: string }) {
+async function handleTransferReversed(data: { reference: string; fee?: number }) {
+  const transferFeeCents = extractTransferFee(data);
   const { reference } = data;
 
   const { data: transaction } = await supabase
@@ -891,6 +911,7 @@ async function handleTransferReversed(data: { reference: string }) {
     status: 'failed',
     failureReason: 'Transfer reversed by Paystack',
     settleFrom: [...OPEN_PAYOUT_STATUSES, 'completed'],
+    transferFeeCents,
   });
 
   logOpsEvent('paystack-webhook', 'warn', 'Transfer reversed and balance updated', { reference, previousState: transaction.state });

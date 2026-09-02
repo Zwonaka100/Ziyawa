@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
         status: p.get('status') || 'all',
         search: p.get('q') || '',
         page: Number(p.get('page') || '1'),
+        includeIncomplete: p.get('includeIncomplete') === 'true',
       })
     )
   } catch (error) {

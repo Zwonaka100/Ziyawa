@@ -50,10 +50,14 @@ export default function EarningsPage() {
 
     setLoadingTx(true)
 
+    // Only money that actually moved. A checkout someone started and abandoned
+    // sits in 'initiated' forever, and showing those here made a person's own
+    // earnings list read like a series of failed payments.
     const { data, error } = await supabase
       .from('transactions')
       .select('id, type, amount, state, payer_id, recipient_id, created_at')
       .or(`payer_id.eq.${user.id},recipient_id.eq.${user.id}`)
+      .not('state', 'in', '(initiated,failed)')
       .order('created_at', { ascending: false })
       .limit(20)
 

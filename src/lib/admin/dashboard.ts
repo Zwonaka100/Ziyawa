@@ -195,6 +195,10 @@ export interface TradingData {
   days: number
   grossSalesRands: TradingFigure
   feeEarnedRands: TradingFigure
+  /** What the gateway took out of feeEarnedRands. Ziyawa's real cost of trading. */
+  gatewayFeesRands: TradingFigure
+  /** feeEarned minus gatewayFees. The honest revenue line. */
+  netEarnedRands: TradingFigure
   ticketsSold: TradingFigure
   checkoutsAttempted: number
   checkoutsCompleted: number
@@ -224,12 +228,12 @@ export async function loadTrading(days: TradingPeriod = 30): Promise<TradingData
   const [current, prior, lastSale, lastAttempt, signups, events] = await Promise.all([
     db
       .from('transactions')
-      .select('amount, platform_fee, state, created_at')
+      .select('amount, platform_fee, gateway_fee_cents, state, created_at')
       .eq('type', 'ticket_purchase')
       .gte('created_at', periodStart),
     db
       .from('transactions')
-      .select('amount, platform_fee, state, created_at')
+      .select('amount, platform_fee, gateway_fee_cents, state, created_at')
       .eq('type', 'ticket_purchase')
       .gte('created_at', priorStart)
       .lt('created_at', periodStart),
@@ -250,12 +254,17 @@ export async function loadTrading(days: TradingPeriod = 30): Promise<TradingData
     db.from('events').select('created_at').gte('created_at', priorStart),
   ])
 
-  type TxnRow = { amount: number | null; platform_fee: number | null; state: string }
+  type TxnRow = {
+    amount: number | null
+    platform_fee: number | null
+    gateway_fee_cents: number | null
+    state: string
+  }
 
   const settled = (rows: TxnRow[] | null) =>
     (rows || []).filter((r) => !ABANDONED_STATES.includes(r.state))
 
-  const sumRands = (rows: TxnRow[], key: 'amount' | 'platform_fee') =>
+  const sumRands = (rows: TxnRow[], key: 'amount' | 'platform_fee' | 'gateway_fee_cents') =>
     rows.reduce((total, row) => total + Number(row[key] || 0) / CENTS, 0)
 
   const currentSettled = settled(current.data)
@@ -278,6 +287,14 @@ export async function loadTrading(days: TradingPeriod = 30): Promise<TradingData
     feeEarnedRands: figure(
       sumRands(currentSettled, 'platform_fee'),
       sumRands(priorSettled, 'platform_fee')
+    ),
+    gatewayFeesRands: figure(
+      sumRands(currentSettled, 'gateway_fee_cents'),
+      sumRands(priorSettled, 'gateway_fee_cents')
+    ),
+    netEarnedRands: figure(
+      sumRands(currentSettled, 'platform_fee') - sumRands(currentSettled, 'gateway_fee_cents'),
+      sumRands(priorSettled, 'platform_fee') - sumRands(priorSettled, 'gateway_fee_cents')
     ),
     ticketsSold: figure(currentSettled.length, priorSettled.length),
     checkoutsAttempted: attempted,
