@@ -99,3 +99,19 @@ export async function listAdminUsers({
     totalCount: count || 0,
   }
 }
+
+/** The single profile the admin edit form needs, narrowed to its fields. */
+export async function loadUserForEdit(userId: string) {
+  const supabaseAdmin = createAdminServiceClient()
+
+  const { data, error } = await supabaseAdmin
+    .from('profiles')
+    .select(
+      'id, full_name, email, phone, location, bio, is_organizer, is_verified, avatar_url, is_suspended, is_banned, is_admin, admin_role, suspension_reason, ban_reason'
+    )
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (error) throw new Error('Failed to load user')
+  return data
+}
