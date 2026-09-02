@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { requireAdminPage, createAdminServiceClient } from '@/lib/admin-auth'
 import { ConversationLogsClient } from './conversations-client'
 
 export const metadata = {
@@ -21,24 +21,17 @@ function normaliseConversations(rows: any[]) {
 }
 
 export default async function AdminConversationLogsPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) redirect('/auth/signin')
-
-  // Verify admin/super_admin access
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('is_admin, admin_role')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.is_admin && profile?.admin_role !== 'super_admin') {
+  // This was the seventeenth hand-rolled copy of the admin check. It now uses
+  // the shared gate, and keeps its own stricter condition on top: this page
+  // shows people's private messages, so it stays limited to the roles the
+  // original allowed rather than widening to every admin_role.
+  const admin = await requireAdminPage('/admin/communications/conversations')
+  if (admin.adminRole !== 'super_admin' && admin.adminRole !== 'admin') {
     redirect('/dashboard')
   }
 
-  // Fetch all conversations with participant info using service role would bypass RLS,
-  // but admin policy in migration handles this. Admin policy lets admins see all.
+  const supabase = createAdminServiceClient()
+
   const { data: conversations } = await supabase
     .from('conversations')
     .select(`
