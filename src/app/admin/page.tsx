@@ -1,258 +1,289 @@
-import { createClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { 
-  Users, 
-  Calendar, 
-  AlertTriangle, 
-  MessageSquare,
-  UserPlus,
-  CalendarPlus,
-  Briefcase
-} from 'lucide-react'
 import Link from 'next/link'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  AlertTriangle,
+  ArrowRight,
+  CalendarCheck,
+  CheckCircle2,
+  Scale,
+  ShieldCheck,
+  MessageSquare,
+  Banknote,
+  RotateCcw,
+  Flag,
+} from 'lucide-react'
+import { loadDashboard, type QueueSummary } from '@/lib/admin/dashboard'
+import { formatMoneyExact } from '@/lib/helpers'
 
-export const metadata = {
-  title: 'Admin Dashboard | Ziyawa',
+export const metadata = { title: 'Admin Dashboard | Ziyawa' }
+
+/** How long the oldest item has been waiting, in plain words. */
+function waitingFor(oldestAt: string | null): string | null {
+  if (!oldestAt) return null
+  const days = Math.floor((Date.now() - new Date(oldestAt).getTime()) / 86_400_000)
+  if (days <= 0) return 'today'
+  if (days === 1) return '1 day'
+  return `${days} days`
 }
 
-export default async function AdminDashboardPage() {
-  const supabase = await createClient()
+interface QueueProps {
+  title: string
+  href: string
+  icon: React.ElementType
+  queue: QueueSummary
+  /** What lands here, shown when nothing is waiting. */
+  whenEmpty: string
+  amountLabel?: string
+}
 
-  // Fetch all stats in parallel
-  const [
-    { count: totalUsers },
-    { count: totalOrganizers },
-    { count: totalArtists },
-    { count: totalCrewProfiles },
-    { count: totalEvents },
-    { count: publishedEvents },
-    { count: pendingReports },
-    { count: openTickets },
-    { data: recentUsers },
-    { data: recentEvents },
-    { data: recentReports },
-  ] = await Promise.all([
-    supabase.from('profiles').select('*', { count: 'exact', head: true }),
-    supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('is_organizer', true),
-    supabase.from('artists').select('*', { count: 'exact', head: true }),
-    supabase.from('providers').select('*', { count: 'exact', head: true }),
-    supabase.from('events').select('*', { count: 'exact', head: true }),
-    supabase.from('events').select('*', { count: 'exact', head: true }).eq('is_published', true),
-    supabase.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-    supabase.from('support_tickets').select('*', { count: 'exact', head: true }).in('status', ['open', 'in_progress']),
-    supabase.from('profiles').select('id, full_name, email, created_at').order('created_at', { ascending: false }).limit(5),
-    supabase.from('events').select('id, title, created_at, is_published').order('created_at', { ascending: false }).limit(5),
-    supabase.from('reports').select('id, reported_type, reason, status, created_at').order('created_at', { ascending: false }).limit(5),
-  ])
+function QueueCard({ title, href, icon: Icon, queue, whenEmpty, amountLabel }: QueueProps) {
+  const waiting = waitingFor(queue.oldestAt)
 
-  const stats = [
-    { name: 'Total Users', value: totalUsers || 0, icon: Users, href: '/admin/users', color: 'text-blue-600' },
-    { name: 'Organizers', value: totalOrganizers || 0, icon: Users, href: '/admin/users?role=organizer', color: 'text-purple-600' },
-    { name: 'Artists', value: totalArtists || 0, icon: Users, href: '/admin/artists', color: 'text-pink-600' },
-    { name: 'Crew Profiles', value: totalCrewProfiles || 0, icon: Briefcase, href: '/admin/crew', color: 'text-indigo-600' },
-    { name: 'Total Events', value: totalEvents || 0, icon: Calendar, href: '/admin/events', color: 'text-green-600' },
-    { name: 'Published Events', value: publishedEvents || 0, icon: Calendar, href: '/admin/events?status=published', color: 'text-emerald-600' },
-    { name: 'Pending Reports', value: pendingReports || 0, icon: AlertTriangle, href: '/admin/reports', color: 'text-orange-600' },
-    { name: 'Open Tickets', value: openTickets || 0, icon: MessageSquare, href: '/admin/support', color: 'text-yellow-600' },
-  ]
-
-  return (
-    <div className="space-y-6">
-      {/* Welcome */}
-      <div>
-        <h2 className="text-2xl font-bold">Welcome to Admin Dashboard</h2>
-        <p className="text-muted-foreground">Here&apos;s what&apos;s happening on Ziyawa today.</p>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <Link key={stat.name} href={stat.href}>
-            <Card className="hover:shadow-md transition-shadow cursor-pointer">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">{stat.name}</p>
-                    <p className="text-3xl font-bold">{stat.value}</p>
-                  </div>
-                  <stat.icon className={`h-10 w-10 ${stat.color}`} />
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
-
-      {/* Recent Activity */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Recent Users */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-medium">Recent Users</CardTitle>
-            <UserPlus className="h-5 w-5 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {recentUsers?.map((user) => (
-                <Link 
-                  key={user.id} 
-                  href={`/admin/users/${user.id}`}
-                  className="flex items-center justify-between py-2 hover:bg-neutral-50 rounded px-2 -mx-2"
-                >
-                  <div>
-                    <p className="font-medium text-sm">{user.full_name || 'No name'}</p>
-                    <p className="text-xs text-muted-foreground">{user.email}</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(user.created_at).toLocaleDateString()}
-                  </p>
-                </Link>
-              ))}
-              {(!recentUsers || recentUsers.length === 0) && (
-                <p className="text-sm text-muted-foreground text-center py-4">No users yet</p>
-              )}
+  // An empty queue should still say what it is for. A blank screen with no
+  // explanation is how a page that had approve and decline all along came
+  // across as not having them.
+  if (queue.count === 0) {
+    return (
+      <Card className="border-dashed">
+        <CardContent className="p-5">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <p className="font-medium">{title}</p>
+              <p className="text-sm text-muted-foreground">Nothing waiting. {whenEmpty}</p>
             </div>
-            <Link 
-              href="/admin/users"
-              className="block text-center text-sm text-primary hover:underline mt-4"
-            >
-              View all users →
-            </Link>
-          </CardContent>
-        </Card>
-
-        {/* Recent Events */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-medium">Recent Events</CardTitle>
-            <CalendarPlus className="h-5 w-5 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {recentEvents?.map((event) => (
-                <Link 
-                  key={event.id} 
-                  href={`/admin/events/${event.id}`}
-                  className="flex items-center justify-between py-2 hover:bg-neutral-50 rounded px-2 -mx-2"
-                >
-                  <div>
-                    <p className="font-medium text-sm line-clamp-1">{event.title}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded ${
-                      event.is_published 
-                        ? 'bg-green-100 text-green-700' 
-                        : 'bg-yellow-100 text-yellow-700'
-                    }`}>
-                      {event.is_published ? 'Published' : 'Draft'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(event.created_at).toLocaleDateString()}
-                  </p>
-                </Link>
-              ))}
-              {(!recentEvents || recentEvents.length === 0) && (
-                <p className="text-sm text-muted-foreground text-center py-4">No events yet</p>
-              )}
-            </div>
-            <Link 
-              href="/admin/events"
-              className="block text-center text-sm text-primary hover:underline mt-4"
-            >
-              View all events →
-            </Link>
-          </CardContent>
-        </Card>
-
-        {/* Recent Reports */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-medium">Recent Reports</CardTitle>
-            <AlertTriangle className="h-5 w-5 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {recentReports?.map((report) => (
-                <Link 
-                  key={report.id} 
-                  href={`/admin/reports/${report.id}`}
-                  className="flex items-center justify-between py-2 hover:bg-neutral-50 rounded px-2 -mx-2"
-                >
-                  <div>
-                    <p className="font-medium text-sm capitalize">{report.reported_type} - {report.reason}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded ${
-                      report.status === 'pending' 
-                        ? 'bg-orange-100 text-orange-700' 
-                        : report.status === 'resolved'
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-neutral-100 text-neutral-700'
-                    }`}>
-                      {report.status}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(report.created_at).toLocaleDateString()}
-                  </p>
-                </Link>
-              ))}
-              {(!recentReports || recentReports.length === 0) && (
-                <p className="text-sm text-muted-foreground text-center py-4">No reports yet</p>
-              )}
-            </div>
-            <Link 
-              href="/admin/reports"
-              className="block text-center text-sm text-primary hover:underline mt-4"
-            >
-              View all reports →
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-3">
-            <Link href="/admin/users">
-              <button className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90">
-                Manage Users
-              </button>
-            </Link>
-            <Link href="/admin/artists">
-              <button className="px-4 py-2 bg-pink-600 text-white rounded-lg text-sm font-medium hover:bg-pink-700">
-                Manage Artists
-              </button>
-            </Link>
-            <Link href="/admin/crew">
-              <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">
-                Manage Crew
-              </button>
-            </Link>
-            <Link href="/admin/events">
-              <button className="px-4 py-2 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-800">
-                Manage Events
-              </button>
-            </Link>
-            <Link href="/admin/reports?status=pending">
-              <button className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700">
-                Review Reports ({pendingReports || 0})
-              </button>
-            </Link>
-            <Link href="/admin/support?status=open">
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
-                Open Tickets ({openTickets || 0})
-              </button>
-            </Link>
-            <Link href="/admin/communications/send">
-              <button className="px-4 py-2 border border-neutral-300 rounded-lg text-sm font-medium hover:bg-neutral-50">
-                Send Email
-              </button>
-            </Link>
           </div>
         </CardContent>
       </Card>
+    )
+  }
+
+  return (
+    <Link href={href}>
+      <Card className="hover:shadow-md transition-shadow h-full border-l-4 border-l-primary">
+        <CardContent className="p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <Icon className="h-4 w-4 text-primary shrink-0" />
+                <p className="font-medium truncate">{title}</p>
+              </div>
+              <p className="text-3xl font-bold">{queue.count}</p>
+              {queue.amountRands !== undefined && queue.amountRands > 0 && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  {amountLabel || 'Value'}: {formatMoneyExact(queue.amountRands)}
+                </p>
+              )}
+              {waiting && (
+                <p className="text-xs text-muted-foreground mt-1">Oldest waiting {waiting}</p>
+              )}
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
+  )
+}
+
+export default async function AdminDashboard() {
+  const data = await loadDashboard()
+
+  const queues: QueueProps[] = [
+    {
+      title: 'Events awaiting completion',
+      href: '/admin/events?lifecycle=past',
+      icon: CalendarCheck,
+      queue: data.needsCompletion,
+      amountLabel: 'Held for these organisers',
+      whenEmpty: 'Past events appear here until their organiser marks them complete.',
+    },
+    {
+      title: 'Verifications to review',
+      href: '/admin/verifications',
+      icon: ShieldCheck,
+      queue: data.verifications,
+      whenEmpty: 'ID and bank submissions land here for approve or decline.',
+    },
+    {
+      title: 'Payouts to approve',
+      href: '/admin/finance/payouts',
+      icon: Banknote,
+      queue: data.payouts,
+      amountLabel: 'Requested',
+      whenEmpty: 'Withdrawal requests land here for approval before any money moves.',
+    },
+    {
+      title: 'Refunds queued',
+      href: '/admin/finance/refunds',
+      icon: RotateCcw,
+      queue: data.refunds,
+      amountLabel: 'To refund',
+      whenEmpty: 'Refunds queued by a cancellation or a buyer request appear here.',
+    },
+    {
+      title: 'Open disputes',
+      href: '/admin/disputes',
+      icon: Scale,
+      queue: data.disputes,
+      whenEmpty: 'Disputed artist and crew bookings appear here to release or refund.',
+    },
+    {
+      title: 'Reports to action',
+      href: '/admin/reports',
+      icon: Flag,
+      queue: data.reports,
+      whenEmpty: 'Reports about users, events or reviews appear here.',
+    },
+    {
+      title: 'Support tickets open',
+      href: '/admin/support',
+      icon: MessageSquare,
+      queue: data.support,
+      whenEmpty: 'Tickets raised from the support form appear here.',
+    },
+  ]
+
+  const waitingCount = queues.filter((q) => q.queue.count > 0).length
+  const { money, failures } = data
+  const failureTotal = failures.failedPayouts + failures.failedRefunds + failures.failedEmails
+
+  // What is owed to people against what is actually in the Paystack balance.
+  // Transfers are funded from that balance, so if it is lower, approving
+  // everything queued would fail at Paystack rather than here.
+  const shortfall =
+    money.paystackBalanceRands !== null
+      ? money.paystackBalanceRands - money.totalOwedRands
+      : null
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-2xl font-bold">
+          {waitingCount === 0 ? 'Nothing needs you right now' : 'What needs you'}
+        </h2>
+        <p className="text-muted-foreground">
+          {waitingCount === 0
+            ? 'Every queue is clear. The cards below say what would land in each.'
+            : `${waitingCount} ${waitingCount === 1 ? 'queue has' : 'queues have'} work waiting.`}
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {queues.map((q) => (
+          <QueueCard key={q.title} {...q} />
+        ))}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-medium">Money position</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Held against events not yet complete</span>
+              <span className="font-medium">{formatMoneyExact(money.heldRands)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Available to withdraw</span>
+              <span className="font-medium">{formatMoneyExact(money.availableRands)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Already paying out</span>
+              <span className="font-medium">{formatMoneyExact(money.pendingPayoutRands)}</span>
+            </div>
+            <div className="flex justify-between border-t pt-3">
+              <span className="font-medium">Total owed to people</span>
+              <span className="font-bold">{formatMoneyExact(money.totalOwedRands)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Paystack balance</span>
+              <span className="font-medium">
+                {money.paystackBalanceRands === null
+                  ? 'Could not read'
+                  : formatMoneyExact(money.paystackBalanceRands)}
+              </span>
+            </div>
+            {shortfall !== null && (
+              <p
+                className={`text-sm rounded-md p-3 ${
+                  shortfall < 0 ? 'bg-red-50 text-red-800' : 'bg-green-50 text-green-800'
+                }`}
+              >
+                {shortfall < 0
+                  ? `Short by ${formatMoneyExact(Math.abs(shortfall))} if everyone withdrew at once.`
+                  : `Covers everything owed, with ${formatMoneyExact(shortfall)} to spare.`}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg font-medium">Failures</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {failureTotal === 0 && failures.payoutsWithoutRecipient === 0 ? (
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+                <p className="text-sm text-muted-foreground">
+                  No failed payouts, refunds or emails. Anything that fails quietly in the
+                  background shows up here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2 text-sm">
+                {failures.failedPayouts > 0 && (
+                  <Link
+                    href="/admin/finance/reconciliation"
+                    className="flex justify-between hover:underline"
+                  >
+                    <span className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-red-600" /> Failed payouts
+                    </span>
+                    <span className="font-medium">{failures.failedPayouts}</span>
+                  </Link>
+                )}
+                {failures.failedRefunds > 0 && (
+                  <Link
+                    href="/admin/finance/reconciliation"
+                    className="flex justify-between hover:underline"
+                  >
+                    <span className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-red-600" /> Failed refunds
+                    </span>
+                    <span className="font-medium">{failures.failedRefunds}</span>
+                  </Link>
+                )}
+                {failures.failedEmails > 0 && (
+                  <Link
+                    href="/admin/communications/history?status=failed"
+                    className="flex justify-between hover:underline"
+                  >
+                    <span className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-red-600" /> Failed emails
+                    </span>
+                    <span className="font-medium">{failures.failedEmails}</span>
+                  </Link>
+                )}
+                {failures.payoutsWithoutRecipient > 0 && (
+                  <Link
+                    href="/admin/finance/payouts"
+                    className="flex justify-between hover:underline"
+                  >
+                    <span className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-600" /> Payout accounts with no
+                      Paystack recipient
+                    </span>
+                    <span className="font-medium">{failures.payoutsWithoutRecipient}</span>
+                  </Link>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
