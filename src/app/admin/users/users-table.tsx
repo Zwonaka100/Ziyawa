@@ -1,0 +1,392 @@
+'use client'
+
+import { useState, useEffect, useCallback, useRef } from 'react'
+import Link from 'next/link'
+import Image from 'next/image'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { 
+  Search, 
+  MoreHorizontal, 
+  Eye, 
+  Edit, 
+  Ban, 
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  Mail,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-react'
+import type { AdminUserRow } from '@/lib/admin/users'
+import { toast } from 'sonner'
+import { format } from 'date-fns'
+
+const ITEMS_PER_PAGE = 20
+
+export function AdminUsersTable({
+  initialUsers,
+  initialTotalCount,
+}: {
+  initialUsers: AdminUserRow[]
+  initialTotalCount: number
+}) {
+  useRouter()
+  const searchParams = useSearchParams()
+  // Seeded from the server render — no empty first paint, no fetch on mount.
+  const [users, setUsers] = useState<AdminUserRow[]>(initialUsers)
+  const [loading, setLoading] = useState(false)
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '')
+  const [roleFilter, setRoleFilter] = useState(searchParams.get('role') || 'all')
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all')
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(initialTotalCount)
+  const hydratedFromServer = useRef(true)
+
+  const fetchUsers = useCallback(async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({
+        page: String(page),
+        role: roleFilter,
+        status: statusFilter,
+      })
+      if (searchQuery) params.set('q', searchQuery)
+
+      const response = await fetch(`/api/admin/users?${params.toString()}`, { cache: 'no-store' })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Failed to fetch users')
+
+      setUsers(data.users || [])
+      setTotalCount(data.totalCount || 0)
+    } catch (error) {
+      console.error(error)
+      toast.error(error instanceof Error ? error.message : 'Failed to fetch users')
+    } finally {
+      setLoading(false)
+    }
+  }, [page, roleFilter, statusFilter, searchQuery])
+
+  useEffect(() => {
+    if (hydratedFromServer.current) {
+      hydratedFromServer.current = false
+      return
+    }
+    void fetchUsers()
+  }, [fetchUsers])
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    setPage(1)
+    fetchUsers()
+  }
+
+  const moderateUser = async (userId: string, body: { suspend?: boolean; ban?: boolean }) => {
+    const response = await fetch(`/api/admin/users/${userId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const payload = await response.json()
+    if (!response.ok) throw new Error(payload.error || 'Failed to update user')
+  }
+
+  const handleSuspendUser = async (userId: string, suspend: boolean) => {
+    try {
+      await moderateUser(userId, { suspend })
+      toast.success(suspend ? 'User suspended' : 'User unsuspended')
+      fetchUsers()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update user')
+    }
+  }
+
+  const handleBanUser = async (userId: string, ban: boolean) => {
+    if (ban && !confirm('Are you sure you want to permanently ban this user?')) {
+      return
+    }
+
+    try {
+      await moderateUser(userId, { ban })
+      toast.success(ban ? 'User banned' : 'User unbanned')
+      fetchUsers()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update user')
+    }
+  }
+
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE)
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">User Management</h2>
+          <p className="text-muted-foreground">Manage all platform users</p>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-4">
+          <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={roleFilter} onValueChange={(v) => { setRoleFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="user">Users</SelectItem>
+                <SelectItem value="organizer">Organizers</SelectItem>
+                <SelectItem value="artist">Artists</SelectItem>
+                <SelectItem value="crew">Crew</SelectItem>
+                <SelectItem value="admin">Admins</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="suspended">Suspended</SelectItem>
+                <SelectItem value="banned">Banned</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button type="submit">Search</Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Users Table */}
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>User</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Joined</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  </TableCell>
+                </TableRow>
+              ) : users.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    No users found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                users.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-neutral-200 flex items-center justify-center">
+                          {user.avatar_url ? (
+                            <Image src={user.avatar_url} alt="" width={40} height={40} className="w-full h-full rounded-full object-cover" />
+                          ) : (
+                            <span className="text-sm font-medium">
+                              {user.full_name?.charAt(0) || user.email?.charAt(0) || '?'}
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-medium">{user.full_name || 'No name'}</p>
+                          <p className="text-sm text-muted-foreground">{user.email}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {user.is_admin && (
+                          <span className="px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-700">
+                            {user.admin_role || 'Admin'}
+                          </span>
+                        )}
+                        {user.is_organizer && (
+                          <span className="px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700">
+                            Organizer
+                          </span>
+                        )}
+                        {user.is_artist && (
+                          <span className="px-2 py-0.5 rounded text-xs bg-pink-100 text-pink-700">
+                            Artist
+                          </span>
+                        )}
+                        {user.is_provider && (
+                          <span className="px-2 py-0.5 rounded text-xs bg-indigo-100 text-indigo-700">
+                            Crew
+                          </span>
+                        )}
+                        {!user.is_admin && !user.is_organizer && !user.is_artist && !user.is_provider && (
+                          <span className="px-2 py-0.5 rounded text-xs bg-neutral-100 text-neutral-700">
+                            User
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {user.is_banned ? (
+                        <span className="flex items-center gap-1 text-red-600">
+                          <XCircle className="h-4 w-4" />
+                          Banned
+                        </span>
+                      ) : user.is_suspended ? (
+                        <span className="flex items-center gap-1 text-orange-600">
+                          <AlertTriangle className="h-4 w-4" />
+                          Suspended
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-green-600">
+                          <CheckCircle className="h-4 w-4" />
+                          Active
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {format(new Date(user.created_at), 'MMM d, yyyy')}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/admin/users/${user.id}`}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/admin/users/${user.id}/edit`}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit User
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/admin/communications/send?to=${user.id}`}>
+                              <Mail className="h-4 w-4 mr-2" />
+                              Send Email
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {!user.is_banned && (
+                            <>
+                              {user.is_suspended ? (
+                                <DropdownMenuItem onClick={() => handleSuspendUser(user.id, false)}>
+                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                  Unsuspend
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem 
+                                  onClick={() => handleSuspendUser(user.id, true)}
+                                  className="text-orange-600"
+                                >
+                                  <AlertTriangle className="h-4 w-4 mr-2" />
+                                  Suspend
+                                </DropdownMenuItem>
+                              )}
+                            </>
+                          )}
+                          {user.is_banned ? (
+                            <DropdownMenuItem onClick={() => handleBanUser(user.id, false)}>
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Unban
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem 
+                              onClick={() => handleBanUser(user.id, true)}
+                              className="text-red-600"
+                            >
+                              <Ban className="h-4 w-4 mr-2" />
+                              Ban User
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Showing {((page - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(page * ITEMS_PER_PAGE, totalCount)} of {totalCount} users
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm">
+              Page {page} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
