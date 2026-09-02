@@ -2,92 +2,55 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   AlertTriangle,
-  ArrowRight,
+  Banknote,
   CalendarCheck,
   CheckCircle2,
+  Flag,
+  MessageSquare,
+  RotateCcw,
   Scale,
   ShieldCheck,
-  MessageSquare,
-  Banknote,
-  RotateCcw,
-  Flag,
 } from 'lucide-react'
-import { loadDashboard, type QueueSummary } from '@/lib/admin/dashboard'
+import {
+  loadDashboard,
+  loadForwardView,
+  loadTrading,
+  TRADING_PERIODS,
+  type TradingPeriod,
+} from '@/lib/admin/dashboard'
+import {
+  AlertBand,
+  ForwardCard,
+  QueueCard,
+  TradingTile,
+  type QueueProps,
+} from '@/components/admin/dashboard-sections'
 import { formatMoneyExact } from '@/lib/helpers'
 
 export const metadata = { title: 'Admin Dashboard | Ziyawa' }
 
-/** How long the oldest item has been waiting, in plain words. */
-function waitingFor(oldestAt: string | null): string | null {
-  if (!oldestAt) return null
-  const days = Math.floor((Date.now() - new Date(oldestAt).getTime()) / 86_400_000)
-  if (days <= 0) return 'today'
-  if (days === 1) return '1 day'
-  return `${days} days`
-}
+/** Flag a dry spell before it becomes a surprise. */
+const STALE_SALE_DAYS = 14
+const LOW_COMPLETION_PCT = 50
 
-interface QueueProps {
-  title: string
-  href: string
-  icon: React.ElementType
-  queue: QueueSummary
-  /** What lands here, shown when nothing is waiting. */
-  whenEmpty: string
-  amountLabel?: string
-}
+export default async function AdminDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ days?: string }>
+}) {
+  const params = await searchParams
+  const requested = Number(params.days)
+  const days: TradingPeriod = (TRADING_PERIODS as readonly number[]).includes(requested)
+    ? (requested as TradingPeriod)
+    : 30
 
-function QueueCard({ title, href, icon: Icon, queue, whenEmpty, amountLabel }: QueueProps) {
-  const waiting = waitingFor(queue.oldestAt)
+  const [data, trading, forward] = await Promise.all([
+    loadDashboard(),
+    loadTrading(days),
+    loadForwardView(),
+  ])
 
-  // An empty queue should still say what it is for. A blank screen with no
-  // explanation is how a page that had approve and decline all along came
-  // across as not having them.
-  if (queue.count === 0) {
-    return (
-      <Card className="border-dashed">
-        <CardContent className="p-5">
-          <div className="flex items-start gap-3">
-            <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
-            <div className="min-w-0">
-              <p className="font-medium">{title}</p>
-              <p className="text-sm text-muted-foreground">Nothing waiting. {whenEmpty}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  return (
-    <Link href={href}>
-      <Card className="hover:shadow-md transition-shadow h-full border-l-4 border-l-primary">
-        <CardContent className="p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <Icon className="h-4 w-4 text-primary shrink-0" />
-                <p className="font-medium truncate">{title}</p>
-              </div>
-              <p className="text-3xl font-bold">{queue.count}</p>
-              {queue.amountRands !== undefined && queue.amountRands > 0 && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  {amountLabel || 'Value'}: {formatMoneyExact(queue.amountRands)}
-                </p>
-              )}
-              {waiting && (
-                <p className="text-xs text-muted-foreground mt-1">Oldest waiting {waiting}</p>
-              )}
-            </div>
-            <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
-  )
-}
-
-export default async function AdminDashboard() {
-  const data = await loadDashboard()
+  const { money, failures } = data
 
   const queues: QueueProps[] = [
     {
@@ -145,37 +108,152 @@ export default async function AdminDashboard() {
   ]
 
   const waitingCount = queues.filter((q) => q.queue.count > 0).length
-  const { money, failures } = data
   const failureTotal = failures.failedPayouts + failures.failedRefunds + failures.failedEmails
 
-  // What is owed to people against what is actually in the Paystack balance.
-  // Transfers are funded from that balance, so if it is lower, approving
-  // everything queued would fail at Paystack rather than here.
+  // Owed against what is actually in the Paystack balance. Transfers are funded
+  // from that balance, so if it is lower, approving everything queued would
+  // fail at Paystack rather than here.
   const shortfall =
     money.paystackBalanceRands !== null
       ? money.paystackBalanceRands - money.totalOwedRands
       : null
 
+  const alerts: { text: string; href?: string }[] = []
+
+  if (trading.daysSinceLastSale !== null && trading.daysSinceLastSale >= STALE_SALE_DAYS) {
+    alerts.push({
+      text: `No completed ticket sale in ${trading.daysSinceLastSale} days. The last checkout anyone started was ${trading.daysSinceLastAttempt} days ago.`,
+      href: '/admin/finance/transactions',
+    })
+  }
+
+  if (
+    trading.completionPct !== null &&
+    trading.completionPct < LOW_COMPLETION_PCT &&
+    trading.checkoutsAttempted > 0
+  ) {
+    alerts.push({
+      text: `Only ${trading.checkoutsCompleted} of ${trading.checkoutsAttempted} checkouts completed in the last ${days} days (${trading.completionPct}%). The rest were started and abandoned before payment.`,
+      href: '/admin/finance/transactions',
+    })
+  }
+
+  if (shortfall !== null && shortfall < 0) {
+    alerts.push({
+      text: `Paystack balance is ${formatMoneyExact(Math.abs(shortfall))} short of what is owed to people.`,
+      href: '/admin/finance/payouts',
+    })
+  }
+
+  if (data.needsCompletion.count > 0) {
+    alerts.push({
+      text: `${data.needsCompletion.count} past ${data.needsCompletion.count === 1 ? 'event has' : 'events have'} not been marked complete, holding ${formatMoneyExact(data.needsCompletion.amountRands || 0)}.`,
+      href: '/admin/events?lifecycle=past',
+    })
+  }
+
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-2xl font-bold">
-          {waitingCount === 0 ? 'Nothing needs you right now' : 'What needs you'}
-        </h2>
-        <p className="text-muted-foreground">
-          {waitingCount === 0
-            ? 'Every queue is clear. The cards below say what would land in each.'
-            : `${waitingCount} ${waitingCount === 1 ? 'queue has' : 'queues have'} work waiting.`}
-        </p>
-      </div>
+      <AlertBand alerts={alerts} />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {queues.map((q) => (
-          <QueueCard key={q.title} {...q} />
-        ))}
-      </div>
+      {/* ── Trading ─────────────────────────────────────────────────────── */}
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-bold">Trading</h2>
+            <p className="text-muted-foreground text-sm">
+              Compared with the previous {days} days.
+            </p>
+          </div>
+          <div className="flex gap-1 rounded-lg border p-1">
+            {TRADING_PERIODS.map((p) => (
+              <Link
+                key={p}
+                href={`/admin?days=${p}`}
+                scroll={false}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  p === days
+                    ? 'bg-primary text-primary-foreground font-medium'
+                    : 'hover:bg-muted text-muted-foreground'
+                }`}
+              >
+                {p} days
+              </Link>
+            ))}
+          </div>
+        </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Six tiles: three columns keeps them as two even rows. */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <TradingTile
+            label="Ziyawa earned (booking fees)"
+            figure={trading.feeEarnedRands}
+            money
+            emphasis
+          />
+          <TradingTile label="Gross ticket sales" figure={trading.grossSalesRands} money />
+          <TradingTile label="Tickets sold" figure={trading.ticketsSold} />
+          <Card>
+            <CardContent className="p-5">
+              <p className="text-sm text-muted-foreground">Checkouts completed</p>
+              <p className="text-2xl font-bold mt-1">
+                {trading.completionPct === null ? '—' : `${trading.completionPct}%`}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {trading.checkoutsCompleted} of {trading.checkoutsAttempted} started
+              </p>
+            </CardContent>
+          </Card>
+          <TradingTile label="New signups" figure={trading.newSignups} />
+          <TradingTile label="Events created" figure={trading.newEvents} />
+        </div>
+      </section>
+
+      {/* ── Work queues ─────────────────────────────────────────────────── */}
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-2xl font-bold">
+            {waitingCount === 0 ? 'Nothing needs you right now' : 'What needs you'}
+          </h2>
+          <p className="text-muted-foreground text-sm">
+            {waitingCount === 0
+              ? 'Every queue is clear. The cards below say what would land in each.'
+              : `${waitingCount} ${waitingCount === 1 ? 'queue has' : 'queues have'} work waiting.`}
+          </p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {queues.map((q) => (
+            <QueueCard key={q.title} {...q} />
+          ))}
+        </div>
+      </section>
+
+      {/* ── What's coming ───────────────────────────────────────────────── */}
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-2xl font-bold">What&apos;s coming</h2>
+          <p className="text-muted-foreground text-sm">
+            Events still ahead, and how they are selling.
+          </p>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ForwardCard
+            title="Happening in the next 7 days"
+            events={forward.nextSevenDays}
+            emptyText="No published events in the next week."
+          />
+          <ForwardCard
+            title="Published but selling nothing"
+            events={forward.publishedNotSelling}
+            emptyText="Every upcoming published event has sold at least one ticket."
+          />
+        </div>
+      </section>
+
+      {/* ── Money and failures ──────────────────────────────────────────── */}
+      <section className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg font-medium">Money position</CardTitle>
@@ -283,7 +361,7 @@ export default async function AdminDashboard() {
             )}
           </CardContent>
         </Card>
-      </div>
+      </section>
     </div>
   )
 }

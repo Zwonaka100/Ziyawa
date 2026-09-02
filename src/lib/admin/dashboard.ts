@@ -162,3 +162,188 @@ export async function loadDashboard(): Promise<DashboardData> {
     },
   }
 }
+
+// ── Trading ────────────────────────────────────────────────────────────────
+//
+// MONEY UNITS ARE NOT CONSISTENT ACROSS TABLES. Getting this wrong is silent
+// and produces figures that look plausible: summing platform_fee as rands
+// reported "R28,350 earned" against R260 of actual ticket sales.
+//
+//   cents  transactions.amount, .net_amount, .platform_fee
+//          refund_work_items.amount_cents
+//   rands  tickets.price_paid, payout_requests.amount,
+//          profiles.wallet_balance / held_balance / pending_payout_balance
+//
+// Everything below converts at the point of reading and returns rands.
+
+const CENTS = 100
+
+/** A checkout that never completed leaves its transaction in this state. */
+const ABANDONED_STATES = ['initiated']
+
+export const TRADING_PERIODS = [7, 30, 90] as const
+export type TradingPeriod = (typeof TRADING_PERIODS)[number]
+
+export interface TradingFigure {
+  value: number
+  previous: number
+  /** Percent change, or null when the previous period was zero. */
+  changePct: number | null
+}
+
+export interface TradingData {
+  days: number
+  grossSalesRands: TradingFigure
+  feeEarnedRands: TradingFigure
+  ticketsSold: TradingFigure
+  checkoutsAttempted: number
+  checkoutsCompleted: number
+  completionPct: number | null
+  newSignups: TradingFigure
+  newEvents: TradingFigure
+  daysSinceLastSale: number | null
+  daysSinceLastAttempt: number | null
+}
+
+const figure = (value: number, previous: number): TradingFigure => ({
+  value,
+  previous,
+  changePct: previous === 0 ? null : Math.round(((value - previous) / previous) * 100),
+})
+
+const daysSince = (iso: string | null | undefined): number | null =>
+  iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000) : null
+
+export async function loadTrading(days: TradingPeriod = 30): Promise<TradingData> {
+  const db = createAdminServiceClient()
+
+  const now = Date.now()
+  const periodStart = new Date(now - days * 86_400_000).toISOString()
+  const priorStart = new Date(now - days * 2 * 86_400_000).toISOString()
+
+  const [current, prior, lastSale, lastAttempt, signups, events] = await Promise.all([
+    db
+      .from('transactions')
+      .select('amount, platform_fee, state, created_at')
+      .eq('type', 'ticket_purchase')
+      .gte('created_at', periodStart),
+    db
+      .from('transactions')
+      .select('amount, platform_fee, state, created_at')
+      .eq('type', 'ticket_purchase')
+      .gte('created_at', priorStart)
+      .lt('created_at', periodStart),
+    db
+      .from('transactions')
+      .select('created_at')
+      .not('state', 'in', `(${ABANDONED_STATES.join(',')})`)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    db
+      .from('transactions')
+      .select('created_at')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    db.from('profiles').select('created_at').gte('created_at', priorStart),
+    db.from('events').select('created_at').gte('created_at', priorStart),
+  ])
+
+  type TxnRow = { amount: number | null; platform_fee: number | null; state: string }
+
+  const settled = (rows: TxnRow[] | null) =>
+    (rows || []).filter((r) => !ABANDONED_STATES.includes(r.state))
+
+  const sumRands = (rows: TxnRow[], key: 'amount' | 'platform_fee') =>
+    rows.reduce((total, row) => total + Number(row[key] || 0) / CENTS, 0)
+
+  const currentSettled = settled(current.data)
+  const priorSettled = settled(prior.data)
+
+  const inPeriod = (rows: { created_at: string }[] | null) =>
+    (rows || []).filter((r) => r.created_at >= periodStart).length
+  const inPrior = (rows: { created_at: string }[] | null) =>
+    (rows || []).filter((r) => r.created_at < periodStart).length
+
+  const attempted = (current.data || []).length
+  const completed = currentSettled.length
+
+  return {
+    days,
+    grossSalesRands: figure(
+      sumRands(currentSettled, 'amount'),
+      sumRands(priorSettled, 'amount')
+    ),
+    feeEarnedRands: figure(
+      sumRands(currentSettled, 'platform_fee'),
+      sumRands(priorSettled, 'platform_fee')
+    ),
+    ticketsSold: figure(currentSettled.length, priorSettled.length),
+    checkoutsAttempted: attempted,
+    checkoutsCompleted: completed,
+    completionPct: attempted === 0 ? null : Math.round((completed / attempted) * 100),
+    newSignups: figure(inPeriod(signups.data), inPrior(signups.data)),
+    newEvents: figure(inPeriod(events.data), inPrior(events.data)),
+    daysSinceLastSale: daysSince(lastSale.data?.created_at),
+    daysSinceLastAttempt: daysSince(lastAttempt.data?.created_at),
+  }
+}
+
+// ── What's coming ──────────────────────────────────────────────────────────
+
+export interface UpcomingEvent {
+  id: string
+  title: string
+  event_date: string
+  capacity: number
+  tickets_sold: number
+  ticketPriceRands: number
+}
+
+export interface ForwardView {
+  nextSevenDays: UpcomingEvent[]
+  publishedNotSelling: UpcomingEvent[]
+}
+
+export async function loadForwardView(): Promise<ForwardView> {
+  const db = createAdminServiceClient()
+  const today = new Date().toISOString().slice(0, 10)
+  const inAWeek = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10)
+
+  const [soon, notSelling] = await Promise.all([
+    db
+      .from('events')
+      .select('id, title, event_date, capacity, tickets_sold, ticket_price')
+      .eq('is_published', true)
+      .gte('event_date', today)
+      .lte('event_date', inAWeek)
+      .order('event_date', { ascending: true }),
+    // Published, still to come, and nobody has bought a ticket. These are the
+    // ones an organiser needs nudging about while there is still time.
+    db
+      .from('events')
+      .select('id, title, event_date, capacity, tickets_sold, ticket_price')
+      .eq('is_published', true)
+      .gte('event_date', today)
+      .or('tickets_sold.is.null,tickets_sold.eq.0')
+      .order('event_date', { ascending: true })
+      .limit(10),
+  ])
+
+  const shape = (rows: Record<string, unknown>[] | null): UpcomingEvent[] =>
+    (rows || []).map((e) => ({
+      id: String(e.id),
+      title: String(e.title),
+      event_date: String(e.event_date),
+      capacity: Number(e.capacity || 0),
+      tickets_sold: Number(e.tickets_sold || 0),
+      // events.ticket_price is rands, unlike transactions.
+      ticketPriceRands: Number(e.ticket_price || 0),
+    }))
+
+  return {
+    nextSevenDays: shape(soon.data),
+    publishedNotSelling: shape(notSelling.data),
+  }
+}
