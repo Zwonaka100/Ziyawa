@@ -2,7 +2,6 @@ import { createClient } from '@supabase/supabase-js'
 import { createNotification } from '@/lib/notifications'
 import { recordBalanceLedgerEntries, type BalanceLedgerContext } from '@/lib/payments/balance-ledger'
 import { logOpsEvent } from '@/lib/monitoring'
-import { PLATFORM_FEES } from '@/lib/constants'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -82,8 +81,13 @@ export function calculateHoldUntil(baseDate: string | null | undefined, holdHour
  * approve. Money never leaves on its own: this only creates the request.
  *
  * Skips anyone without a usable payout destination (unverified, or no Paystack
- * recipient) rather than queueing something that could never be paid — those
- * users surface in the admin panel as blocked instead, via their payout_account.
+ * recipient) rather than queueing something that could never be paid.
+ *
+ * That skip used to be invisible. The claim that such users "surface in the
+ * admin panel as blocked" was not true: the blocked list is built from
+ * payout_accounts rows, and an unverified organiser has no payout_accounts row
+ * to be listed by. They appeared nowhere at all. The outcome is returned now so
+ * callers can record it, and the admin dashboard reads the balances directly.
  *
  * Idempotent by design: one pending request per person at a time, so the
  * nightly release sweep cannot pile up duplicates for the same balance.
@@ -91,7 +95,15 @@ export function calculateHoldUntil(baseDate: string | null | undefined, holdHour
  * Never throws — a queueing failure must not roll back a completed release, or
  * money would stay stuck in `held` with no way forward.
  */
-export async function enqueuePayoutRequest(profileId: string): Promise<void> {
+export type EnqueueOutcome =
+  | 'queued'
+  | 'already_queued'
+  | 'no_balance'
+  | 'not_verified'
+  | 'no_payout_account'
+  | 'error'
+
+export async function enqueuePayoutRequest(profileId: string): Promise<EnqueueOutcome> {
   try {
     const { data: existing } = await supabaseAdmin
       .from('payout_requests')
@@ -101,7 +113,7 @@ export async function enqueuePayoutRequest(profileId: string): Promise<void> {
       .limit(1)
       .maybeSingle()
 
-    if (existing?.id) return
+    if (existing?.id) return 'already_queued'
 
     const { data: profile } = await supabaseAdmin
       .from('profiles')
@@ -110,14 +122,18 @@ export async function enqueuePayoutRequest(profileId: string): Promise<void> {
       .single()
 
     const availableRands = Number(profile?.wallet_balance || 0)
-    if (!profile?.is_verified || availableRands <= 0) return
 
-    // Every transfer costs roughly R3.45 whether or not it succeeds, and Ziyawa
-    // absorbs it rather than deducting it from the recipient. Queueing on any
-    // balance above zero would spend R3.45 to move R5. Below the floor the
-    // balance simply accumulates until the next release makes it worth paying.
-    const minimumRands = PLATFORM_FEES.wallet.minimumWithdrawal / 100
-    if (availableRands < minimumRands) return
+    if (availableRands <= 0) return 'no_balance'
+
+    // Every one of these used to be a bare `return`. Money simply stopped, with
+    // no row, no log and nothing anywhere to say why — so an organiser waiting
+    // to be paid and an admin looking for something to approve both saw an
+    // empty screen and no explanation. The reason is returned now, and callers
+    // record it.
+    if (!profile?.is_verified) {
+      console.warn('Payout not queued: recipient is not verified', { profileId, availableRands })
+      return 'not_verified'
+    }
 
     const { data: payoutAccount } = await supabaseAdmin
       .from('payout_accounts')
@@ -125,9 +141,16 @@ export async function enqueuePayoutRequest(profileId: string): Promise<void> {
       .eq('profile_id', profileId)
       .maybeSingle()
 
-    if (!payoutAccount?.paystack_recipient_code) return
+    if (!payoutAccount?.paystack_recipient_code) {
+      console.warn('Payout not queued: no Paystack recipient on file', { profileId, availableRands })
+      return 'no_payout_account'
+    }
 
-    await supabaseAdmin.from('payout_requests').insert({
+    // There is deliberately no minimum here. A transfer costs Ziyawa about
+    // R3.45 either way, and a floor meant an organiser whose first event earned
+    // less than it could never be paid at all — their money would sit until
+    // they happened to sell more. Every completed event gets paid.
+    const { error } = await supabaseAdmin.from('payout_requests').insert({
       user_id: profileId,
       amount: availableRands,
       bank_name: payoutAccount.bank_name,
@@ -135,8 +158,16 @@ export async function enqueuePayoutRequest(profileId: string): Promise<void> {
       account_holder: payoutAccount.account_holder,
       status: 'pending',
     })
+
+    if (error) {
+      console.error('Failed to queue payout request:', error)
+      return 'error'
+    }
+
+    return 'queued'
   } catch (error) {
     console.error('Failed to queue payout request:', error)
+    return 'error'
   }
 }
 

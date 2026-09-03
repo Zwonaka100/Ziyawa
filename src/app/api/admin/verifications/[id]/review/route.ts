@@ -12,6 +12,7 @@ import { requireAdminApi } from '@/lib/admin-auth'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createNotification } from '@/lib/notifications'
 import { createTransferRecipient } from '@/lib/paystack'
+import { enqueuePayoutRequest } from '@/lib/payments/escrow'
 import { buildRejectionMessage } from '@/lib/verification-rejection-reasons'
 
 const supabaseAdmin = createAdminClient(
@@ -190,22 +191,46 @@ export async function POST(
       // approval, so it is recorded and left for retry instead of thrown.
       const payoutSetup = await setUpPayoutAccount(verificationRequest)
 
+      // Money that released BEFORE this approval is stranded without this call.
+      //
+      // enqueuePayoutRequest only ever ran after a fund release. So verifying
+      // first and releasing later worked, while releasing first and verifying
+      // later left the balance sitting in wallet_balance with nothing that
+      // would ever queue it again — no admin row to approve, no notification,
+      // nothing. Verification is exactly the moment that block clears, so it is
+      // the moment to retry the queue.
+      const enqueueOutcome = payoutSetup.ok
+        ? await enqueuePayoutRequest(verificationRequest.profile_id)
+        : 'no_payout_account'
+
+      if (enqueueOutcome === 'error') {
+        console.error('Post-verification payout enqueue failed', {
+          profileId: verificationRequest.profile_id,
+        })
+      }
+
       await createNotification({
         userId: verificationRequest.profile_id,
         type: 'profile_verified',
         title: 'Identity verified ✓',
-        message: 'Congratulations! Your identity has been verified. You can now withdraw funds from your wallet.',
-        link: '/dashboard/settings?tab=verification',
+        // Ziyawa has no withdrawals — self-service withdrawal is a retired 410
+        // route. Telling a newly verified organiser to "withdraw from your
+        // wallet" sent them looking for a button that does not exist.
+        message: enqueueOutcome === 'queued'
+          ? 'Your identity is verified. Your available earnings are now queued for payout — our team approves it and the money goes to your bank. Nothing further for you to do.'
+          : 'Your identity is verified. Earnings from your events are paid out to your bank automatically after each event clears its settlement period. There is nothing to withdraw and nothing further for you to do.',
+        link: '/earnings',
         sendEmail: true,
       })
 
       return NextResponse.json({
         success: true,
         message: payoutSetup.ok
-          ? 'Verification approved. Payout account is ready.'
+          ? `Verification approved. Payout account is ready.${enqueueOutcome === 'queued' ? ' Their available balance has been queued for payout.' : ''}`
           : `Verification approved, but the payout account could not be set up: ${payoutSetup.error}`,
         payoutAccountReady: payoutSetup.ok,
         payoutAccountError: payoutSetup.ok ? null : payoutSetup.error,
+        payoutQueued: enqueueOutcome === 'queued',
       })
     }
 
