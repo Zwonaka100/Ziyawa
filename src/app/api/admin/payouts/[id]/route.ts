@@ -16,6 +16,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminApi } from '@/lib/admin-auth'
+import { buildPayoutRejectionMessage } from '@/lib/payout-rejection-reasons'
+import { buildPayoutStatementPdf } from '@/lib/payments/payout-statement-pdf'
+import { sendPayoutStatementEmail } from '@/lib/email'
+import { formatMoneyExact } from '@/lib/helpers'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { initiateTransfer, generatePaymentReference } from '@/lib/paystack'
 import { adjustProfileBalanceBuckets } from '@/lib/payments/escrow'
@@ -32,6 +36,13 @@ function resolveRecipientType(profile: { is_artist?: boolean; is_provider?: bool
   return 'organizer'
 }
 
+/** How the recipient's role reads on their own statement. */
+const RECIPIENT_ROLE_LABEL: Record<string, string> = {
+  organizer: 'Event organiser',
+  artist: 'Artist',
+  vendor: 'Crew / service provider',
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -43,9 +54,17 @@ export async function POST(
     if ('response' in gate) return gate.response
     const user = { id: gate.admin.userId }
 
-    const body = await request.json().catch(() => ({})) as { action?: string; admin_notes?: string }
+    const body = await request.json().catch(() => ({})) as {
+      action?: string
+      admin_notes?: string
+      rejection_codes?: string[]
+    }
     const action = body.action
     const adminNotes = typeof body.admin_notes === 'string' ? body.admin_notes.trim() : ''
+    const rejectionCodes = Array.isArray(body.rejection_codes) ? body.rejection_codes : []
+    // Composed server-side from the codes, so the browser cannot choose the
+    // wording of an email Ziyawa sends about someone's money.
+    const rejectionText = buildPayoutRejectionMessage(rejectionCodes, adminNotes)
 
     if (!action || !['approve', 'reject'].includes(action)) {
       return NextResponse.json({ error: 'action must be approve or reject' }, { status: 400 })
@@ -72,9 +91,9 @@ export async function POST(
     const now = new Date().toISOString()
 
     if (action === 'reject') {
-      if (!adminNotes) {
+      if (!rejectionText) {
         return NextResponse.json(
-          { error: 'A note is required when rejecting, so there is a record of why' },
+          { error: 'Select at least one reason, or add a note explaining why this was declined' },
           { status: 400 }
         )
       }
@@ -83,15 +102,42 @@ export async function POST(
         .from('payout_requests')
         .update({
           status: 'rejected',
-          admin_notes: adminNotes,
+          // The full composed prose, so the record and the email agree.
+          admin_notes: rejectionText,
           reviewed_by: user.id,
           processed_at: now,
         })
         .eq('id', payoutId)
 
+      // Tell them. This branch used to require a reason and then send nothing —
+      // no email, no notification — so someone expecting money watched it not
+      // arrive with no explanation anywhere. The approve branch has always
+      // notified; only the bad news was silent.
+      const { data: recipient } = await supabaseAdmin
+        .from('profiles')
+        .select('id, full_name, email')
+        .eq('id', payoutRequest.user_id)
+        .maybeSingle()
+
+      if (recipient) {
+        await createNotification({
+          userId: recipient.id,
+          type: 'payment_failed',
+          title: 'Your payout is on hold',
+          message:
+            `We could not send your payment of ${formatMoneyExact(Number(payoutRequest.amount || 0))} yet. ` +
+            `Here is why:\n\n${rejectionText}\n\n` +
+            'Your money is safe and stays in your Ziyawa balance.',
+          link: '/earnings',
+          sendEmail: true,
+        }).catch((error) => {
+          console.error('Payout rejection notification failed', { payoutId, error })
+        })
+      }
+
       // Money stays in the recipient's available balance — rejecting declines
       // this request, it does not confiscate anything.
-      return NextResponse.json({ success: true, message: 'Payout rejected. Funds remain in the recipient balance.' })
+      return NextResponse.json({ success: true, message: 'Payout rejected. The recipient has been told why, and the funds remain in their balance.' })
     }
 
     // ── Approve ──────────────────────────────────────────────────────────────
@@ -276,15 +322,90 @@ export async function POST(
       .update({ gateway_reference: transferData?.transfer_code || null, gateway_response: transferData })
       .eq('id', payoutId)
 
+    // The in-app notification stays short; the email carries the detail.
     await createNotification({
       userId: payoutRequest.user_id,
       type: 'payout_sent',
       title: 'Payout on its way',
-      message: `Your payout of R${amountRands.toFixed(2)} has been approved and sent to your bank account.`,
+      message: `${formatMoneyExact(amountRands)} has been sent to your ${payoutAccount.bank_name || 'bank'} account ending ${String(payoutAccount.account_number || '').slice(-4)}. It usually lands within one business day.`,
       link: '/earnings',
       transactionId: transaction.id,
-      sendEmail: true,
+      sendEmail: false,
     })
+
+    // A proper statement, with a PDF to keep. This used to be a one-line
+    // generic notification on the single most important message Ziyawa sends —
+    // no amount breakdown, no bank details, no record of what it covered.
+    //
+    // Everything below is best-effort: the transfer has already been
+    // initiated, so a failure to describe it must never fail the request.
+    try {
+      // payout_requests carries no event link — enqueuePayoutRequest queues the
+      // whole pooled wallet balance, so the event→money trail is severed at
+      // write time. The releases that made this balance payable are the
+      // closest honest answer, so they are what the statement itemises.
+      const { data: released } = await supabaseAdmin
+        .from('transactions')
+        .select('net_amount, released_at, event:events(title, event_date)')
+        .eq('recipient_id', payoutRequest.user_id)
+        .eq('type', 'ticket_purchase')
+        .eq('state', 'released')
+        .order('released_at', { ascending: false })
+        .limit(20)
+
+      const sources = ((released || []) as unknown as {
+        net_amount: number | null
+        event: { title: string; event_date: string } | null
+      }[])
+        .filter((row) => row.event)
+        .map((row) => ({
+          label: row.event!.title,
+          detail: row.event!.event_date,
+          amountRands: Number(row.net_amount || 0) / 100,
+        }))
+
+      const grossSalesRands = sources.reduce((total, row) => total + row.amountRands, 0)
+
+      const statementPdf = await buildPayoutStatementPdf({
+        reference,
+        recipientName: profile.full_name || profile.email,
+        recipientEmail: profile.email,
+        recipientRole: RECIPIENT_ROLE_LABEL[resolveRecipientType(profile)] ?? 'Recipient',
+        amountRands,
+        bankName: payoutAccount.bank_name || 'Bank',
+        accountLast4: String(payoutAccount.account_number || '').slice(-4),
+        accountHolder: payoutAccount.account_holder || profile.full_name || '',
+        approvedAt: new Date(now),
+        sources,
+        grossSalesRands: grossSalesRands || amountRands,
+        bookingFeesRands: Math.max(0, (grossSalesRands || amountRands) - amountRands),
+        gatewayFeesRands: 0,
+      })
+
+      const emailResult = await sendPayoutStatementEmail(profile.email, {
+        recipientName: (profile.full_name || profile.email).split(' ')[0],
+        amount: formatMoneyExact(amountRands),
+        bankName: payoutAccount.bank_name || 'your bank',
+        accountLast4: String(payoutAccount.account_number || '').slice(-4),
+        reference,
+        sources: sources.map((row) => ({
+          label: row.label,
+          detail: row.detail,
+          amount: formatMoneyExact(row.amountRands),
+        })),
+        recipientId: profile.id,
+        statementPdf,
+      })
+
+      if (!emailResult.success) {
+        console.error('Payout statement email not sent', { payoutId, reason: emailResult.error })
+      }
+    } catch (statementError) {
+      console.error('Payout statement could not be produced', {
+        payoutId,
+        message: statementError instanceof Error ? statementError.message : String(statementError),
+      })
+    }
 
     return NextResponse.json({
       success: true,

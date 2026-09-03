@@ -39,6 +39,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import { formatMoneyExact } from '@/lib/helpers'
+import { PAYOUT_REJECTION_REASONS } from '@/lib/payout-rejection-reasons'
 import { toast } from 'sonner'
 
 export interface PayoutRow {
@@ -104,6 +105,7 @@ export function AdminPayoutsQueue({
   const [confirmRow, setConfirmRow] = useState<PayoutRow | null>(null)
   const [rejectRow, setRejectRow] = useState<PayoutRow | null>(null)
   const [notes, setNotes] = useState('')
+  const [rejectionCodes, setRejectionCodes] = useState<string[]>([])
 
   const fetchRows = useCallback(async () => {
     setLoading(true)
@@ -136,13 +138,14 @@ export function AdminPayoutsQueue({
       const res = await fetch(`/api/admin/payouts/${row.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, admin_notes: notes.trim() }),
+        body: JSON.stringify({ action, admin_notes: notes.trim(), rejection_codes: rejectionCodes }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       toast.success(data.message || 'Done')
       setConfirmRow(null)
       setRejectRow(null)
+      setRejectionCodes([])
       setNotes('')
       await fetchRows()
     } catch (error) {
@@ -364,26 +367,53 @@ export function AdminPayoutsQueue({
       </Dialog>
 
       {/* Reject */}
-      <Dialog open={!!rejectRow} onOpenChange={(o) => { if (!o) { setRejectRow(null); setNotes('') } }}>
-        <DialogContent>
+      <Dialog open={!!rejectRow} onOpenChange={(o) => { if (!o) { setRejectRow(null); setNotes(''); setRejectionCodes([]) } }}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Reject payout</DialogTitle>
+            <DialogTitle>Hold this payout</DialogTitle>
             <DialogDescription>
-              The funds stay in the recipient&apos;s available balance and can be queued again later.
+              The funds stay in the recipient&apos;s balance and can be queued again later.
+              Tick what is wrong — the recipient is emailed exactly these points, so they
+              know what to do next.
             </DialogDescription>
           </DialogHeader>
+          <div className="space-y-2">
+            {PAYOUT_REJECTION_REASONS.map((reason) => (
+              <label
+                key={reason.code}
+                className="flex gap-3 rounded-lg border p-3 text-sm cursor-pointer hover:bg-muted/50"
+              >
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={rejectionCodes.includes(reason.code)}
+                  onChange={(e) =>
+                    setRejectionCodes((current) =>
+                      e.target.checked
+                        ? [...current, reason.code]
+                        : current.filter((code) => code !== reason.code)
+                    )
+                  }
+                />
+                <span>
+                  <span className="font-medium block">{reason.adminLabel}</span>
+                  <span className="text-xs text-muted-foreground">{reason.userMessage}</span>
+                </span>
+              </label>
+            ))}
+          </div>
           <Textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="Why is this being rejected? Recorded against the payout."
+            placeholder="Anything else? Added to the end of the message the recipient receives."
             rows={3}
             maxLength={500}
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setRejectRow(null); setNotes('') }}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setRejectRow(null); setNotes(''); setRejectionCodes([]) }}>Cancel</Button>
             <Button
               variant="destructive"
-              disabled={!notes.trim() || processing === rejectRow?.id}
+              disabled={(rejectionCodes.length === 0 && !notes.trim()) || processing === rejectRow?.id}
               onClick={() => rejectRow && act(rejectRow, 'reject')}
             >
               {processing === rejectRow?.id ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}

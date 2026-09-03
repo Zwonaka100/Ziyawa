@@ -35,6 +35,12 @@ interface SendEmailParams {
   recipientIds?: string[];
   /** Set false to suppress the audit row (for callers that write their own). */
   logToAudit?: boolean;
+  /**
+   * Files to attach. Resend takes base64 content, so binary is encoded here
+   * rather than at each call site. Resend caps a message at 40MB including
+   * attachments; a payout statement is a few KB.
+   */
+  attachments?: { filename: string; content: Buffer | Uint8Array }[];
 }
 
 interface SendEmailResult {
@@ -118,8 +124,11 @@ const EMAIL_SEND_DISABLED = process.env.EMAIL_SEND_DISABLED === 'true';
 export async function sendEmail(params: SendEmailParams): Promise<SendEmailResult> {
   if (EMAIL_SEND_DISABLED) {
     const recipients = Array.isArray(params.to) ? params.to.join(', ') : params.to;
+    const attached = params.attachments?.length
+      ? ` with ${params.attachments.map((f) => f.filename).join(', ')}`
+      : '';
     console.warn(
-      `[email blocked] EMAIL_SEND_DISABLED is set. Would have sent "${params.subject}" to ${recipients}`
+      `[email blocked] EMAIL_SEND_DISABLED is set. Would have sent "${params.subject}" to ${recipients}${attached}`
     );
     // Deliberately does not write an email_logs row: nothing was sent, and a
     // blocked send must not look like a delivery in the audit trail or in
@@ -147,6 +156,14 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
         text: params.text,
         reply_to: params.replyTo || DEFAULT_REPLY_TO,
         tags: params.tags,
+        ...(params.attachments?.length
+          ? {
+              attachments: params.attachments.map((file) => ({
+                filename: file.filename,
+                content: Buffer.from(file.content).toString('base64'),
+              })),
+            }
+          : {}),
       }),
     });
 
@@ -444,6 +461,41 @@ export async function sendAdminAlertEmail(
       console.error('Admin alert not sent', { to: recipient.email, category, reason: result.error });
     }
   }
+}
+
+export async function sendPayoutStatementEmail(
+  to: string,
+  data: {
+    recipientName: string;
+    amount: string;
+    bankName: string;
+    accountLast4: string;
+    reference: string;
+    sources: { label: string; detail: string; amount: string }[];
+    recipientId?: string;
+    statementPdf?: Uint8Array;
+  }
+): Promise<SendEmailResult> {
+  const { recipientId, statementPdf, ...templateData } = data;
+
+  return sendEmail({
+    to,
+    from: ACCOUNTS_FROM_EMAIL,
+    // Settlement mail invites a reply about someone's money, so it must not be
+    // diverted to the support queue.
+    replyTo: process.env.ACCOUNTS_EMAIL || process.env.SUPPORT_EMAIL,
+    subject: `${data.amount} is on its way to your bank`,
+    html: EmailTemplates.payoutStatementEmail({
+      ...templateData,
+      earningsUrl: `${SITE_URL}/earnings`,
+    }),
+    emailType: 'individual',
+    recipientIds: recipientId ? [recipientId] : [],
+    tags: [{ name: 'category', value: 'payout-statement' }],
+    attachments: statementPdf
+      ? [{ filename: `ziyawa-payout-${data.reference}.pdf`, content: statementPdf }]
+      : undefined,
+  });
 }
 
 export async function sendProviderBookingRequestEmail(

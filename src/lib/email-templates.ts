@@ -770,6 +770,72 @@ export function eventCompletedEmail(data: {
   return emailWrapper(content);
 }
 
+// The email that tells someone their money is on the way.
+//
+// This replaces a generic one-line notification ("Your payout of R180.00 has
+// been approved and sent to your bank account") on the single most important
+// message Ziyawa sends. Someone being paid wants to know the amount, which
+// account it is going to, what it covers and when to expect it — and to have a
+// document they can file. The PDF statement arrives attached.
+export function payoutStatementEmail(data: {
+  recipientName: string;
+  amount: string;
+  bankName: string;
+  accountLast4: string;
+  reference: string;
+  sources: { label: string; detail: string; amount: string }[];
+  earningsUrl: string;
+}): string {
+  const sourceRows = data.sources
+    .map(
+      (source) => `
+      <div class="detail-row">
+        <span class="detail-label">${source.label}</span>
+        <span class="detail-value">${source.amount}</span>
+      </div>`
+    )
+    .join('');
+
+  const content = `
+    <h1>${data.amount} is on its way</h1>
+    <p>Hi ${data.recipientName},</p>
+    <p>We've sent your payout to your bank. Transfers usually land within one business day, and sometimes the same day.</p>
+
+    <div class="highlight-box">
+      <div class="detail-row">
+        <span class="detail-label">Amount</span>
+        <span class="detail-value">${data.amount}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">To</span>
+        <span class="detail-value">${data.bankName} ···· ${data.accountLast4}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Reference</span>
+        <span class="detail-value">${data.reference}</span>
+      </div>
+    </div>
+
+    ${data.sources.length > 0 ? `
+    <h2>What this covers</h2>
+    <div class="highlight-box">${sourceRows}</div>` : ''}
+
+    <p>A full statement is attached as a PDF, with the fee breakdown and your bank details for your records.</p>
+
+    <div class="note-box">
+      <p style="margin:0;">Ziyawa covers the card processing and bank transfer costs on your sales. Nothing is deducted from the amount above.</p>
+    </div>
+
+    <p style="text-align: center;">
+      <a href="${data.earningsUrl}" class="button">
+        View my earnings
+      </a>
+    </p>
+  `;
+
+  return emailWrapper(content);
+}
+
 // Operations alert: an organizer completed their event, so there is money to
 // settle. Goes to every admin.
 //
@@ -1307,10 +1373,24 @@ export function brandedNotificationEmail(data: {
   actionUrl?: string;
   actionLabel?: string;
 }): string {
+  // Notification messages are composed as plain text with real line breaks —
+  // buildRejectionMessage() in verification-rejection-reasons.ts numbers each
+  // reason on its own line and separates the reviewer's note with a blank line.
+  // Dropped raw into one <p>, HTML collapses every one of those to a single
+  // space, so a three-reason verification rejection arrived as an unreadable
+  // run-on: "1. ... 2. ... 3. ...". The in-app notification renders it
+  // correctly because it uses whitespace-pre-wrap; the email did not.
+  //
+  // Blank lines become paragraphs, single newlines become <br>.
+  const paragraphs = data.message
+    .split(/\n\s*\n/)
+    .map((block) => `<p>${block.trim().replace(/\n/g, '<br />')}</p>`)
+    .join('');
+
   const content = `
     <h1>${data.title}</h1>
     <p>Hi ${data.recipientName},</p>
-    <p>${data.message}</p>
+    ${paragraphs}
     ${data.actionUrl ? `
       <p style="text-align: center;">
         <a href="${data.actionUrl}" class="button">
