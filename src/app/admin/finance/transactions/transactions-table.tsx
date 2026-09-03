@@ -35,7 +35,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Ticket,
-  Wallet,
   ArrowUpRight,
   ArrowDownRight,
   RefreshCcw,
@@ -43,7 +42,10 @@ import {
   Download,
   type LucideIcon,
 } from 'lucide-react'
-import { formatCurrency, formatMoneyExact } from '@/lib/helpers'
+import { formatMoneyExact } from '@/lib/helpers'
+// Server-free module on purpose: importing this from the loader would pull
+// next/headers into the client bundle.
+import { TRANSACTIONS_PAGE_SIZE } from '@/lib/admin/pagination'
 import { format } from 'date-fns'
 
 interface Transaction {
@@ -58,6 +60,8 @@ interface Transaction {
   net_amount: number
   payer_id: string
   recipient_id: string | null
+  /** Who is owed, and in what role. Fetched all along; never rendered. */
+  recipient_type: 'organizer' | 'artist' | 'vendor' | null
   event_id: string | null
   created_at: string
   payer?: { full_name: string; email: string }
@@ -65,14 +69,22 @@ interface Transaction {
   event?: { title: string }
 }
 
-const ITEMS_PER_PAGE = 25
+const ITEMS_PER_PAGE = TRANSACTIONS_PAGE_SIZE
+
+/**
+ * transactions.recipient_type says who is owed and in what role. Crew and
+ * service providers are both stored as `vendor`.
+ */
+const RECIPIENT_ROLE: Record<string, string> = {
+  organizer: 'Organiser',
+  artist: 'Artist',
+  vendor: 'Crew / Provider',
+}
 
 const TYPE_CONFIG: Record<string, { label: string; icon: LucideIcon; color: string }> = {
   ticket_purchase: { label: 'Ticket Sale', icon: Ticket, color: 'bg-green-100 text-green-700' },
-  wallet_deposit: { label: 'Wallet Deposit', icon: Wallet, color: 'bg-blue-100 text-blue-700' },
   payout: { label: 'Payout', icon: ArrowUpRight, color: 'bg-orange-100 text-orange-700' },
   refund: { label: 'Refund', icon: RefreshCcw, color: 'bg-red-100 text-red-700' },
-  booking_payment: { label: 'Booking Payment', icon: CreditCard, color: 'bg-neutral-100 text-neutral-700' },
   artist_booking: { label: 'Artist Booking', icon: CreditCard, color: 'bg-neutral-100 text-neutral-700' },
   vendor_service: { label: 'Vendor Service', icon: CreditCard, color: 'bg-pink-100 text-pink-700' },
   platform_fee: { label: 'Platform Fee', icon: ArrowDownRight, color: 'bg-neutral-100 text-neutral-700' },
@@ -169,6 +181,36 @@ export function AdminTransactionsTable({
     return STATUS_CONFIG[tx.state] || { label: tx.state, color: 'bg-neutral-100' }
   }
 
+  const handleExport = () => {
+    const escape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`
+    const header = [
+      'reference', 'type', 'state', 'payer', 'owed_to', 'owed_to_role',
+      'event', 'amount_zar', 'booking_fee_zar', 'paystack_fee_zar', 'ziyawa_net_zar', 'created_at',
+    ]
+    const rows = transactions.map((tx) => [
+      tx.reference,
+      tx.type,
+      tx.state,
+      tx.payer?.full_name || tx.payer?.email || '',
+      tx.recipient?.full_name || tx.recipient?.email || '',
+      tx.recipient_type ? RECIPIENT_ROLE[tx.recipient_type] ?? tx.recipient_type : '',
+      tx.event?.title || '',
+      ((tx.amount || 0) / 100).toFixed(2),
+      ((tx.platform_fee || 0) / 100).toFixed(2),
+      tx.gateway_fee_cents === null ? '' : (tx.gateway_fee_cents / 100).toFixed(2),
+      tx.gateway_fee_cents === null ? '' : (((tx.platform_fee || 0) - tx.gateway_fee_cents) / 100).toFixed(2),
+      tx.created_at,
+    ].map(escape).join(','))
+
+    const csv = [header.join(','), ...rows].join(String.fromCharCode(10))
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `ziyawa-transactions-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -185,7 +227,7 @@ export function AdminTransactionsTable({
             <p className="text-muted-foreground">View all platform transactions</p>
           </div>
         </div>
-        <Button variant="outline">
+        <Button variant="outline" onClick={handleExport} disabled={transactions.length === 0}>
           <Download className="h-4 w-4 mr-2" />
           Export CSV
         </Button>
@@ -259,10 +301,10 @@ export function AdminTransactionsTable({
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="ticket_purchase">Ticket Sales</SelectItem>
-                <SelectItem value="wallet_deposit">Wallet Deposits</SelectItem>
                 <SelectItem value="payout">Payouts</SelectItem>
                 <SelectItem value="refund">Refunds</SelectItem>
-                <SelectItem value="booking_payment">Booking Payments</SelectItem>
+                <SelectItem value="artist_booking">Artist Bookings</SelectItem>
+                <SelectItem value="vendor_service">Crew / Vendor Services</SelectItem>
               </SelectContent>
             </Select>
             <label className="flex items-center gap-2 text-sm whitespace-nowrap cursor-pointer">
@@ -302,7 +344,7 @@ export function AdminTransactionsTable({
                 <TableHead>Reference</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Payer</TableHead>
-                <TableHead>Recipient</TableHead>
+                <TableHead>Owed to</TableHead>
                 <TableHead>Event</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead className="text-right">Booking fee</TableHead>
@@ -315,13 +357,13 @@ export function AdminTransactionsTable({
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8">
+                  <TableCell colSpan={12} className="text-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
                   </TableCell>
                 </TableRow>
               ) : transactions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                     No transactions found
                   </TableCell>
                 </TableRow>
@@ -331,7 +373,7 @@ export function AdminTransactionsTable({
                   const statusConfig = getStatusConfig(tx)
                   const TypeIcon = typeConfig.icon
 
-                  return (
+  return (
                     <TableRow key={tx.id}>
                       <TableCell>
                         <code className="text-xs bg-neutral-100 px-2 py-1 rounded">
@@ -353,9 +395,16 @@ export function AdminTransactionsTable({
                       </TableCell>
                       <TableCell>
                         {tx.recipient ? (
-                          <Link href={`/admin/users/${tx.recipient_id}`} className="hover:underline text-sm">
-                            {tx.recipient.full_name || tx.recipient.email}
-                          </Link>
+                          <div className="flex flex-col gap-0.5">
+                            <Link href={`/admin/users/${tx.recipient_id}`} className="hover:underline text-sm">
+                              {tx.recipient.full_name || tx.recipient.email}
+                            </Link>
+                            {tx.recipient_type && (
+                              <span className="text-xs text-muted-foreground">
+                                {RECIPIENT_ROLE[tx.recipient_type] ?? tx.recipient_type}
+                              </span>
+                            )}
+                          </div>
                         ) : '-'}
                       </TableCell>
                       <TableCell>

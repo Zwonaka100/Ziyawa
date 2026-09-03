@@ -12,6 +12,7 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import {
+  loadBlockedMoney,
   loadDashboard,
   loadForwardView,
   loadTrading,
@@ -44,10 +45,11 @@ export default async function AdminDashboard({
     ? (requested as TradingPeriod)
     : 30
 
-  const [data, trading, forward] = await Promise.all([
+  const [data, trading, forward, blocked] = await Promise.all([
     loadDashboard(),
     loadTrading(days),
     loadForwardView(),
+    loadBlockedMoney(),
   ])
 
   const { money, failures } = data
@@ -255,6 +257,60 @@ export default async function AdminDashboard({
           />
         </div>
       </section>
+
+      {/* ── Money that cannot move ──────────────────────────────────────
+          Every other queue lists something a person submitted. An organiser
+          whose payout is stuck submitted nothing, and a completed event drops
+          out of all seven queues — so the moment money became owed was the
+          moment it became invisible. */}
+      {blocked.rows.length > 0 && (
+        <section>
+          <Card className={blocked.stuckCount > 0 ? 'border-amber-300' : undefined}>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg font-medium flex items-center gap-2">
+                <Banknote className="h-4 w-4" />
+                Who is owed money
+              </CardTitle>
+              {blocked.stuckCount > 0 && (
+                <p className="text-sm text-amber-700">
+                  {formatMoneyExact(blocked.stuckRands)} is payable right now but blocked
+                  {blocked.stuckCount === 1 ? ' for one person' : ` across ${blocked.stuckCount} people`}.
+                </p>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {blocked.rows.map((row) => {
+                const isStuck = ['not_verified', 'verification_pending', 'verification_rejected', 'no_payout_account'].includes(row.reason)
+                return (
+                  <div
+                    key={row.profileId}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <Link href={`/admin/users/${row.profileId}`} className="font-medium hover:underline">
+                        {row.name}
+                      </Link>
+                      <p className={isStuck ? 'text-xs text-amber-700' : 'text-xs text-muted-foreground'}>
+                        {row.label}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium">
+                        {formatMoneyExact(row.availableRands + row.heldRands + row.pendingPayoutRands)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {row.heldRands > 0 && `${formatMoneyExact(row.heldRands)} held`}
+                        {row.heldRands > 0 && row.availableRands > 0 && ' · '}
+                        {row.availableRands > 0 && `${formatMoneyExact(row.availableRands)} payable`}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {/* ── Money and failures ──────────────────────────────────────────── */}
       <section className="grid gap-4 lg:grid-cols-2">

@@ -1,74 +1,57 @@
-import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { 
-  DollarSign, 
-  Wallet, 
-  ArrowUpRight, 
+import {
+  DollarSign,
+  ArrowUpRight,
   ArrowDownRight,
   CreditCard,
   RefreshCcw,
-  ShieldCheck
+  ShieldCheck,
 } from 'lucide-react'
-import { formatCurrency } from '@/lib/helpers'
+import { formatMoneyExact } from '@/lib/helpers'
+import { loadFinanceOverview } from '@/lib/admin/finance-overview'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata = {
   title: 'Finance | Admin | Ziyawa',
 }
 
 export default async function AdminFinancePage() {
-  const supabase = await createClient()
-
-  // Fetch financial stats
-  const [
-    { data: transactions },
-    { data: profiles },
-  ] = await Promise.all([
-    supabase.from('transactions').select('amount, type, state, platform_fee').limit(10000),
-    supabase.from('profiles').select('wallet_balance, held_balance, pending_payout_balance'),
-  ])
-
-  // Calculate totals
-  const totalRevenue = transactions?.filter(t => t.type === 'ticket_purchase' && ['settled', 'released'].includes(t.state || ''))
-    .reduce((sum, t) => sum + (t.amount || 0), 0) || 0
-  
-  const totalPayouts = transactions?.filter(t => t.type === 'payout' && ['settled', 'released'].includes(t.state || ''))
-    .reduce((sum, t) => sum + (t.amount || 0), 0) || 0
-
-  const pendingPayouts = profiles?.reduce((sum, p) => sum + Number(p.pending_payout_balance || 0), 0) || 0
-
-  // Platform commission from actual fees collected
-  const platformEarnings = transactions?.filter(t => ['settled', 'released'].includes(t.state || ''))
-    .reduce((sum, t) => sum + (t.platform_fee || 0), 0) || 0
+  const overview = await loadFinanceOverview()
 
   const stats = [
-    { 
-      name: 'Total Revenue', 
-      value: formatCurrency(totalRevenue), 
-      icon: DollarSign, 
+    {
+      name: 'Ticket sales',
+      value: formatMoneyExact(overview.grossSalesRands),
+      hint: `${overview.ticketSaleCount} completed sale${overview.ticketSaleCount === 1 ? '' : 's'}`,
+      icon: DollarSign,
       color: 'text-green-600',
-      bgColor: 'bg-green-100'
+      bgColor: 'bg-green-100',
     },
-    { 
-      name: 'Platform Earnings (10%)', 
-      value: formatCurrency(platformEarnings), 
-      icon: ArrowUpRight, 
+    {
+      name: 'Ziyawa net',
+      value: formatMoneyExact(overview.ziyawaNetRands),
+      hint: `${formatMoneyExact(overview.bookingFeesRands)} in fees, less ${formatMoneyExact(overview.gatewayFeesRands)} to Paystack`,
+      icon: ArrowUpRight,
       color: 'text-blue-600',
-      bgColor: 'bg-blue-100'
+      bgColor: 'bg-blue-100',
     },
-    { 
-      name: 'Total Payouts', 
-      value: formatCurrency(totalPayouts), 
-      icon: ArrowDownRight, 
+    {
+      name: 'Owed to users',
+      value: formatMoneyExact(overview.totalOwedRands),
+      hint: `${formatMoneyExact(overview.heldRands)} held, ${formatMoneyExact(overview.availableRands)} payable, ${formatMoneyExact(overview.pendingPayoutRands)} in flight`,
+      icon: ArrowDownRight,
       color: 'text-orange-600',
-      bgColor: 'bg-orange-100'
+      bgColor: 'bg-orange-100',
     },
-    { 
-      name: 'Pending Payouts', 
-      value: formatCurrency(pendingPayouts), 
-      icon: Wallet, 
-      color: 'text-yellow-600',
-      bgColor: 'bg-yellow-100'
+    {
+      name: 'Paid out',
+      value: formatMoneyExact(overview.paidOutRands),
+      hint: 'Transfers that reached a bank account',
+      icon: ShieldCheck,
+      color: 'text-neutral-700',
+      bgColor: 'bg-neutral-100',
     },
   ]
 
@@ -76,7 +59,7 @@ export default async function AdminFinancePage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold">Financial Overview</h2>
-        <p className="text-muted-foreground">Manage platform finances, payouts, and transactions</p>
+        <p className="text-muted-foreground">Every figure here counts money that actually moved — abandoned and failed checkouts are excluded, and refunds are not counted as revenue.</p>
       </div>
 
       {/* Stats */}
@@ -85,9 +68,10 @@ export default async function AdminFinancePage() {
           <Card key={stat.name}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm text-muted-foreground">{stat.name}</p>
                   <p className="text-2xl font-bold">{stat.value}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{stat.hint}</p>
                 </div>
                 <div className={`p-3 rounded-full ${stat.bgColor}`}>
                   <stat.icon className={`h-6 w-6 ${stat.color}`} />
@@ -99,7 +83,7 @@ export default async function AdminFinancePage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Link href="/admin/finance/transactions">
           <Card className="hover:shadow-md transition-shadow h-full cursor-pointer group">
             <CardHeader>
@@ -113,24 +97,6 @@ export default async function AdminFinancePage() {
             <CardContent>
               <p className="text-muted-foreground">
                 View all platform transactions, filter by type and status.
-              </p>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link href="/admin/finance/wallets">
-          <Card className="hover:shadow-md transition-shadow h-full cursor-pointer group">
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-blue-100 group-hover:bg-blue-200 transition-colors">
-                  <Wallet className="h-6 w-6 text-blue-600" />
-                </div>
-                <CardTitle className="text-lg">Wallets</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Manage user wallets and balances, credit or debit adjustments.
               </p>
             </CardContent>
           </Card>

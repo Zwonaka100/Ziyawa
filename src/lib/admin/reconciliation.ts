@@ -18,7 +18,14 @@ export async function loadReconciliation(): Promise<ReconciliationData> {
 
   const [dailyResult, failedPayoutsResult, failedRefundsResult, openRefundQueueResult] =
     await Promise.all([
-      supabaseAdmin.from('finance_daily_reconciliation').select('*').limit(30),
+      // Order explicitly. The view carries an ORDER BY, but a LIMIT over a view
+      // is not obliged to preserve it, and the UI treats the first row as the
+      // latest day.
+      supabaseAdmin
+        .from('finance_daily_reconciliation')
+        .select('*')
+        .order('day', { ascending: false })
+        .limit(30),
       supabaseAdmin
         .from('transactions')
         .select('id, reference, amount, failure_reason, created_at, updated_at')

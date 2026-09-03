@@ -70,6 +70,8 @@ export interface PayoutRow {
     paystack_recipient_code: string | null
     recipient_error: string | null
   } | null
+  /** Their latest verification request, so "not verified" can say which kind. */
+  verification: { status: string; submitted_at: string | null } | null
   blockers: string[]
   payable: boolean
 }
@@ -229,7 +231,13 @@ export function AdminPayoutsQueue({
                       <p className="font-semibold">{row.recipient?.full_name || 'Unknown recipient'}</p>
                       <StatusBadge status={row.status} />
                       {row.recipient?.is_verified === false && (
-                        <Badge variant="outline" className="border-red-400 text-red-600">Unverified</Badge>
+                        <Badge variant="outline" className="border-red-400 text-red-600">
+                          {row.verification?.status === 'pending'
+                            ? 'Awaiting your review'
+                            : row.verification?.status === 'rejected'
+                              ? 'Verification rejected'
+                              : 'Never applied'}
+                        </Badge>
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground">{row.recipient?.email}</p>
@@ -301,6 +309,19 @@ export function AdminPayoutsQueue({
                     <ul className="text-xs text-amber-800 list-disc list-inside space-y-0.5">
                       {row.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
                     </ul>
+                    {/* An admin who hits a verification blocker had nowhere to
+                        go from here — they had to leave, find the user and
+                        search by hand. */}
+                    {row.recipient?.is_verified === false && (
+                      <Link
+                        href={row.verification?.status === 'pending' ? '/admin/verifications' : `/admin/users/${row.user_id}`}
+                        className="mt-2 inline-block text-xs font-medium text-amber-900 underline"
+                      >
+                        {row.verification?.status === 'pending'
+                          ? 'Review their verification →'
+                          : 'Open their profile →'}
+                      </Link>
+                    )}
                   </div>
                 )}
               </CardContent>

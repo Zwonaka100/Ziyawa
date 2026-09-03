@@ -364,3 +364,130 @@ export async function loadForwardView(): Promise<ForwardView> {
     publishedNotSelling: shape(notSelling.data),
   }
 }
+
+/**
+ * Money Ziyawa owes that cannot currently move, and why.
+ *
+ * Nothing surfaced this. The seven queues are all request-driven — they list
+ * things someone submitted — and an organiser whose money is stuck submitted
+ * nothing. Worse, once an event is completed it drops out of every one of them,
+ * so the exact moment money becomes owed is the moment it becomes invisible.
+ *
+ * The blocked list on /admin/finance/payouts could not cover this either: it is
+ * built from payout_requests rows, and the whole problem is that no row was
+ * ever created.
+ *
+ * Reads the balances directly, which is the only source that cannot be missing.
+ */
+export interface BlockedMoneyRow {
+  profileId: string
+  name: string
+  email: string
+  availableRands: number
+  heldRands: number
+  pendingPayoutRands: number
+  reason: 'not_verified' | 'verification_pending' | 'verification_rejected' | 'no_payout_account' | 'queued' | 'in_hold'
+  label: string
+}
+
+export async function loadBlockedMoney(): Promise<{
+  rows: BlockedMoneyRow[]
+  stuckCount: number
+  stuckRands: number
+}> {
+  const db = createAdminServiceClient()
+
+  const { data: profiles } = await db
+    .from('profiles')
+    .select('id, full_name, email, is_verified, wallet_balance, held_balance, pending_payout_balance')
+    .or('wallet_balance.gt.0,held_balance.gt.0,pending_payout_balance.gt.0')
+
+  const owed = profiles || []
+  if (owed.length === 0) return { rows: [], stuckCount: 0, stuckRands: 0 }
+
+  const ids = owed.map((p) => p.id)
+  const [{ data: accounts }, { data: verifications }, { data: openPayouts }] = await Promise.all([
+    db.from('payout_accounts').select('profile_id, paystack_recipient_code').in('profile_id', ids),
+    db
+      .from('verification_requests')
+      .select('profile_id, status, submitted_at')
+      .in('profile_id', ids)
+      .order('submitted_at', { ascending: false }),
+    db
+      .from('payout_requests')
+      .select('user_id')
+      .in('user_id', ids)
+      .in('status', ['pending', 'approved', 'processing']),
+  ])
+
+  const hasRecipient = new Set(
+    (accounts || []).filter((a) => a.paystack_recipient_code).map((a) => a.profile_id)
+  )
+  const queued = new Set((openPayouts || []).map((r) => r.user_id))
+  const latestVerification = new Map<string, string>()
+  for (const row of verifications || []) {
+    if (!latestVerification.has(row.profile_id)) latestVerification.set(row.profile_id, row.status)
+  }
+
+  const rows: BlockedMoneyRow[] = owed.map((profile) => {
+    const availableRands = Number(profile.wallet_balance || 0)
+    const heldRands = Number(profile.held_balance || 0)
+    const pendingPayoutRands = Number(profile.pending_payout_balance || 0)
+    const verification = latestVerification.get(profile.id)
+
+    let reason: BlockedMoneyRow['reason']
+    let label: string
+
+    if (queued.has(profile.id)) {
+      reason = 'queued'
+      label = 'Queued for your approval'
+    } else if (availableRands <= 0) {
+      // Nothing payable yet — the money is still inside its settlement hold.
+      reason = 'in_hold'
+      label = 'In settlement hold'
+    } else if (!profile.is_verified) {
+      if (verification === 'pending') {
+        reason = 'verification_pending'
+        label = 'Waiting in your verification queue'
+      } else if (verification === 'rejected') {
+        reason = 'verification_rejected'
+        label = 'Verification rejected — waiting on them'
+      } else {
+        reason = 'not_verified'
+        label = 'Never submitted verification'
+      }
+    } else if (!hasRecipient.has(profile.id)) {
+      reason = 'no_payout_account'
+      label = 'Verified, but no Paystack recipient'
+    } else {
+      reason = 'queued'
+      label = 'Payable — will queue on the next release'
+    }
+
+    return {
+      profileId: profile.id,
+      name: profile.full_name || profile.email || 'Unknown',
+      email: profile.email || '',
+      availableRands,
+      heldRands,
+      pendingPayoutRands,
+      reason,
+      label,
+    }
+  })
+
+  // "Stuck" means payable money that nothing will move on its own.
+  const STUCK: BlockedMoneyRow['reason'][] = [
+    'not_verified',
+    'verification_pending',
+    'verification_rejected',
+    'no_payout_account',
+  ]
+  const stuck = rows.filter((r) => STUCK.includes(r.reason))
+
+  return {
+    rows: rows.sort((a, b) => b.availableRands + b.heldRands - (a.availableRands + a.heldRands)),
+    stuckCount: stuck.length,
+    stuckRands: stuck.reduce((sum, r) => sum + r.availableRands, 0),
+  }
+}

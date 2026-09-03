@@ -9,7 +9,8 @@
 
 import { createAdminServiceClient } from '@/lib/admin-auth'
 
-export const TRANSACTIONS_PAGE_SIZE = 20
+export { TRANSACTIONS_PAGE_SIZE } from './pagination'
+import { TRANSACTIONS_PAGE_SIZE } from './pagination'
 
 export interface TransactionStats {
   totalTransactions: number
@@ -75,7 +76,7 @@ export async function loadTransactions({
     listQuery,
     supabaseAdmin
       .from('transactions')
-      .select('amount, net_amount, platform_fee, gateway_fee_cents, state', { count: 'exact' }),
+      .select('amount, net_amount, platform_fee, gateway_fee_cents, state, type', { count: 'exact' }),
   ])
 
   if (listResult.error) throw new Error('Failed to load transactions')
@@ -85,23 +86,39 @@ export async function loadTransactions({
   // which excluded 'held' - the state every paid ticket sits in until its event
   // completes. The result was that Total Volume and Booking Fees read R0.00
   // against R260.00 of real sales, because nothing had reached settlement yet.
-  const completed = rows.filter((t) => !INCOMPLETE_STATES.includes(t.state))
+  // `refunded` is money that came back. It was previously counted as completed,
+  // so a reversed sale still inflated volume, fees and the transaction count.
+  const completed = rows.filter(
+    (t) => !INCOMPLETE_STATES.includes(t.state) && t.state !== 'refunded'
+  )
+
+  // Volume means what buyers paid, so it counts ticket sales only. Summing
+  // every type counted the same money up to three times — once as the sale,
+  // again as the payout of that sale, and again as a refund of it — so R260 of
+  // real trade could read as R780.
+  const sales = completed.filter((t) => t.type === 'ticket_purchase')
   const held = rows.filter((t) => t.state === 'held')
   const issues = rows.filter((t) => ['failed', 'refunded'].includes(t.state))
+  const sum = (list: typeof rows, key: 'amount' | 'platform_fee' | 'gateway_fee_cents' | 'net_amount') =>
+    list.reduce((total, t) => total + (Number(t[key]) || 0), 0)
 
   const stats: TransactionStats = {
     // Counts what the table shows, not abandoned checkouts alongside it.
     totalTransactions: completed.length,
-    totalVolume: completed.reduce((sum, t) => sum + (t.amount || 0), 0),
-    platformFees: completed.reduce((sum, t) => sum + (t.platform_fee || 0), 0),
-    gatewayFees: completed.reduce((sum, t) => sum + (t.gateway_fee_cents || 0), 0),
-    netAfterGateway:
-      completed.reduce((sum, t) => sum + (t.platform_fee || 0), 0) -
-      completed.reduce((sum, t) => sum + (t.gateway_fee_cents || 0), 0),
-    pendingCount: rows.filter((t) =>
-      ['initiated', 'authorized', 'held', 'released'].includes(t.state)
-    ).length,
-    heldVolume: held.reduce((sum, t) => sum + (t.net_amount || t.amount || 0), 0),
+    totalVolume: sum(sales, 'amount'),
+    platformFees: sum(sales, 'platform_fee'),
+    gatewayFees: sum(sales, 'gateway_fee_cents'),
+    netAfterGateway: sum(sales, 'platform_fee') - sum(sales, 'gateway_fee_cents'),
+    // In-flight money awaiting settlement. `initiated` was in this list, which
+    // contradicted the page's own rule — the table hides abandoned checkouts,
+    // so counting them here described rows the admin could not see.
+    pendingCount: rows.filter((t) => ['authorized', 'held', 'released'].includes(t.state)).length,
+    // net_amount is the recipient's share; `|| t.amount` on a legitimate zero
+    // would silently substitute the gross.
+    heldVolume: held.reduce(
+      (total, t) => total + Number(t.net_amount ?? t.amount ?? 0),
+      0
+    ),
     issueCount: issues.length,
   }
 

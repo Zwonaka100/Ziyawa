@@ -13,15 +13,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { formatCurrency } from '@/lib/helpers'
+import { formatMoneyExact } from '@/lib/helpers'
 
 type DailyRow = {
   day: string
-  wallet_deposits_rands: number
+  ticket_sales_rands: number
   payout_requests_rands: number
   refunds_rands: number
   held_value_rands: number
   transaction_count: number
+  abandoned_count: number
+  failed_count: number
 }
 
 type ExceptionRow = {
@@ -49,15 +51,23 @@ export function AdminReconciliationView({
 }) {
 
   const summary = useMemo(() => {
-    const latest = daily[0]
-    const totalHeld = daily.reduce((sum, row) => sum + Number(row.held_value_rands || 0), 0)
+    // `daily` is ordered newest-first by the view, but a LIMIT without an
+    // explicit ORDER BY is not contractually ordered, so sort here rather than
+    // trusting daily[0] to be the latest.
+    const sorted = [...daily].sort((a, b) => (a.day < b.day ? 1 : -1))
+    const latest = sorted[0]
     return {
       latestDay: latest?.day || null,
       latestTxCount: Number(latest?.transaction_count || 0),
-      latestDeposits: Number(latest?.wallet_deposits_rands || 0),
-      latestPayoutRequests: Number(latest?.payout_requests_rands || 0),
-      latestRefunds: Number(latest?.refunds_rands || 0),
-      totalHeld,
+      latestAbandoned: Number(latest?.abandoned_count || 0),
+      latestTicketSales: Number(latest?.ticket_sales_rands || 0),
+      // Ticket sales over the whole window, which is a flow and can be summed.
+      // The tile here used to sum held_value_rands across 30 rows — that is a
+      // BALANCE, so adding it up over time produced roughly 30x the exposure
+      // and meant nothing at all.
+      windowTicketSales: daily.reduce((sum, row) => sum + Number(row.ticket_sales_rands || 0), 0),
+      // The current held balance is the latest day's figure, not a sum.
+      currentHeld: Number(latest?.held_value_rands || 0),
       openExceptions: failedPayouts.length + failedRefunds.length + refundQueue.length,
     }
   }, [daily, failedPayouts, failedRefunds, refundQueue])
@@ -73,7 +83,7 @@ export function AdminReconciliationView({
         </Link>
         <div>
           <h2 className="text-2xl font-bold">Finance Reconciliation</h2>
-          <p className="text-muted-foreground">Daily money movement checks and exception tracking</p>
+          <p className="text-muted-foreground">Daily money movement and open exceptions. &ldquo;Payouts Sent&rdquo; counts transfers that left Ziyawa, not requests still waiting for approval.</p>
         </div>
       </div>
 
@@ -82,21 +92,23 @@ export function AdminReconciliationView({
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Latest Day</p>
             <p className="text-xl font-semibold">{summary.latestDay || 'No data'}</p>
-            <p className="text-sm text-muted-foreground">{summary.latestTxCount} transactions</p>
+            <p className="text-sm text-muted-foreground">
+              {summary.latestTxCount} paid{summary.latestAbandoned > 0 ? `, ${summary.latestAbandoned} abandoned` : ''}
+            </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Latest Wallet Deposits</p>
-            <p className="text-xl font-semibold">{formatCurrency(summary.latestDeposits)}</p>
-            <p className="text-sm text-muted-foreground">Request volume snapshot</p>
+            <p className="text-sm text-muted-foreground">Ticket Sales (30d)</p>
+            <p className="text-xl font-semibold">{formatMoneyExact(summary.windowTicketSales)}</p>
+            <p className="text-sm text-muted-foreground">{formatMoneyExact(summary.latestTicketSales)} on the latest day</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Held Exposure (30d sum)</p>
-            <p className="text-xl font-semibold">{formatCurrency(summary.totalHeld)}</p>
-            <p className="text-sm text-muted-foreground">Held-value monitoring</p>
+            <p className="text-sm text-muted-foreground">Held Exposure</p>
+            <p className="text-xl font-semibold">{formatMoneyExact(summary.currentHeld)}</p>
+            <p className="text-sm text-muted-foreground">Owed on the latest day, not a sum</p>
           </CardContent>
         </Card>
         <Card className={summary.openExceptions > 0 ? 'border-orange-300 bg-orange-50' : 'border-green-300 bg-green-50'}>
@@ -120,27 +132,29 @@ export function AdminReconciliationView({
             <TableHeader>
               <TableRow>
                 <TableHead>Day</TableHead>
-                <TableHead className="text-right">Wallet Deposits</TableHead>
-                <TableHead className="text-right">Payout Requests</TableHead>
+                <TableHead className="text-right">Ticket Sales</TableHead>
+                <TableHead className="text-right">Payouts Sent</TableHead>
                 <TableHead className="text-right">Refunds</TableHead>
                 <TableHead className="text-right">Held Value</TableHead>
-                <TableHead className="text-right">Transactions</TableHead>
+                <TableHead className="text-right">Paid</TableHead>
+                <TableHead className="text-right">Abandoned</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {daily.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">No reconciliation data yet</TableCell>
+                  <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">No reconciliation data yet</TableCell>
                 </TableRow>
               ) : (
                 daily.map((row) => (
                   <TableRow key={row.day}>
                     <TableCell>{row.day}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(Number(row.wallet_deposits_rands || 0))}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(Number(row.payout_requests_rands || 0))}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(Number(row.refunds_rands || 0))}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(Number(row.held_value_rands || 0))}</TableCell>
+                    <TableCell className="text-right">{formatMoneyExact(Number(row.ticket_sales_rands || 0))}</TableCell>
+                    <TableCell className="text-right">{formatMoneyExact(Number(row.payout_requests_rands || 0))}</TableCell>
+                    <TableCell className="text-right">{formatMoneyExact(Number(row.refunds_rands || 0))}</TableCell>
+                    <TableCell className="text-right">{formatMoneyExact(Number(row.held_value_rands || 0))}</TableCell>
                     <TableCell className="text-right">{Number(row.transaction_count || 0)}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{Number(row.abandoned_count || 0)}</TableCell>
                   </TableRow>
                 ))
               )}
@@ -164,7 +178,7 @@ export function AdminReconciliationView({
               failedPayouts.slice(0, 5).map((row) => (
                 <div key={row.id} className="rounded-md border p-3 text-sm">
                   <p className="font-medium">{row.reference || row.id}</p>
-                  <p>{formatCurrency(Number(row.amount || 0) / 100)}</p>
+                  <p>{formatMoneyExact(Number(row.amount || 0) / 100)}</p>
                   <p className="text-muted-foreground">{row.failure_reason || 'Unknown reason'}</p>
                 </div>
               ))
@@ -186,7 +200,7 @@ export function AdminReconciliationView({
               failedRefunds.slice(0, 5).map((row) => (
                 <div key={row.id} className="rounded-md border p-3 text-sm">
                   <p className="font-medium">{row.reference || row.id}</p>
-                  <p>{formatCurrency(Number(row.amount || 0) / 100)}</p>
+                  <p>{formatMoneyExact(Number(row.amount || 0) / 100)}</p>
                   <p className="text-muted-foreground">{row.failure_reason || 'Unknown reason'}</p>
                 </div>
               ))
@@ -208,7 +222,7 @@ export function AdminReconciliationView({
               refundQueue.slice(0, 5).map((row) => (
                 <div key={row.id} className="rounded-md border p-3 text-sm">
                   <p className="font-medium">{row.id}</p>
-                  <p>{formatCurrency(Number(row.amount_cents || 0) / 100)}</p>
+                  <p>{formatMoneyExact(Number(row.amount_cents || 0) / 100)}</p>
                   <p className="text-muted-foreground">{row.reason_code || 'Unknown reason'} • {row.status || 'unknown'}</p>
                 </div>
               ))
