@@ -8,9 +8,14 @@
  * this endpoint receives the storage paths (not raw files).
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createNotification } from '@/lib/notifications'
+import { createAdminServiceClient } from '@/lib/admin-auth'
+import { sendAdminAlertEmail } from '@/lib/email'
+import { adminVerificationSubmittedEmail } from '@/lib/email-templates'
+import { SITE_URL } from '@/lib/constants'
+import { formatMoneyExact } from '@/lib/helpers'
 
 export async function POST(request: NextRequest) {
   try {
@@ -190,6 +195,57 @@ export async function POST(request: NextRequest) {
       message: 'Your verification documents have been received. Our team will review within 1–2 business days.',
       link: '/dashboard/settings?tab=verification',
       sendEmail: false,
+    })
+
+    // Tell every admin there is someone waiting on them. Nothing can be paid
+    // out until a human reviews this, so an unseen submission is money stuck.
+    // Runs after the response so the submitter is never held up by mail.
+    after(async () => {
+      try {
+        const db = createAdminServiceClient()
+        const [{ data: admins }, { data: applicant }] = await Promise.all([
+          db.from('profiles').select('id, email').eq('is_admin', true),
+          db
+            .from('profiles')
+            .select('full_name, email, wallet_balance, held_balance')
+            .eq('id', user.id)
+            .maybeSingle(),
+        ])
+
+        const pendingRands =
+          Number(applicant?.wallet_balance || 0) + Number(applicant?.held_balance || 0)
+
+        await Promise.all(
+          (admins || []).map((admin: { id: string }) =>
+            createNotification({
+              userId: admin.id,
+              type: 'message_received',
+              title: 'New verification to review',
+              message: `${applicant?.full_name || applicant?.email || 'A user'} submitted verification documents${pendingRands > 0 ? ` — ${formatMoneyExact(pendingRands)} is waiting on it` : ''}.`,
+              link: '/admin/verifications',
+              sendEmail: false,
+            }).catch(() => undefined)
+          )
+        )
+
+        await sendAdminAlertEmail(
+          (admins || []) as { id: string; email: string }[],
+          `Verification to review: ${applicant?.full_name || applicant?.email || 'new submission'}`,
+          adminVerificationSubmittedEmail({
+            applicantName: applicant?.full_name || 'Unknown',
+            applicantEmail: applicant?.email || 'unknown',
+            entityType: entity_type === 'business' ? 'Business (CIPC)' : 'Individual',
+            amountPending: formatMoneyExact(pendingRands),
+            adminUrl: `${SITE_URL}/admin/verifications`,
+          }),
+          'admin-verification-submitted'
+        )
+      } catch (error) {
+        console.error('Admin verification alert failed', {
+          userId: user.id,
+          message: error instanceof Error ? error.message : String(error),
+        })
+      }
     })
 
     return NextResponse.json({

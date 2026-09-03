@@ -589,17 +589,23 @@ export default function OrganizerEventManagePage() {
         throw new Error(data.error || 'Failed to complete event')
       }
 
-      // Explain a zero release rather than leaving the organizer to guess.
-      const blocked = data.releaseResult?.blockedByObligations || []
-      if (blocked.length > 0) {
-        toast.success(
-          'Event marked complete. Your ticket revenue is on hold while a booking on this event is ' +
-          'under dispute. Our team will resolve it and release your funds.',
-          { duration: 9000 }
-        )
-      } else {
-        toast.success(`Event marked complete. ${data.releaseResult?.released || 0} payout batch${(data.releaseResult?.released || 0) === 1 ? '' : 'es'} released.`)
-      }
+      // Say what actually happens next. This used to report
+      // "0 payout batches released", which was true and read like a failure:
+      // funds are always held for a settlement period after completion, so the
+      // count is zero every single time by design.
+      const holdUntil = data.payoutHoldUntil ? new Date(data.payoutHoldUntil) : null
+      const holdText = holdUntil && !Number.isNaN(holdUntil.getTime())
+        ? holdUntil.toLocaleString('en-ZA', {
+            day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+          })
+        : null
+
+      toast.success(
+        holdText
+          ? `Event marked complete. Your funds clear the settlement hold on ${holdText}, then go to Ziyawa for payout approval.`
+          : 'Event marked complete. Your funds enter the settlement hold, then go to Ziyawa for payout approval.',
+        { duration: 9000 }
+      )
       await loadAttendees()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to complete event')

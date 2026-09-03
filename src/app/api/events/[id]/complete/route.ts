@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { calculateHoldUntil, releaseEligibleHeldFunds } from '@/lib/payments/escrow'
+import { notifyEventCompleted } from '@/lib/events/completion-notifications'
 
 export async function POST(
   request: NextRequest,
@@ -89,12 +90,51 @@ export async function POST(
       )
     }
 
-    const releaseResult = await releaseEligibleHeldFunds({ eventId: id })
+    // Release runs after the response, not inside it.
+    //
+    // canReleaseEventTransaction() refuses to release until payout_hold_until
+    // has passed, and the line above sets that to completed_at + 48h. So at
+    // this moment the sweep can never release anything — it walks the held
+    // transactions for this event, skips every one, and charges the organiser
+    // several round trips to Ireland for the privilege. The nightly
+    // /api/payments/release cron is what actually settles them.
+    //
+    // Kept rather than deleted because the hold is configurable: with
+    // PAYOUT_HOLD_HOURS=0 this call is the thing that releases. after() gives
+    // both — it still runs on the same invocation, just once the organiser
+    // already has their answer.
+    after(async () => {
+      try {
+        const releaseResult = await releaseEligibleHeldFunds({ eventId: id })
+        if (releaseResult.failures.length > 0) {
+          console.error('Post-completion release reported failures', {
+            eventId: id,
+            failures: releaseResult.failures,
+          })
+        }
+      } catch (releaseError) {
+        // Never surfaces to the organiser: their event is already completed and
+        // committed. The cron will pick these transactions up regardless.
+        console.error('Post-completion release failed', {
+          eventId: id,
+          message: releaseError instanceof Error ? releaseError.message : String(releaseError),
+        })
+      }
+
+      // Tell the organiser what just happened to their money, and tell admin
+      // there is money to settle. Runs after release so the notification
+      // reflects the final state. It swallows its own errors — the event is
+      // already completed and committed.
+      await notifyEventCompleted({
+        eventId: id,
+        completedByAdmin: isAdmin,
+        payoutHoldUntil: updates.payout_hold_until,
+      })
+    })
 
     return NextResponse.json({
       success: true,
       eventId: id,
-      releaseResult,
       payoutHoldUntil: updates.payout_hold_until,
     })
   } catch (error) {

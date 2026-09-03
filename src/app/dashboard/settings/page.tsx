@@ -78,7 +78,36 @@ function SettingsPageInner() {
   const { user, profile, refreshProfile, loading: authLoading } = useAuth()
   const supabase = createClient()
 
-  const defaultTab = searchParams.get('tab') ?? 'profile'
+  // Controlled, not defaultValue. Radix reads defaultValue once at mount, so
+  // arriving at /dashboard/settings?tab=verification from a page that is
+  // already mounted left the user staring at Profile.
+  const requestedTab = searchParams.get('tab') ?? 'profile'
+  const [activeTab, setActiveTab] = useState(requestedTab)
+  const tabsListRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setActiveTab(requestedTab)
+  }, [requestedTab])
+
+  // The tab strip scrolls horizontally on a phone, so the active tab can start
+  // out off-screen — which is what "it always lands on Profile" looked like
+  // even once the tab itself was correct.
+  //
+  // scrollIntoView() is wrong for this on two counts, both observed: it runs
+  // before web fonts settle so it computes against a narrower strip and stops
+  // short, and it scrolls every scrollable ancestor including the page, which
+  // jumps the whole view. Setting scrollLeft on the strip itself moves only the
+  // strip, and a rAF lets layout finish first.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const list = tabsListRef.current
+      const active = list?.querySelector<HTMLElement>('[data-state="active"]')
+      if (!list || !active) return
+      const centred = active.offsetLeft - (list.clientWidth - active.clientWidth) / 2
+      list.scrollLeft = Math.max(0, centred)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [activeTab])
 
   // Profile tab state
   const [fullName, setFullName] = useState('')
@@ -137,9 +166,14 @@ function SettingsPageInner() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.replace('/auth/signin')
+      // Carry the destination through sign-in. Without this, the "Verify now"
+      // link in an email opened on a signed-out device lost ?tab=verification
+      // and the auth form's fallback dropped the user on /profile.
+      const query = searchParams.toString()
+      const destination = `/dashboard/settings${query ? `?${query}` : ''}`
+      router.replace(`/auth/signin?next=${encodeURIComponent(destination)}`)
     }
-  }, [authLoading, user, router])
+  }, [authLoading, user, router, searchParams])
 
   useEffect(() => {
     if (profile) {
@@ -472,22 +506,33 @@ function SettingsPageInner() {
         <p className="text-muted-foreground">Manage your profile, roles, verification, and security</p>
       </div>
 
-      <Tabs defaultValue={defaultTab}>
-        <TabsList className="mb-6 flex-wrap h-auto gap-1">
-          <TabsTrigger value="profile" className="flex items-center gap-1.5">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        {/*
+          One scrollable row rather than a wrapping one. Five tabs cannot fit a
+          phone, and with flex-wrap the last two landed on a second row where
+          `flex-1` stretched them to half width each — so Security and
+          Notifications read as a different control from the first three.
+          flex-nowrap + overflow-x-auto keeps them one strip; shrink-0 and
+          flex-none defeat the flex-1 the trigger inherits.
+        */}
+        <TabsList
+          ref={tabsListRef}
+          className="mb-6 w-full justify-start gap-1 overflow-x-auto flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          <TabsTrigger value="profile" className="flex flex-none shrink-0 items-center gap-1.5">
             <User className="h-4 w-4" />Profile
           </TabsTrigger>
-          <TabsTrigger value="account" className="flex items-center gap-1.5">
+          <TabsTrigger value="account" className="flex flex-none shrink-0 items-center gap-1.5">
             <ArrowRight className="h-4 w-4" />Account
           </TabsTrigger>
-          <TabsTrigger value="verification" className="flex items-center gap-1.5">
+          <TabsTrigger value="verification" className="flex flex-none shrink-0 items-center gap-1.5">
             <ShieldCheck className="h-4 w-4" />Verification
             {hasPending && <span className="ml-1 h-2 w-2 rounded-full bg-orange-500 inline-block" />}
           </TabsTrigger>
-          <TabsTrigger value="security" className="flex items-center gap-1.5">
+          <TabsTrigger value="security" className="flex flex-none shrink-0 items-center gap-1.5">
             <Shield className="h-4 w-4" />Security
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex items-center gap-1.5">
+          <TabsTrigger value="notifications" className="flex flex-none shrink-0 items-center gap-1.5">
             <Bell className="h-4 w-4" />Notifications
           </TabsTrigger>
         </TabsList>

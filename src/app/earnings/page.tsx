@@ -20,7 +20,7 @@ import {
   Lock,
   LoaderCircle
 } from 'lucide-react'
-import { formatCurrency, formatDate } from '@/lib/helpers'
+import { formatDate, formatMoneyExact } from '@/lib/helpers'
 import { useRouter } from 'next/navigation'
 import { PLATFORM_FEES } from '@/lib/constants'
 
@@ -146,7 +146,7 @@ export default function EarningsPage() {
           <CardHeader className="pb-2">
             <CardDescription>Ready for payout</CardDescription>
             <CardTitle className="text-3xl font-bold text-primary">
-              {formatCurrency(availableBalance)}
+              {formatMoneyExact(availableBalance)}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -160,7 +160,7 @@ export default function EarningsPage() {
           <CardHeader className="pb-2">
             <CardDescription>Not yet cleared</CardDescription>
             <CardTitle className="text-3xl font-bold text-amber-600">
-              {formatCurrency(heldBalance)}
+              {formatMoneyExact(heldBalance)}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -174,7 +174,7 @@ export default function EarningsPage() {
           <CardHeader className="pb-2">
             <CardDescription>Payout on the way</CardDescription>
             <CardTitle className="text-3xl font-bold text-primary">
-              {formatCurrency(pendingPayoutBalance)}
+              {formatMoneyExact(pendingPayoutBalance)}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -192,7 +192,7 @@ export default function EarningsPage() {
           {availableBalance > 0 ? (
             <div className="rounded-lg border border-green-200 bg-green-50 p-4">
               <p className="text-sm font-medium text-green-900">
-                {formatCurrency(availableBalance)} is queued for payout
+                {formatMoneyExact(availableBalance)} is queued for payout
               </p>
               <p className="text-xs text-green-800 mt-1">
                 Our team reviews and releases payouts to your verified bank account. You don&apos;t need to
@@ -222,10 +222,25 @@ export default function EarningsPage() {
             </p>
           )}
 
-          {hasRoles && !profile.is_verified && availableBalance > 0 && (
-            <p className="text-xs text-amber-600 mt-3 text-center">
-              Verify your account in settings so we can pay these funds out to you.
-            </p>
+          {/*
+            This used to be unlinked text that only appeared once money had
+            already been released. An organiser whose event has just completed
+            has everything in `held`, so the one screen where they look for
+            their money said nothing at all about the step blocking it.
+          */}
+          {hasRoles && !profile.is_verified && (heldBalance + availableBalance) > 0 && (
+            <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-center">
+              <p className="text-sm font-medium text-amber-900">
+                Verify your account so we can pay you
+              </p>
+              <p className="mt-1 text-xs text-amber-800">
+                {formatMoneyExact(heldBalance + availableBalance)} is waiting. We can only send money to a
+                verified account — it takes a few minutes and needs your ID and bank details.
+              </p>
+              <Link href="/dashboard/settings?tab=verification">
+                <Button size="sm" className="mt-3">Verify my account</Button>
+              </Link>
+            </div>
           )}
 
           <div className="mt-3 flex justify-center">
@@ -273,7 +288,7 @@ export default function EarningsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">{formatCurrency(heldBalance + availableBalance)}</p>
+                <p className="text-2xl font-bold">{formatMoneyExact(heldBalance + availableBalance)}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   Net of the {PLATFORM_FEES.ticketing.platformFeePercent}% platform fee.
                 </p>
@@ -290,7 +305,7 @@ export default function EarningsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">{formatCurrency(heldBalance + availableBalance)}</p>
+                <p className="text-2xl font-bold">{formatMoneyExact(heldBalance + availableBalance)}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   Released only after confirmation and the safety hold window.
                 </p>
@@ -307,7 +322,7 @@ export default function EarningsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">{formatCurrency(heldBalance + availableBalance)}</p>
+                <p className="text-2xl font-bold">{formatMoneyExact(heldBalance + availableBalance)}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   Cleared after delivery is confirmed and reviewed.
                 </p>
@@ -503,7 +518,7 @@ function TransactionList({
             </div>
             <div className="text-left sm:text-right">
               <p className={`font-semibold ${isCredit ? 'text-green-600' : 'text-red-600'}`}>
-                {isCredit ? '+' : '-'}{formatCurrency(tx.amount / 100)}
+                {isCredit ? '+' : '-'}{formatMoneyExact(tx.amount / 100)}
               </p>
               <Badge variant={tx.state === 'settled' || tx.state === 'released' ? 'default' : 'secondary'} className="text-xs capitalize gap-1">
                 {tx.state === 'held' && <Lock className="h-3 w-3" />}

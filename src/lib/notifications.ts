@@ -49,6 +49,7 @@ export type NotificationType =
   | 'event_reminder'
   | 'event_cancelled'
   | 'event_updated'
+  | 'event_completed'
   | 'review_requested'
   | 'welcome'
   | 'profile_verified'

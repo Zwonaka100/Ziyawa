@@ -704,6 +704,195 @@ export function organizerCompleteEventReminderEmail(data: {
   return emailWrapper(content);
 }
 
+// Confirms an organizer's own completion, and — the point of it — tells them
+// what happens to their money next.
+//
+// Until now completing an event produced a toast and then silence: no email, no
+// notification, nothing in admin. The reminder nudging them to complete existed
+// (organizerCompleteEventReminderEmail above); the confirmation that they had
+// did not, so from the organizer's side the action had no visible effect.
+export function eventCompletedEmail(data: {
+  recipientName: string;
+  eventName: string;
+  eventDate: string;
+  ticketsSold: number;
+  grossSales: string;
+  yourEarnings: string;
+  holdClearsOn: string;
+  isVerified: boolean;
+  verifyUrl: string;
+  earningsUrl: string;
+  completedByAdmin?: boolean;
+}): string {
+  const content = `
+    <h1>${data.eventName} is marked complete</h1>
+    <p>Hi ${data.recipientName},</p>
+    ${data.completedByAdmin
+      ? `<p>Our team marked <strong>${data.eventName}</strong> as complete on your behalf. If that wasn't expected, reply to this email and we'll look into it.</p>`
+      : `<p>Thanks for confirming <strong>${data.eventName}</strong> went ahead. Here's where your money stands.</p>`}
+
+    <div class="highlight-box">
+      <div class="detail-row">
+        <span class="detail-label">Event date</span>
+        <span class="detail-value">${data.eventDate}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Tickets sold</span>
+        <span class="detail-value">${data.ticketsSold}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Ticket sales</span>
+        <span class="detail-value">${data.grossSales}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Your earnings</span>
+        <span class="detail-value">${data.yourEarnings}</span>
+      </div>
+    </div>
+
+    <h2>What happens next</h2>
+    <p>Your earnings are held until <strong>${data.holdClearsOn}</strong>. This settlement window covers refunds and disputes, and it applies to every event.</p>
+    <p>After that they're queued for payout, our team approves it, and the money goes to your bank account. You'll get an email at each step — there is nothing further for you to do.</p>
+
+    ${data.isVerified ? '' : `
+    <div style="background-color: #fef3c7; border-radius: 8px; padding: 16px; margin: 20px 0; color: #92400e;">
+      <strong>One thing is still blocking payment.</strong> Your account isn't verified yet, and we can only pay out to a verified account. Your earnings are safe either way, but they can't be sent until you
+      <a href="${data.verifyUrl}" style="color: #92400e;">verify your account</a>.
+    </div>`}
+
+    <p style="text-align: center;">
+      <a href="${data.earningsUrl}" class="button">
+        View my earnings
+      </a>
+    </p>
+  `;
+
+  return emailWrapper(content);
+}
+
+// Operations alert: an organizer completed their event, so there is money to
+// settle. Goes to every admin.
+//
+// Deliberately leads with whether the payout is blocked, because that is the
+// only part an admin can act on. A completion where the organizer is verified
+// needs nothing from anyone until the hold clears.
+export function adminEventCompletedEmail(data: {
+  eventName: string;
+  eventDate: string;
+  organiserName: string;
+  organiserEmail: string;
+  ticketsSold: number;
+  grossSales: string;
+  organiserEarns: string;
+  ziyawaNet: string;
+  holdClearsOn: string;
+  isVerified: boolean;
+  hasPayoutAccount: boolean;
+  completedByAdmin: boolean;
+  adminUrl: string;
+}): string {
+  const blockers: string[] = [];
+  if (!data.isVerified) blockers.push('Organiser is not verified');
+  if (!data.hasPayoutAccount) blockers.push('No payout account on file');
+
+  const content = `
+    <h1>${data.eventName} completed</h1>
+    <p>${data.completedByAdmin
+      ? `Marked complete by an admin on behalf of <strong>${data.organiserName}</strong>.`
+      : `<strong>${data.organiserName}</strong> marked their event complete.`}</p>
+
+    ${blockers.length > 0 ? `
+    <div style="background-color: #fef3c7; border-radius: 8px; padding: 16px; margin: 20px 0; color: #92400e;">
+      <strong>Payout is blocked.</strong>
+      <ul style="margin: 8px 0 0 18px; padding: 0;">
+        ${blockers.map((item) => `<li>${item}</li>`).join('')}
+      </ul>
+    </div>` : `
+    <div class="note-box">
+      <p style="margin:0;">Nothing is blocking this payout. It queues for your approval once the hold clears.</p>
+    </div>`}
+
+    <div class="highlight-box">
+      <div class="detail-row">
+        <span class="detail-label">Organiser</span>
+        <span class="detail-value">${data.organiserEmail}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Event date</span>
+        <span class="detail-value">${data.eventDate}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Tickets sold</span>
+        <span class="detail-value">${data.ticketsSold}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Gross sales</span>
+        <span class="detail-value">${data.grossSales}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Organiser receives</span>
+        <span class="detail-value">${data.organiserEarns}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Ziyawa keeps after Paystack</span>
+        <span class="detail-value">${data.ziyawaNet}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Releases</span>
+        <span class="detail-value">${data.holdClearsOn}</span>
+      </div>
+    </div>
+
+    <p style="text-align: center;">
+      <a href="${data.adminUrl}" class="button">
+        Open in admin
+      </a>
+    </p>
+  `;
+
+  return emailWrapper(content);
+}
+
+// Operations alert: someone submitted identity + bank details and is waiting on
+// a human. Goes to every admin.
+export function adminVerificationSubmittedEmail(data: {
+  applicantName: string;
+  applicantEmail: string;
+  entityType: string;
+  amountPending: string;
+  adminUrl: string;
+}): string {
+  const content = `
+    <h1>New verification to review</h1>
+    <p><strong>${data.applicantName}</strong> submitted their documents and is waiting on a decision.</p>
+
+    <div class="highlight-box">
+      <div class="detail-row">
+        <span class="detail-label">Email</span>
+        <span class="detail-value">${data.applicantEmail}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Type</span>
+        <span class="detail-value">${data.entityType}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Funds waiting on this</span>
+        <span class="detail-value">${data.amountPending}</span>
+      </div>
+    </div>
+
+    <p>Approving also creates their Paystack transfer recipient, so nothing can be paid out until this is reviewed.</p>
+
+    <p style="text-align: center;">
+      <a href="${data.adminUrl}" class="button">
+        Review verification
+      </a>
+    </p>
+  `;
+
+  return emailWrapper(content);
+}
+
 // One-off apology + call to action for organizers whose funds were left
 // sitting because nothing ever prompted them to complete their event.
 export function organizerSettlementApologyEmail(data: {

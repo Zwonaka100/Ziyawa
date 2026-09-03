@@ -13,6 +13,7 @@ import { SITE_URL } from './constants';
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'Ziyawa <noreply@ziyawa.com>';
 const DEFAULT_REPLY_TO = process.env.REPLY_TO_EMAIL || process.env.SUPPORT_EMAIL || 'support@ziyawa.com';
+const ACCOUNTS_FROM_EMAIL = process.env.ACCOUNTS_FROM_EMAIL || 'Ziyawa Accounts <accounts@ziyawa.com>';
 const RESEND_API_URL = 'https://api.resend.com/emails';
 
 interface SendEmailParams {
@@ -90,9 +91,42 @@ async function recordEmailAudit(
 }
 
 /**
+ * A per-machine kill switch for outbound mail.
+ *
+ * This exists because local development points at the LIVE database and the
+ * LIVE mail provider. Exercising any code path that sends — completing a test
+ * event, running the lifecycle cron, replaying a webhook — reaches real people
+ * on real addresses. That has to be impossible by construction, not by
+ * remembering.
+ *
+ * Why this variable and not NODE_ENV or VERCEL:
+ *   - `next start` sets NODE_ENV=production, so a local production build is
+ *     indistinguishable from the deployed one by that measure.
+ *   - `.env.production.local` is a `vercel env pull` artifact and already
+ *     contains VERCEL=1 and VERCEL_ENV=production, so those are set locally too.
+ *
+ * EMAIL_SEND_DISABLED lives in `.env.local`, which Vercel never reads, so it is
+ * present on this machine in both dev and `next start`, and absent in every
+ * deployment. Nothing about production behaviour changes: unset means send,
+ * exactly as before.
+ */
+const EMAIL_SEND_DISABLED = process.env.EMAIL_SEND_DISABLED === 'true';
+
+/**
  * Send an email using Resend API
  */
 export async function sendEmail(params: SendEmailParams): Promise<SendEmailResult> {
+  if (EMAIL_SEND_DISABLED) {
+    const recipients = Array.isArray(params.to) ? params.to.join(', ') : params.to;
+    console.warn(
+      `[email blocked] EMAIL_SEND_DISABLED is set. Would have sent "${params.subject}" to ${recipients}`
+    );
+    // Deliberately does not write an email_logs row: nothing was sent, and a
+    // blocked send must not look like a delivery in the audit trail or in
+    // admin's Communications history.
+    return { success: false, error: 'Email sending disabled on this machine (EMAIL_SEND_DISABLED)' };
+  }
+
   if (!RESEND_API_KEY) {
     console.warn('RESEND_API_KEY not configured, skipping email send');
     return { success: false, error: 'Email not configured' };
@@ -347,6 +381,69 @@ export async function sendEventPublishedEmail(
     }),
     tags: [{ name: 'category', value: 'event-published' }],
   });
+}
+
+export async function sendEventCompletedEmail(
+  to: string,
+  data: {
+    recipientName: string;
+    eventName: string;
+    eventDate: string;
+    ticketsSold: number;
+    grossSales: string;
+    yourEarnings: string;
+    holdClearsOn: string;
+    isVerified: boolean;
+    completedByAdmin?: boolean;
+    recipientId?: string;
+  }
+): Promise<SendEmailResult> {
+  const { recipientId, ...templateData } = data;
+
+  return sendEmail({
+    to,
+    from: ACCOUNTS_FROM_EMAIL,
+    subject: `${data.eventName} is complete — here's what happens to your money`,
+    html: EmailTemplates.eventCompletedEmail({
+      ...templateData,
+      verifyUrl: `${SITE_URL}/dashboard/settings?tab=verification`,
+      earningsUrl: `${SITE_URL}/earnings`,
+    }),
+    emailType: 'automated',
+    recipientIds: recipientId ? [recipientId] : [],
+    tags: [{ name: 'category', value: 'event-completed' }],
+  });
+}
+
+/**
+ * Fans an operations alert out to every admin.
+ *
+ * Sends are sequential rather than Promise.all so one bad address cannot reject
+ * the batch, and every failure is logged with the address it belongs to.
+ */
+export async function sendAdminAlertEmail(
+  recipients: { email: string; id?: string }[],
+  subject: string,
+  html: string,
+  category: string
+): Promise<void> {
+  for (const recipient of recipients) {
+    if (!recipient.email) continue;
+
+    const result = await sendEmail({
+      to: recipient.email,
+      from: ACCOUNTS_FROM_EMAIL,
+      subject,
+      html,
+      emailType: 'automated',
+      recipientIds: recipient.id ? [recipient.id] : [],
+      tags: [{ name: 'category', value: category }],
+    });
+
+    if (!result.success) {
+      console.error('Admin alert not sent', { to: recipient.email, category, reason: result.error });
+    }
+  }
 }
 
 export async function sendProviderBookingRequestEmail(
