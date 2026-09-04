@@ -1350,8 +1350,8 @@ export function payoutStatusEmail(data: {
     : data.status === 'completed'
       ? `Your payout of <strong>${data.amount}</strong> has been completed successfully.`
       : data.status === 'failed'
-        ? `Your payout of <strong>${data.amount}</strong> could not be completed. The funds have been restored to your wallet.`
-        : `Your payout of <strong>${data.amount}</strong> was reversed. The funds are now back in your wallet.`;
+        ? `Your payout of <strong>${data.amount}</strong> could not be completed. Nothing is lost &mdash; the money is back in your Ziyawa balance and we will try again.`
+        : `Your payout of <strong>${data.amount}</strong> was reversed by the bank. Nothing is lost &mdash; the money is back in your Ziyawa balance.`;
 
   const content = `
     <h1>${title}</h1>
@@ -1360,7 +1360,7 @@ export function payoutStatusEmail(data: {
 
     <p style="text-align: center;">
       <a href="${data.actionUrl}" class="button">
-        Open Wallet
+        View my earnings
       </a>
     </p>
   `;

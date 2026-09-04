@@ -64,12 +64,10 @@ function roundCurrency(value: number) {
   return Math.round(value * 100) / 100
 }
 
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat('en-ZA', {
-    style: 'currency',
-    currency: 'ZAR',
-  }).format(amount)
-}
+// Intl's en-ZA currency format drops trailing cents, so R90.00 came out as
+// "R 90,00" in messages about someone's money. formatMoneyExact is the shared
+// helper that does not.
+import { formatMoneyExact } from '@/lib/helpers'
 
 export function calculateHoldUntil(baseDate: string | null | undefined, holdHours: number): string {
   const base = baseDate ? new Date(baseDate) : new Date()
@@ -423,6 +421,13 @@ async function releaseTransactionToWallet(
     throw transactionError
   }
 
+  // In-app only, deliberately.
+  //
+  // This used to email, once per released transaction, so an event with two
+  // ticket sales sent two near-identical emails saying money was "available in
+  // your wallet" — a thing that does not exist. The organiser's email timeline
+  // is completion ("in review") then payout ("on its way"); release sits
+  // between them and means nothing to them. It stays in the bell as a record.
   await createNotification({
     userId: transaction.recipient_id,
     type: 'payment_received',
@@ -430,7 +435,7 @@ async function releaseTransactionToWallet(
     message,
     link,
     transactionId: transaction.id,
-    sendEmail: true,
+    sendEmail: false,
   })
 
   // Deliberately does NOT queue the payout here.
@@ -532,8 +537,8 @@ export async function releaseEligibleHeldFunds(options?: {
 
         await releaseTransactionToWallet(
           transaction,
-          'Event revenue released',
-          `${formatCurrency(Number(transaction.net_amount || 0) / 100)} from "${event.title}" is now available in your wallet.`,
+          'Your event earnings are ready',
+          `${formatMoneyExact(Number(transaction.net_amount || 0) / 100)} from "${event.title}" has cleared review and is ready to be paid out to your bank.`,
           '/earnings'
         )
 
@@ -584,8 +589,8 @@ export async function releaseEligibleHeldFunds(options?: {
 
         await releaseTransactionToWallet(
           transaction,
-          'Booking payout released',
-          `${formatCurrency(Number(transaction.net_amount || 0) / 100)} is now available in your wallet for your completed booking.`,
+          'Your booking payment is ready',
+          `${formatMoneyExact(Number(transaction.net_amount || 0) / 100)} for your completed booking is ready to be paid out to your bank.`,
           '/earnings'
         )
 

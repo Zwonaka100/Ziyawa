@@ -120,7 +120,7 @@ export const NotificationTemplates = {
   
   bookingCompleted: (eventTitle: string, amount: string) => ({
     title: 'Booking Completed 🎊',
-    message: `Your performance at "${eventTitle}" is complete! ${amount} has been released to your wallet.`,
+    message: `Your performance at "${eventTitle}" is complete. ${amount} is ready to be paid out to your bank.`,
   }),
 
   // Payment notifications
