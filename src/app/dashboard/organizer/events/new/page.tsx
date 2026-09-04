@@ -19,12 +19,17 @@ import { createClient } from '@/lib/supabase/client'
 import { PROVINCES } from '@/lib/constants'
 import { toast } from 'sonner'
 import { useAuth } from '@/components/providers/auth-provider'
+import { VerificationStatusBanner } from '@/components/organizer/verification-status'
 import { TicketTierEditor } from '@/components/events/ticket-tier-editor'
 import { createEmptyTier, getEventCapacityFromTiers, getStartingPriceFromTiers, normalizeTierPayload } from '@/lib/ticketing'
 
 export default function NewEventPage() {
   const router = useRouter()
   const { profile } = useAuth()
+  const isVerified = Boolean(
+    (profile as { is_verified?: boolean; is_admin?: boolean } | null)?.is_verified ||
+    (profile as { is_admin?: boolean } | null)?.is_admin
+  )
   const [loading, setLoading] = useState(false)
   
   const [formData, setFormData] = useState({
@@ -150,11 +155,19 @@ export default function NewEventPage() {
         Back to Dashboard
       </Link>
 
+      {/* Publishing needs a verified account, so say so before they spend
+          twenty minutes filling this in. The draft itself is never blocked. */}
+      {!isVerified && (
+        <div className="mb-6">
+          <VerificationStatusBanner state="none" />
+        </div>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Create New Event</CardTitle>
           <CardDescription>
-            Fill in the details for your event. First save the draft, then add media, review everything, and publish when ready.
+            Fill in the details for your event. First save the draft, then add media, review everything, and publish when ready.{!isVerified && ' Publishing needs a verified account.'}
           </CardDescription>
         </CardHeader>
         <CardContent>

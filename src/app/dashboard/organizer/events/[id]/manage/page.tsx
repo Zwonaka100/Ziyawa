@@ -591,19 +591,12 @@ export default function OrganizerEventManagePage() {
 
       // Say what actually happens next. This used to report
       // "0 payout batches released", which was true and read like a failure:
-      // funds are always held for a settlement period after completion, so the
-      // count is zero every single time by design.
-      const holdUntil = data.payoutHoldUntil ? new Date(data.payoutHoldUntil) : null
-      const holdText = holdUntil && !Number.isNaN(holdUntil.getTime())
-        ? holdUntil.toLocaleString('en-ZA', {
-            day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-          })
-        : null
-
+      // funds are never released at the moment of completion, so the count is
+      // zero every single time by design. It also promised a fixed release
+      // date, which is not a promise to make — an admin can release sooner,
+      // and a problem with the event can mean later.
       toast.success(
-        holdText
-          ? `Event marked complete. Your funds clear the settlement hold on ${holdText}, then go to Ziyawa for payout approval.`
-          : 'Event marked complete. Your funds enter the settlement hold, then go to Ziyawa for payout approval.',
+        "Event marked complete. Your earnings are now in review — usually under 48 hours — and we'll be in touch if anything needs your attention.",
         { duration: 9000 }
       )
       await loadAttendees()

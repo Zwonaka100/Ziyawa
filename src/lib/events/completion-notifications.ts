@@ -58,8 +58,8 @@ export async function notifyEventCompleted(options: {
       type: 'event_completed',
       title: `${breakdown.eventTitle} is complete`,
       message: completedByAdmin
-        ? `Our team marked this event complete. Your ${earnings} clears the settlement hold on ${holdClearsOn}.`
-        : `Thanks for confirming. Your ${earnings} clears the settlement hold on ${holdClearsOn}, then goes for payout approval.`,
+        ? `Our team marked this event complete. Your ${earnings} is in review and will be released once we're happy with the details.`
+        : `Thanks for confirming. Your ${earnings} is now in review — usually under 48 hours — and we'll be in touch if anything needs your attention.`,
       link: '/earnings',
       eventId,
       // sendEmail is false because the branded email below carries the full
@@ -76,7 +76,6 @@ export async function notifyEventCompleted(options: {
         ticketsSold: breakdown.ticketsSold,
         grossSales: formatMoneyExact(breakdown.grossTakenRands),
         yourEarnings: earnings,
-        holdClearsOn,
         isVerified: breakdown.organiserVerified,
         completedByAdmin,
         recipientId: breakdown.organiserId,

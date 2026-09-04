@@ -8,6 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Calendar, Plus, Users, Clock, Wrench, Star } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/helpers'
 import { BOOKING_STATUS, PROVINCES } from '@/lib/constants'
+import {
+  VerificationBadge,
+  VerificationStatusBanner,
+  verificationStateFrom,
+} from '@/components/organizer/verification-status'
 
 export const metadata = {
   title: 'Organizer Dashboard | Ziyawa',
@@ -44,13 +49,28 @@ export default async function OrganizerDashboardPage() {
   // Check role - use new boolean flags
   const { data: profile } = await supabase
     .from('profiles')
-    .select('is_organizer, is_admin')
+    .select('is_organizer, is_admin, is_verified')
     .eq('id', user.id)
     .single()
 
   if (!profile || (!profile.is_organizer && !profile.is_admin)) {
     redirect('/profile')
   }
+
+  // Verification now gates publishing, so the organiser needs to see where they
+  // stand before they build an event, not when they press Publish.
+  const { data: latestVerification } = await supabase
+    .from('verification_requests')
+    .select('status, rejection_reason')
+    .eq('profile_id', user.id)
+    .order('submitted_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const verificationState = verificationStateFrom(
+    profile.is_verified || profile.is_admin,
+    latestVerification?.status
+  )
 
   // Fetch organizer's events
   const { data: events } = await supabase
@@ -99,7 +119,10 @@ export default async function OrganizerDashboardPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold">Organizer Dashboard</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-bold">Organizer Dashboard</h1>
+            <VerificationBadge state={verificationState} />
+          </div>
           <p className="text-muted-foreground">Manage your events and bookings</p>
         </div>
         <Link href="/dashboard/organizer/events/new">
@@ -108,6 +131,13 @@ export default async function OrganizerDashboardPage() {
             Create Event
           </Button>
         </Link>
+      </div>
+
+      <div className="mb-8">
+        <VerificationStatusBanner
+          state={verificationState}
+          rejectionReason={latestVerification?.rejection_reason}
+        />
       </div>
 
       {/* Stats Cards */}

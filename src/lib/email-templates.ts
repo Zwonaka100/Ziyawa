@@ -718,10 +718,10 @@ export function eventCompletedEmail(data: {
   ticketsSold: number;
   grossSales: string;
   yourEarnings: string;
-  holdClearsOn: string;
   isVerified: boolean;
   verifyUrl: string;
   earningsUrl: string;
+  termsUrl: string;
   completedByAdmin?: boolean;
 }): string {
   const content = `
@@ -751,8 +751,8 @@ export function eventCompletedEmail(data: {
     </div>
 
     <h2>What happens next</h2>
-    <p>Your earnings are held until <strong>${data.holdClearsOn}</strong>. This settlement window covers refunds and disputes, and it applies to every event.</p>
-    <p>After that they're queued for payout, our team approves it, and the money goes to your bank account. You'll get an email at each step — there is nothing further for you to do.</p>
+    <p><strong>Your event is now in review.</strong> We check the details before releasing funds — usually within 48 hours, often sooner. Your money is released as soon as we're happy with everything.</p>
+    <p>If anything doesn't look right, we'll contact you before releasing. Otherwise there is nothing further for you to do: the funds go to your bank account and you'll get an email at each step. More detail is in our <a href="${data.termsUrl}" class="text-link">Terms of Use</a>.</p>
 
     ${data.isVerified ? '' : `
     <div style="background-color: #fef3c7; border-radius: 8px; padding: 16px; margin: 20px 0; color: #92400e;">
@@ -874,8 +874,9 @@ export function adminEventCompletedEmail(data: {
         ${blockers.map((item) => `<li>${item}</li>`).join('')}
       </ul>
     </div>` : `
-    <div class="note-box">
-      <p style="margin:0;">Nothing is blocking this payout. It queues for your approval once the hold clears.</p>
+    <div style="background-color: #ecfdf5; border-radius: 8px; padding: 16px; margin: 20px 0; color: #065f46;">
+      <strong>Ready to pay out now.</strong> This organiser is verified with a bank account on file.
+      You can review and release immediately — there is no need to wait out the settlement window.
     </div>`}
 
     <div class="highlight-box">
@@ -904,14 +905,14 @@ export function adminEventCompletedEmail(data: {
         <span class="detail-value">${data.ziyawaNet}</span>
       </div>
       <div class="detail-row">
-        <span class="detail-label">Releases</span>
+        <span class="detail-label">Releases automatically</span>
         <span class="detail-value">${data.holdClearsOn}</span>
       </div>
     </div>
 
     <p style="text-align: center;">
       <a href="${data.adminUrl}" class="button">
-        Open in admin
+        ${blockers.length > 0 ? 'Open in admin' : 'Review and pay out'}
       </a>
     </p>
   `;

@@ -409,7 +409,6 @@ export async function sendEventCompletedEmail(
     ticketsSold: number;
     grossSales: string;
     yourEarnings: string;
-    holdClearsOn: string;
     isVerified: boolean;
     completedByAdmin?: boolean;
     recipientId?: string;
@@ -425,6 +424,7 @@ export async function sendEventCompletedEmail(
       ...templateData,
       verifyUrl: `${SITE_URL}/dashboard/settings?tab=verification`,
       earningsUrl: `${SITE_URL}/earnings`,
+      termsUrl: `${SITE_URL}/terms`,
     }),
     emailType: 'automated',
     recipientIds: recipientId ? [recipientId] : [],

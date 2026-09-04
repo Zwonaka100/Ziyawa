@@ -51,6 +51,7 @@ import {
   Ban,
   Eye,
   Loader2,
+  Banknote,
   Flag,
   Trash2,
   Users,
@@ -157,6 +158,7 @@ export function AdminEventDetail({
   initialReports: ReportSummary[]
 }) {
   const router = useRouter()
+  const [releasingFunds, setReleasingFunds] = useState(false)
 
   // Seeded from the server render — no empty first paint, no fetch on mount.
   const [event, setEvent] = useState<EventDetail | null>(initialEvent)
@@ -500,6 +502,28 @@ export function AdminEventDetail({
   const lifecycleStatus = getEventLifecycleStatus(event)
   const revenue = bookings.reduce((sum, b) => sum + (b.total_amount || 0), 0)
 
+  const handleReleaseFunds = async () => {
+    const confirmed = window.confirm(
+      "Release this event's held funds now, without waiting out the settlement " +
+      'window? This queues the payout for your approval. It does not send any ' +
+      'money on its own.'
+    )
+    if (!confirmed) return
+
+    try {
+      setReleasingFunds(true)
+      const res = await fetch(`/api/admin/events/${event.id}/release-funds`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Could not release the funds')
+      toast.success(data.message || 'Funds released.', { duration: 8000 })
+      router.refresh()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not release the funds')
+    } finally {
+      setReleasingFunds(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -587,6 +611,23 @@ export function AdminEventDetail({
               <XCircle className="h-4 w-4 mr-2" />
               Cancel
             </Button>
+
+            {/* The settlement window guards money nobody has examined. An admin
+                who has read this page and decided to pay is a better check than
+                a timer, so they can skip it. */}
+            {event.state === 'completed' && (
+              <Button
+                onClick={() => handleReleaseFunds()}
+                variant="outline"
+                className="text-green-700 border-green-300 hover:bg-green-50"
+                disabled={releasingFunds}
+              >
+                {releasingFunds
+                  ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  : <Banknote className="h-4 w-4 mr-2" />}
+                Release funds now
+              </Button>
+            )}
 
             {event.state !== 'suspended' && (
               <Button onClick={() => openAction('suspend')} variant="outline" className="text-orange-600 border-orange-300 hover:bg-orange-50">

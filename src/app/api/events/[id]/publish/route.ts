@@ -43,6 +43,27 @@ export async function POST(
       return NextResponse.json({ error: 'This event is locked and cannot be moved back to published.' }, { status: 400 })
     }
 
+    // Verification gates publishing, not just getting paid. A database trigger
+    // enforces this for every path; checking here as well means the organiser
+    // gets a sentence they can act on rather than a raw constraint error.
+    const { data: publisher } = await supabaseAdmin
+      .from('profiles')
+      .select('is_verified, is_admin')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (!publisher?.is_verified && !publisher?.is_admin) {
+      return NextResponse.json(
+        {
+          error: 'Verify your account before publishing',
+          reason:
+            'We verify every organiser before their event goes live, so ticket buyers know who they are paying and we can settle your earnings without delay. It takes a few minutes and needs your ID and bank details.',
+          action: { label: 'Verify my account', href: '/dashboard/settings?tab=verification' },
+        },
+        { status: 403 }
+      )
+    }
+
     const { data: updated, error: updateError } = await supabaseAdmin
       .from('events')
       .update({

@@ -311,15 +311,25 @@ function needsManualReview(amountCents: number) {
   return amountCents / 100 >= MANUAL_REVIEW_THRESHOLD_RANDS
 }
 
-function canReleaseEventTransaction(event: EventReleaseCandidate, tx: HeldTransaction) {
+function canReleaseEventTransaction(
+  event: EventReleaseCandidate,
+  tx: HeldTransaction,
+  bypassHold = false
+) {
   if (event.state !== 'completed' || event.cancelled_at) return false
   if (!(event.organizer_completed_at || event.admin_completed_at || event.completed_at)) return false
 
-  const holdUntil = event.payout_hold_until || calculateHoldUntil(event.completed_at || event.event_date, DEFAULT_EVENT_HOLD_HOURS)
-  if (new Date(holdUntil).getTime() > Date.now()) return false
+  // The settlement window is a safety net for money nobody has looked at. An
+  // admin who has opened the event, checked the organiser and decided to pay is
+  // a better check than a timer, so they can release now rather than wait for
+  // it. Only an authenticated admin route can pass bypassHold.
+  if (!bypassHold) {
+    const holdUntil = event.payout_hold_until || calculateHoldUntil(event.completed_at || event.event_date, DEFAULT_EVENT_HOLD_HOURS)
+    if (new Date(holdUntil).getTime() > Date.now()) return false
 
-  if (needsManualReview(tx.net_amount || tx.amount) && !event.admin_completed_at) {
-    return false
+    if (needsManualReview(tx.net_amount || tx.amount) && !event.admin_completed_at) {
+      return false
+    }
   }
 
   return true
@@ -435,6 +445,11 @@ export async function releaseEligibleHeldFunds(options?: {
   eventId?: string
   bookingId?: string
   providerBookingId?: string
+  /**
+   * Release without waiting out the settlement window. Admin-initiated only —
+   * every caller that reaches this from a user request leaves it unset.
+   */
+  bypassHold?: boolean
 }): Promise<ReleaseResult> {
   let query = supabaseAdmin
     .from('transactions')
@@ -485,7 +500,7 @@ export async function releaseEligibleHeldFunds(options?: {
           continue
         }
 
-        if (!canReleaseEventTransaction(event as EventReleaseCandidate, transaction)) {
+        if (!canReleaseEventTransaction(event as EventReleaseCandidate, transaction, options?.bypassHold)) {
           result.skipped += 1
           continue
         }
