@@ -876,7 +876,8 @@ export function adminEventCompletedEmail(data: {
     </div>` : `
     <div style="background-color: #ecfdf5; border-radius: 8px; padding: 16px; margin: 20px 0; color: #065f46;">
       <strong>Ready to pay out now.</strong> This organiser is verified with a bank account on file.
-      You can review and release immediately — there is no need to wait out the settlement window.
+      You can review and pay immediately — the window is for review, not a required wait. Nothing is
+      ever paid without an admin approving it, before or after that date.
     </div>`}
 
     <div class="highlight-box">
@@ -905,7 +906,7 @@ export function adminEventCompletedEmail(data: {
         <span class="detail-value">${data.ziyawaNet}</span>
       </div>
       <div class="detail-row">
-        <span class="detail-label">Releases automatically</span>
+        <span class="detail-label">Review window closes</span>
         <span class="detail-value">${data.holdClearsOn}</span>
       </div>
     </div>
