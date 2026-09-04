@@ -181,7 +181,10 @@ const CENTS = 100
 /** A checkout that never completed leaves its transaction in this state. */
 const ABANDONED_STATES = ['initiated']
 
-export const TRADING_PERIODS = [7, 30, 90] as const
+// 0 means all time. At this stage every sale can be older than a 30-day
+// window, and a dashboard that answers "how is the business doing" with R0.00
+// while R260 of real trade exists is worse than no dashboard.
+export const TRADING_PERIODS = [7, 30, 90, 0] as const
 export type TradingPeriod = (typeof TRADING_PERIODS)[number]
 
 export interface TradingFigure {
@@ -218,12 +221,34 @@ const figure = (value: number, previous: number): TradingFigure => ({
 const daysSince = (iso: string | null | undefined): number | null =>
   iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000) : null
 
+/**
+ * Whether there has been any real trade in the last 30 days.
+ *
+ * Decides the dashboard's default window: a rolling period is the right view
+ * once sales are regular, and actively misleading before then.
+ */
+export async function hasRecentSales(days = 30): Promise<boolean> {
+  const { count } = await createAdminServiceClient()
+    .from('transactions')
+    .select('id', { count: 'exact', head: true })
+    .eq('type', 'ticket_purchase')
+    .not('state', 'in', `(${ABANDONED_STATES.join(',')})`)
+    .gte('created_at', new Date(Date.now() - days * 86_400_000).toISOString())
+  return (count ?? 0) > 0
+}
+
 export async function loadTrading(days: TradingPeriod = 30): Promise<TradingData> {
   const db = createAdminServiceClient()
 
   const now = Date.now()
-  const periodStart = new Date(now - days * 86_400_000).toISOString()
-  const priorStart = new Date(now - days * 2 * 86_400_000).toISOString()
+  const allTime = days === 0
+  // Far enough back to cover everything; the query shape stays identical.
+  const periodStart = allTime
+    ? new Date(0).toISOString()
+    : new Date(now - days * 86_400_000).toISOString()
+  const priorStart = allTime
+    ? new Date(0).toISOString()
+    : new Date(now - days * 2 * 86_400_000).toISOString()
 
   const [current, prior, lastSale, lastAttempt, signups, events] = await Promise.all([
     db
@@ -415,7 +440,7 @@ export async function loadBlockedMoney(): Promise<{
       .order('submitted_at', { ascending: false }),
     db
       .from('payout_requests')
-      .select('user_id')
+      .select('user_id, status')
       .in('user_id', ids)
       .in('status', ['pending', 'approved', 'processing']),
   ])
@@ -423,7 +448,14 @@ export async function loadBlockedMoney(): Promise<{
   const hasRecipient = new Set(
     (accounts || []).filter((a) => a.paystack_recipient_code).map((a) => a.profile_id)
   )
-  const queued = new Set((openPayouts || []).map((r) => r.user_id))
+  // "Queued" and "already sent" need different words: one is waiting on the
+  // admin, the other is waiting on a bank.
+  const awaitingApproval = new Set(
+    (openPayouts || []).filter((r) => r.status === 'pending').map((r) => r.user_id)
+  )
+  const inFlight = new Set(
+    (openPayouts || []).filter((r) => r.status !== 'pending').map((r) => r.user_id)
+  )
   const latestVerification = new Map<string, string>()
   for (const row of verifications || []) {
     if (!latestVerification.has(row.profile_id)) latestVerification.set(row.profile_id, row.status)
@@ -438,9 +470,15 @@ export async function loadBlockedMoney(): Promise<{
     let reason: BlockedMoneyRow['reason']
     let label: string
 
-    if (queued.has(profile.id)) {
+    if (awaitingApproval.has(profile.id)) {
       reason = 'queued'
       label = 'Queued for your approval'
+    } else if (inFlight.has(profile.id)) {
+      reason = 'queued'
+      label = 'Approved - on its way to their bank'
+    } else if (availableRands <= 0 && pendingPayoutRands > 0) {
+      reason = 'queued'
+      label = 'Approved - on its way to their bank'
     } else if (availableRands <= 0) {
       // Nothing payable yet — the money is still inside its settlement hold.
       reason = 'in_hold'

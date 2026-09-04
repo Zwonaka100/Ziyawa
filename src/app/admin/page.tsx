@@ -16,6 +16,7 @@ import {
   loadDashboard,
   loadForwardView,
   loadTrading,
+  hasRecentSales,
   TRADING_PERIODS,
   type TradingPeriod,
 } from '@/lib/admin/dashboard'
@@ -41,9 +42,13 @@ export default async function AdminDashboard({
 }) {
   const params = await searchParams
   const requested = Number(params.days)
+  // Default to all time until there is enough recent trade for a window to be
+  // meaningful. With every sale older than 30 days, the default view reported
+  // R0.00 across the board and showed the real R260.00 only as a "previous
+  // period" figure in brackets - which reads as a business with no money.
   const days: TradingPeriod = (TRADING_PERIODS as readonly number[]).includes(requested)
     ? (requested as TradingPeriod)
-    : 30
+    : ((await hasRecentSales()) ? 30 : 0)
 
   const [data, trading, forward, blocked] = await Promise.all([
     loadDashboard(),
@@ -76,7 +81,7 @@ export default async function AdminDashboard({
       icon: Banknote,
       queue: data.payouts,
       amountLabel: 'Requested',
-      whenEmpty: 'Withdrawal requests land here for approval before any money moves.',
+      whenEmpty: 'Payouts land here for your approval once an event clears review. Nothing moves without you.',
     },
     {
       title: 'Refunds queued',
@@ -115,9 +120,14 @@ export default async function AdminDashboard({
   // Owed against what is actually in the Paystack balance. Transfers are funded
   // from that balance, so if it is lower, approving everything queued would
   // fail at Paystack rather than here.
+  // Money already sent has left the Paystack balance, so counting it as still
+  // owed reports a shortfall twice over. With R180 in flight and R40.50 held,
+  // this claimed the balance was R159.99 short when the only money still to
+  // find was R40.50.
+  const stillToFundRands = money.heldRands + money.availableRands
   const shortfall =
     money.paystackBalanceRands !== null
-      ? money.paystackBalanceRands - money.totalOwedRands
+      ? money.paystackBalanceRands - stillToFundRands
       : null
 
   const alerts: { text: string; href?: string }[] = []
@@ -135,14 +145,14 @@ export default async function AdminDashboard({
     trading.checkoutsAttempted > 0
   ) {
     alerts.push({
-      text: `Only ${trading.checkoutsCompleted} of ${trading.checkoutsAttempted} checkouts completed in the last ${days} days (${trading.completionPct}%). The rest were started and abandoned before payment.`,
+      text: `Only ${trading.checkoutsCompleted} of ${trading.checkoutsAttempted} checkouts completed ${days === 0 ? 'in total' : `in the last ${days} days`} (${trading.completionPct}%). The rest were started and abandoned before payment.`,
       href: '/admin/finance/transactions',
     })
   }
 
   if (shortfall !== null && shortfall < 0) {
     alerts.push({
-      text: `Paystack balance is ${formatMoneyExact(Math.abs(shortfall))} short of what is owed to people.`,
+      text: `Paystack balance is ${formatMoneyExact(Math.abs(shortfall))} short of what still has to be paid out. Money already sent is not counted here.`,
       href: '/admin/finance/payouts',
     })
   }
@@ -164,7 +174,9 @@ export default async function AdminDashboard({
           <div>
             <h2 className="text-2xl font-bold">Trading</h2>
             <p className="text-muted-foreground text-sm">
-              Compared with the previous {days} days.
+              {days === 0
+                ? 'Everything since Ziyawa opened.'
+                : `Compared with the previous ${days} days.`}
             </p>
           </div>
           <div className="flex gap-1 rounded-lg border p-1">
@@ -179,7 +191,7 @@ export default async function AdminDashboard({
                     : 'hover:bg-muted text-muted-foreground'
                 }`}
               >
-                {p} days
+                {p === 0 ? 'All time' : `${p} days`}
               </Link>
             ))}
           </div>
@@ -324,7 +336,7 @@ export default async function AdminDashboard({
               <span className="font-medium">{formatMoneyExact(money.heldRands)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Available to withdraw</span>
+              <span className="text-muted-foreground">Released and ready to pay out</span>
               <span className="font-medium">{formatMoneyExact(money.availableRands)}</span>
             </div>
             <div className="flex justify-between text-sm">
