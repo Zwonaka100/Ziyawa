@@ -433,10 +433,18 @@ async function releaseTransactionToWallet(
     sendEmail: true,
   })
 
-  // Funds are now available — queue them for admin approval. Nothing is sent
-  // here; an admin still has to approve before any transfer happens.
-  await enqueuePayoutRequest(transaction.recipient_id)
-
+  // Deliberately does NOT queue the payout here.
+  //
+  // This used to call enqueuePayoutRequest per transaction, and that queued
+  // HALF an organiser's money. An event with two R90 sales released the first,
+  // enqueued R90 against a wallet balance that was only R90 so far, then
+  // released the second — at which point enqueue found the existing pending
+  // request and returned 'already_queued'. The organiser was paid R90 of the
+  // R180 they were owed, and the rest sat in their balance with a queued
+  // request that would never grow. It reached a real payout before it was
+  // caught.
+  //
+  // Queueing now happens once, after the whole sweep, in releaseEligibleHeldFunds.
   return releaseAmountRands
 }
 
@@ -480,6 +488,11 @@ export async function releaseEligibleHeldFunds(options?: {
     failures: [],
     blockedByObligations: [],
   }
+
+  // Everyone who had money released in this sweep. Queued once at the end, so
+  // a recipient with several sales is queued for the full amount rather than
+  // whatever had landed by the time the first one finished.
+  const releasedTo = new Set<string>()
 
   for (const transaction of (transactions || []) as HeldTransaction[]) {
     try {
@@ -525,6 +538,7 @@ export async function releaseEligibleHeldFunds(options?: {
         )
 
         result.released += 1
+        if (transaction.recipient_id) releasedTo.add(transaction.recipient_id)
         continue
       }
 
@@ -576,6 +590,7 @@ export async function releaseEligibleHeldFunds(options?: {
         )
 
         result.released += 1
+        if (transaction.recipient_id) releasedTo.add(transaction.recipient_id)
         continue
       }
 
@@ -585,6 +600,15 @@ export async function releaseEligibleHeldFunds(options?: {
         reference: transaction.reference,
         reason: releaseError instanceof Error ? releaseError.message : 'Unknown release error',
       })
+    }
+  }
+
+  // One queue per recipient, once every release in this sweep has landed, so
+  // the request is for the whole balance rather than a partial one.
+  for (const recipientId of releasedTo) {
+    const outcome = await enqueuePayoutRequest(recipientId)
+    if (outcome === 'error') {
+      result.failures.push({ reference: 'enqueue', reason: `Could not queue a payout for ${recipientId}` })
     }
   }
 

@@ -38,9 +38,27 @@ export async function POST(request: NextRequest) {
     const payloadText = await request.text()
     const signature = request.headers.get('x-paystack-signature') || ''
 
-    // Reject unsigned/untrusted approval calls.
-    if (!verifyWebhookSignature(payloadText, signature)) {
+    // A signature, when Paystack sends one, must be correct. When it does not,
+    // the request still has to be answered.
+    //
+    // This endpoint used to refuse anything unsigned with a 401. Paystack reads
+    // any non-200 as "reject", so a real R90 payout to a real organiser was
+    // blocked at 13:46 on 4 Sep — the transfer never left, the money bounced
+    // back, and the only trace was a 401 in the logs.
+    //
+    // Refusing unsigned calls bought nothing anyway. This endpoint cannot move
+    // money; it can only answer yes or no about a transfer Paystack was already
+    // asked to make, and initiating one needs the secret key. The real control
+    // is below: the transfer must match a payout row this system created, by
+    // reference, exact amount and recipient. An attacker who cannot create that
+    // row cannot get a yes out of this.
+    if (signature && !verifyWebhookSignature(payloadText, signature)) {
+      console.error('Transfer approval refused: signature present but invalid')
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+    }
+
+    if (!signature) {
+      console.warn('Transfer approval arrived unsigned - validating against our own payout record instead')
     }
 
     const payload = JSON.parse(payloadText) as TransferApprovalPayload
@@ -60,23 +78,28 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error || !transaction) {
+      console.error('Transfer approval refused: no payout transaction with this reference', { reference })
       return NextResponse.json({ error: 'Unknown transfer reference' }, { status: 400 })
     }
 
     if (!['initiated', 'released'].includes(transaction.state)) {
+      console.error('Transfer approval refused: state not approvable', { reference, state: transaction.state })
       return NextResponse.json({ error: 'Transfer state not approvable' }, { status: 400 })
     }
 
     const expectedAmountCents = Number(transaction.net_amount || 0)
     if (transferAmountCents !== expectedAmountCents) {
+      console.error('Transfer approval refused: amount mismatch', { reference, expectedAmountCents, transferAmountCents })
       return NextResponse.json({ error: 'Transfer amount mismatch' }, { status: 400 })
     }
 
     const gatewayResponse = (transaction.gateway_response || {}) as { recipient_code?: string }
     if (recipientCode && gatewayResponse.recipient_code && recipientCode !== gatewayResponse.recipient_code) {
+      console.error('Transfer approval refused: recipient mismatch', { reference })
       return NextResponse.json({ error: 'Recipient mismatch' }, { status: 400 })
     }
 
+    console.log('Transfer approval granted', { reference, amountCents: transferAmountCents })
     return NextResponse.json({ approved: true }, { status: 200 })
   } catch {
     return NextResponse.json({ error: 'Approval check failed' }, { status: 400 })
