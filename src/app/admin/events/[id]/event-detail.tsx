@@ -61,10 +61,31 @@ import {
   Upload,
 } from 'lucide-react'
 import { format } from 'date-fns'
-import { formatCurrency } from '@/lib/helpers'
+import { formatCurrency, formatMoneyExact } from '@/lib/helpers'
 import { toast } from 'sonner'
 import { CompletionDialog } from '@/components/admin/completion-dialog'
+import type { EventSale, EventReview, EventBooking } from '@/lib/admin/event-detail'
+
+type EventMoney = {
+  grossRands: number
+  paystackFeesRands: number
+  ziyawaFeesRands: number
+  ziyawaNetRands: number
+  organiserRands: number
+  heldRands: number
+  releasedRands: number
+}
+
 import { PayoutReviewDialog } from '@/components/admin/payout-review-dialog'
+
+function MoneyRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 py-1">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className={strong ? 'text-base font-semibold tabular-nums' : 'text-sm tabular-nums'}>{value}</span>
+    </div>
+  )
+}
 
 interface EventDetail {
   id: string
@@ -152,11 +173,23 @@ export function AdminEventDetail({
   initialEvent,
   initialBuyers,
   initialReports,
+  sales,
+  money,
+  reviews,
+  averageRating,
+  eventBookings,
+  attendance,
 }: {
   eventId: string
   initialEvent: EventDetail
   initialBuyers: BookingSummary[]
   initialReports: ReportSummary[]
+  sales: EventSale[]
+  money: EventMoney
+  reviews: EventReview[]
+  averageRating: number | null
+  eventBookings: EventBooking[]
+  attendance: { issued: number; checkedIn: number }
 }) {
   const router = useRouter()
   const [payoutReviewOpen, setPayoutReviewOpen] = useState(false)
@@ -599,13 +632,6 @@ export function AdminEventDetail({
             </Button>
 
 
-            {event.state !== 'suspended' && (
-              <Button onClick={() => openAction('suspend')} variant="outline" className="text-orange-600 border-orange-300 hover:bg-orange-50">
-                <Ban className="h-4 w-4 mr-2" />
-                Suspend
-              </Button>
-            )}
-
             <Button onClick={() => openAction('delete')} variant="destructive">
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
@@ -671,13 +697,133 @@ export function AdminEventDetail({
       </div>
 
       {/* Content Tabs */}
-      <Tabs defaultValue="details">
-        <TabsList>
-          <TabsTrigger value="details">Details</TabsTrigger>
-          <TabsTrigger value="organizer">Organizer</TabsTrigger>
-          <TabsTrigger value="bookings">Bookings ({bookings.length})</TabsTrigger>
-          <TabsTrigger value="reports">Reports ({reports.length})</TabsTrigger>
+      <Tabs defaultValue="money">
+        {/* One scrollable strip rather than a wrapping one: six tabs cannot fit
+            a phone, and admin gets used on a phone. */}
+        <TabsList className="w-full justify-start gap-1 overflow-x-auto flex-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <TabsTrigger value="money" className="flex-none shrink-0">Money</TabsTrigger>
+          <TabsTrigger value="details" className="flex-none shrink-0">Details</TabsTrigger>
+          <TabsTrigger value="organizer" className="flex-none shrink-0">Organizer</TabsTrigger>
+          <TabsTrigger value="bookings" className="flex-none shrink-0">Buyers ({bookings.length})</TabsTrigger>
+          <TabsTrigger value="reviews" className="flex-none shrink-0">Reviews ({reviews.length})</TabsTrigger>
+          <TabsTrigger value="reports" className="flex-none shrink-0">Reports ({reports.length})</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="money" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Where the money went</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1">
+              <MoneyRow label={`Buyers paid (${sales.length} sale${sales.length === 1 ? "" : "s"})`} value={formatMoneyExact(money.grossRands)} />
+              <MoneyRow label="Paystack took" value={"-" + formatMoneyExact(money.paystackFeesRands)} />
+              <MoneyRow label="Ziyawa booking fee" value={"-" + formatMoneyExact(money.ziyawaFeesRands)} />
+              <div className="my-2 border-t" />
+              <MoneyRow label="Organiser earned" value={formatMoneyExact(money.organiserRands)} strong />
+              <MoneyRow label="Ziyawa kept after Paystack" value={formatMoneyExact(money.ziyawaNetRands)} strong />
+              <div className="my-2 border-t" />
+              <MoneyRow label="Still held in escrow" value={formatMoneyExact(money.heldRands)} />
+              <MoneyRow label="Released to the organiser" value={formatMoneyExact(money.releasedRands)} />
+              <MoneyRow label="Checked in at the door" value={`${attendance.checkedIn} of ${attendance.issued}`} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Every ticket sold</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {sales.length === 0 ? (
+                <p className="px-6 pb-6 text-sm text-muted-foreground">No completed sales on this event.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[560px] text-sm">
+                    <thead className="bg-muted/50 text-xs text-muted-foreground">
+                      <tr>
+                        <th className="px-4 py-2 text-left font-medium">Buyer</th>
+                        <th className="px-4 py-2 text-right font-medium">Paid</th>
+                        <th className="px-4 py-2 text-right font-medium">Paystack</th>
+                        <th className="px-4 py-2 text-right font-medium">Ziyawa</th>
+                        <th className="px-4 py-2 text-right font-medium">Organiser</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sales.map((sale) => (
+                        <tr key={sale.reference} className="border-t">
+                          <td className="px-4 py-2">
+                            <span className="block">{sale.buyerName}</span>
+                            <span className="text-xs text-muted-foreground">{sale.reference}</span>
+                          </td>
+                          <td className="px-4 py-2 text-right tabular-nums">{formatMoneyExact(sale.paidRands)}</td>
+                          <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{formatMoneyExact(sale.paystackFeeRands)}</td>
+                          <td className="px-4 py-2 text-right tabular-nums text-muted-foreground">{formatMoneyExact(sale.ziyawaFeeRands)}</td>
+                          <td className="px-4 py-2 text-right font-medium tabular-nums">{formatMoneyExact(sale.organiserRands)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {eventBookings.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Artists and crew booked</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {eventBookings.map((booking) => (
+                  <div key={booking.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm">
+                    <div>
+                      <span className="font-medium">{booking.who}</span>
+                      <span className="ml-2 text-xs text-muted-foreground">{booking.kind}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge variant="outline">{booking.state}</Badge>
+                      <span className="font-medium tabular-nums">{formatMoneyExact(booking.amountRands)}</span>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="reviews" className="mt-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">
+                Attendee reviews
+                {averageRating !== null && (
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    {averageRating.toFixed(1)} out of 5
+                  </span>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {reviews.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nobody has reviewed this event yet. Reviews are requested by email afterwards.
+                </p>
+              ) : (
+                reviews.map((review) => (
+                  <div key={review.id} className="rounded-lg border p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-sm font-medium">{review.reviewerName}</span>
+                      <span className="text-sm tabular-nums">{review.rating} / 5</span>
+                    </div>
+                    {review.comment && <p className="mt-1 text-sm text-muted-foreground">{review.comment}</p>}
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {format(new Date(review.createdAt), 'd MMM yyyy')}
+                    </p>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="details" className="space-y-4 mt-4">
           <div className="grid gap-6 lg:grid-cols-3">

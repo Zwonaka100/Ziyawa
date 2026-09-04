@@ -8,16 +8,22 @@ export default async function AdminEventDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const { event, buyers, reports } = await loadAdminEventDetail(id)
+  const detail = await loadAdminEventDetail(id)
 
-  if (!event) notFound()
+  if (!detail.event) notFound()
 
   return (
     <AdminEventDetail
       eventId={id}
-      initialEvent={event as never}
-      initialBuyers={buyers as never}
-      initialReports={reports as never}
+      initialEvent={detail.event as never}
+      initialBuyers={detail.buyers as never}
+      initialReports={detail.reports as never}
+      sales={detail.sales}
+      money={detail.money}
+      reviews={detail.reviews}
+      averageRating={detail.averageRating}
+      eventBookings={detail.eventBookings}
+      attendance={detail.attendance}
     />
   )
 }

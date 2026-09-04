@@ -280,8 +280,24 @@ export async function loadEventPayoutReview(eventId: string): Promise<EventPayou
     flags.push({ level: 'warning', title: 'An admin completed this, not the organiser', detail: 'The organiser has not personally confirmed the event went ahead.' })
   }
 
-  if (!holdElapsed && holdUntil) {
-    flags.push({ level: 'note', title: 'Still inside the review window', detail: `It would release automatically on ${holdUntil.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long' })}. Approving now is intended — the window is for review, not a required wait.` })
+  // The window never sends money on its own. When it closes, the funds are
+  // released and queued — an admin still approves every transfer. Saying it
+  // "releases automatically" reads as though payment happens without anyone.
+  if (holdUntil) {
+    const when = holdUntil.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long' })
+    flags.push(
+      holdElapsed
+        ? {
+            level: 'note',
+            title: 'Review window closed',
+            detail: `The window closed on ${when}. Nothing has been paid — approving is still up to you, but there is no reason left to wait.`,
+          }
+        : {
+            level: 'note',
+            title: 'Still inside the review window',
+            detail: `It closes on ${when}, when this queues for your approval. No money moves on its own either way — approving now is perfectly normal, the window is for review, not a required wait.`,
+          }
+    )
   }
   if ((paidBefore || []).length === 0) {
     flags.push({ level: 'note', title: "This is the organiser's first payout", detail: 'Nothing has ever been sent to this bank account before.' })

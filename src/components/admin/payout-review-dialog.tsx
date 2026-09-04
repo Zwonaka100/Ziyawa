@@ -182,7 +182,7 @@ export function PayoutReviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[92vh] w-[calc(100vw-1.5rem)] max-w-2xl overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>Review payout</DialogTitle>
           <DialogDescription>
@@ -203,7 +203,7 @@ export function PayoutReviewDialog({
             {/* Headline */}
             <div className="rounded-lg border bg-muted/40 p-4">
               <p className="text-xs text-muted-foreground">Pay the organiser</p>
-              <p className="mt-1 text-3xl font-bold tabular-nums">
+              <p className="mt-1 text-2xl font-bold tabular-nums sm:text-3xl">
                 {formatMoneyExact(review.balances.payoutNowRands)}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -273,40 +273,6 @@ export function PayoutReviewDialog({
               </div>
             </div>
 
-            {/* Every sale */}
-            {review.sales.length > 0 && (
-              <div>
-                <h4 className="mb-1 text-sm font-semibold">Every ticket sold</h4>
-                <div className="overflow-x-auto rounded-lg border">
-                  <table className="w-full text-xs">
-                    <thead className="bg-muted/50 text-muted-foreground">
-                      <tr>
-                        <th className="px-3 py-2 text-left font-medium">Buyer</th>
-                        <th className="px-3 py-2 text-right font-medium">Paid</th>
-                        <th className="px-3 py-2 text-right font-medium">Paystack</th>
-                        <th className="px-3 py-2 text-right font-medium">Ziyawa</th>
-                        <th className="px-3 py-2 text-right font-medium">Organiser</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {review.sales.map((s) => (
-                        <tr key={s.reference} className="border-t">
-                          <td className="px-3 py-2">
-                            <span className="block">{s.buyerName}</span>
-                            <span className="text-muted-foreground">{s.reference}</span>
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums">{formatMoneyExact(s.paidRands)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{formatMoneyExact(s.paystackFeeRands)}</td>
-                          <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{formatMoneyExact(s.ziyawaFeeRands)}</td>
-                          <td className="px-3 py-2 text-right font-medium tabular-nums">{formatMoneyExact(s.organiserRands)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
             {/* Decline reasons */}
             {declining && (
               <div className="space-y-2 rounded-lg border border-amber-300 bg-amber-50/60 p-3">
@@ -342,19 +308,20 @@ export function PayoutReviewDialog({
           </div>
         )}
 
-        <DialogFooter className="gap-2 sm:justify-between">
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={working}>
+        <DialogFooter className="mt-2 flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+          <Button variant="ghost" className="w-full sm:w-auto" onClick={() => onOpenChange(false)} disabled={working}>
             Close
           </Button>
-          <div className="flex gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
             {!declining ? (
-              <Button variant="outline" className="text-red-600" onClick={() => setDeclining(true)} disabled={working || !review}>
+              <Button variant="outline" className="w-full text-red-600 sm:w-auto" onClick={() => setDeclining(true)} disabled={working || !review}>
                 <Ban className="mr-2 h-4 w-4" />
                 Decline
               </Button>
             ) : (
               <Button
                 variant="destructive"
+                className="w-full sm:w-auto"
                 onClick={decline}
                 disabled={working || (codes.length === 0 && !note.trim())}
               >
@@ -364,7 +331,7 @@ export function PayoutReviewDialog({
             )}
             {!declining && (
               <Button
-                className="bg-green-600 text-white hover:bg-green-700"
+                className="w-full bg-green-600 text-white hover:bg-green-700 sm:w-auto"
                 onClick={approve}
                 disabled={working || !review?.canPayOut}
                 title={review && !review.canPayOut ? 'Something is blocking this payout' : undefined}
