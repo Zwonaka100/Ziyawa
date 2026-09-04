@@ -224,6 +224,35 @@ export function PayoutReviewDialog({
               </div>
             </div>
 
+            {(review.payoutInFlight || review.alreadyPaid) && (
+              <div className="rounded-lg border border-green-300 bg-green-50 p-3">
+                <div className="flex gap-2.5">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-700" />
+                  <div className="text-sm text-green-900">
+                    {review.payoutInFlight ? (
+                      <>
+                        <p className="font-medium">Already approved</p>
+                        <p className="mt-0.5 text-xs">
+                          {formatMoneyExact(review.payoutInFlight.amountRands)} is {review.payoutInFlight.status} and
+                          on its way to their bank. Nothing more to do here.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-medium">Paid</p>
+                        <p className="mt-0.5 text-xs">
+                          {formatMoneyExact(review.alreadyPaid!.amountRands)} reached their bank
+                          {review.alreadyPaid!.completedAt
+                            ? ` on ${new Date(review.alreadyPaid!.completedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long' })}`
+                            : ''}.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Anything worth knowing */}
             {(blockers.length > 0 || others.length > 0) && (
               <div className="space-y-2">
@@ -337,7 +366,9 @@ export function PayoutReviewDialog({
                 title={review && !review.canPayOut ? 'Something is blocking this payout' : undefined}
               >
                 {working ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                Approve and pay {review ? formatMoneyExact(review.balances.payoutNowRands) : ''}
+                {review?.payoutInFlight
+                  ? 'Already approved'
+                  : `Approve and pay ${review ? formatMoneyExact(review.balances.payoutNowRands) : ''}`}
               </Button>
             )}
           </div>

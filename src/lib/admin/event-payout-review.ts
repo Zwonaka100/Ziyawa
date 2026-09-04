@@ -109,6 +109,12 @@ export interface EventPayoutReview {
   canPayOut: boolean
   /** An existing queued payout, if the nightly job already made one. */
   existingPayoutRequestId: string | null
+  /**
+   * A payout already sent or in flight for this organiser. Approving again
+   * would be a second transfer and a second fee, so the button turns off.
+   */
+  payoutInFlight: { id: string; status: string; amountRands: number } | null
+  alreadyPaid: { id: string; amountRands: number; completedAt: string | null } | null
 }
 
 export async function loadEventPayoutReview(eventId: string): Promise<EventPayoutReview | null> {
@@ -168,11 +174,11 @@ export async function loadEventPayoutReview(eventId: string): Promise<EventPayou
     db.from('payout_requests').select('id').eq('user_id', organiserId).eq('status', 'completed'),
     db
       .from('payout_requests')
-      .select('id')
+      .select('id, status, amount, completed_at')
       .eq('user_id', organiserId)
-      .in('status', ['pending', 'approved', 'processing'])
-      .limit(1)
-      .maybeSingle(),
+      .in('status', ['pending', 'approved', 'processing', 'completed'])
+      .order('requested_at', { ascending: false })
+      .limit(5),
     fetchPaystackBalanceRands(),
   ])
 
@@ -227,6 +233,13 @@ export async function loadEventPayoutReview(eventId: string): Promise<EventPayou
   const disputedBookings = (artistDisputes || []).length + (crewDisputes || []).length
   const hasRecipient = Boolean(account?.paystack_recipient_code)
 
+  const recentRequests = (openRequest || []) as unknown as {
+    id: string; status: string; amount: number; completed_at: string | null
+  }[]
+  const inFlight = recentRequests.find((r) => ['approved', 'processing'].includes(r.status)) || null
+  const pendingRequest = recentRequests.find((r) => r.status === 'pending') || null
+  const paid = recentRequests.find((r) => r.status === 'completed') || null
+
   const holdUntil = event.payout_hold_until ? new Date(event.payout_hold_until as string) : null
   const holdElapsed = holdUntil ? holdUntil.getTime() <= Date.now() : true
 
@@ -253,6 +266,13 @@ export async function loadEventPayoutReview(eventId: string): Promise<EventPayou
   }
   if (disputedBookings > 0) {
     flags.push({ level: 'blocker', title: `${disputedBookings} disputed booking${disputedBookings === 1 ? '' : 's'} on this event`, detail: 'Settle the dispute before releasing ticket revenue — some of this money may be owed elsewhere.' })
+  }
+  if (inFlight) {
+    flags.push({
+      level: 'blocker',
+      title: 'A payout is already on its way',
+      detail: `R${Number(inFlight.amount).toFixed(2)} is ${inFlight.status}. Approving again would send a second transfer and pay a second fee. Wait for this one to land.`,
+    })
   }
   if (payoutNowRands <= 0) {
     flags.push({ level: 'blocker', title: 'Nothing to pay out', detail: 'This event has no held or payable funds against it.' })
@@ -367,7 +387,13 @@ export async function loadEventPayoutReview(eventId: string): Promise<EventPayou
 
     flags,
     canPayOut: !flags.some((f) => f.level === 'blocker'),
-    existingPayoutRequestId: openRequest?.id ?? null,
+    existingPayoutRequestId: pendingRequest?.id ?? null,
+    payoutInFlight: inFlight
+      ? { id: inFlight.id, status: inFlight.status, amountRands: Number(inFlight.amount) }
+      : null,
+    alreadyPaid: paid
+      ? { id: paid.id, amountRands: Number(paid.amount), completedAt: paid.completed_at }
+      : null,
   }
 }
 

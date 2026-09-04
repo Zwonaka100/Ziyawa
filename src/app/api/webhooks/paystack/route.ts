@@ -18,7 +18,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyWebhookSignature, verifyPayment, generateTicketCode } from '@/lib/paystack';
 import { gatewayFeeColumns, extractTransferFee } from '@/lib/payments/gateway-fees'
-import { adjustProfileBalanceBuckets } from '@/lib/payments/escrow';
+import { adjustProfileBalanceBuckets, enqueuePayoutRequest } from '@/lib/payments/escrow';
 import { createNotification } from '@/lib/notifications';
 import { sendBookingPaymentConfirmedEmail, sendPayoutStatusEmail, sendTicketAssignedEmail, sendTicketPurchasedEmail } from '@/lib/email';
 import { captureServerError, logOpsEvent } from '@/lib/monitoring';
@@ -710,6 +710,24 @@ async function handleTransferSuccess(data: { reference: string; fee?: number }) 
 
   await settlePayoutRequest(reference, { status: 'completed', transferFeeCents });
 
+  // Queue whatever is left over.
+  //
+  // enqueuePayoutRequest refuses while a request is open, so any money released
+  // during this transfer had nowhere to go. Without this it sits payable until
+  // some unrelated future release happens to trigger a queue — the same
+  // stranding that left an organiser's balance stuck before. Paying the whole
+  // outstanding balance in one transfer is also what keeps this to one R3.45
+  // fee instead of several.
+  if (transaction.payer_id) {
+    const outcome = await enqueuePayoutRequest(transaction.payer_id as string);
+    if (outcome === 'queued') {
+      logOpsEvent('paystack-webhook', 'info', 'Queued the remaining balance after a completed payout', {
+        reference,
+        recipient: transaction.payer_id,
+      });
+    }
+  }
+
   if (transaction.payer_id) {
     await createNotification({
       userId: transaction.payer_id,
@@ -824,6 +842,12 @@ async function handleTransferFailed(data: { reference: string; reason: string; f
   // Closes the request so the restored balance can be queued again, rather than
   // stranding the recipient behind a row that never clears.
   await settlePayoutRequest(reference, { status: 'failed', failureReason: reason, transferFeeCents });
+
+  // The money is back on their balance and the request is closed, so it can be
+  // queued again for another attempt rather than waiting on a future release.
+  if (transaction.payer_id) {
+    await enqueuePayoutRequest(transaction.payer_id as string);
+  }
 
   logOpsEvent('paystack-webhook', 'warn', 'Transfer failed and funds restored', { reference, reason });
 }
