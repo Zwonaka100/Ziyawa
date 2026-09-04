@@ -344,42 +344,81 @@ export async function POST(
       // whole pooled wallet balance, so the event→money trail is severed at
       // write time. The releases that made this balance payable are the
       // closest honest answer, so they are what the statement itemises.
+      // Read the real recorded figures rather than deriving them.
+      //
+      // The first version of this took the organiser's NET amounts, called that
+      // "ticket sales", then invented a booking fee as (net - paid) and
+      // hardcoded card fees to zero. Gmaster's statement therefore claimed
+      // R180 of ticket sales, a R90 booking fee and R0.00 to Paystack, when the
+      // truth was R210, R30 and R9.32. Every one of those numbers is stored on
+      // the transaction; none of them needed inventing.
       const { data: released } = await supabaseAdmin
         .from('transactions')
-        .select('net_amount, released_at, event:events(title, event_date)')
+        .select('amount, platform_fee, net_amount, gateway_fee_cents, released_at, recipient_type, event:events(title, event_date)')
         .eq('recipient_id', payoutRequest.user_id)
         .eq('type', 'ticket_purchase')
         .eq('state', 'released')
         .order('released_at', { ascending: false })
-        .limit(20)
+        .limit(200)
 
-      const sources = ((released || []) as unknown as {
+      type ReleasedSale = {
+        amount: number | null
+        platform_fee: number | null
         net_amount: number | null
+        gateway_fee_cents: number | null
+        recipient_type: string | null
         event: { title: string; event_date: string } | null
-      }[])
-        .filter((row) => row.event)
-        .map((row) => ({
-          label: row.event!.title,
-          detail: row.event!.event_date,
-          amountRands: Number(row.net_amount || 0) / 100,
-        }))
+      }
+      const sales = ((released || []) as unknown as ReleasedSale[]).filter((row) => row.event)
 
-      const grossSalesRands = sources.reduce((total, row) => total + row.amountRands, 0)
+      // One line per event, not per ticket: a statement for a fifty-ticket
+      // event should not run to fifty rows.
+      const byEvent = new Map<string, { label: string; detail: string; amountRands: number; tickets: number }>()
+      for (const sale of sales) {
+        const key = `${sale.event!.title}|${sale.event!.event_date}`
+        const entry = byEvent.get(key) ?? {
+          label: sale.event!.title,
+          detail: sale.event!.event_date,
+          amountRands: 0,
+          tickets: 0,
+        }
+        entry.amountRands += Number(sale.net_amount || 0) / 100
+        entry.tickets += 1
+        byEvent.set(key, entry)
+      }
+
+      const sources = [...byEvent.values()].map((entry) => ({
+        label: entry.label,
+        detail: `${entry.tickets} ticket${entry.tickets === 1 ? '' : 's'} · ${new Date(entry.detail).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}`,
+        amountRands: entry.amountRands,
+      }))
+
+      const sumOf = (pick: (row: ReleasedSale) => number | null) =>
+        sales.reduce((total, row) => total + Number(pick(row) || 0), 0) / 100
+
+      const grossSalesRands = sumOf((r) => r.amount)
+      const bookingFeesRands = sumOf((r) => r.platform_fee)
+      const gatewayFeesRands = sumOf((r) => r.gateway_fee_cents)
+
+      // Paid for the role the money was actually earned in. resolveRecipientType
+      // reads profile flags, so an organiser who also has an artist profile was
+      // labelled "Artist" on a statement for their own event's ticket sales.
+      const earnedAs = sales[0]?.recipient_type || resolveRecipientType(profile)
 
       const statementPdf = await buildPayoutStatementPdf({
         reference,
         recipientName: profile.full_name || profile.email,
         recipientEmail: profile.email,
-        recipientRole: RECIPIENT_ROLE_LABEL[resolveRecipientType(profile)] ?? 'Recipient',
+        recipientRole: RECIPIENT_ROLE_LABEL[earnedAs] ?? 'Recipient',
         amountRands,
         bankName: payoutAccount.bank_name || 'Bank',
         accountLast4: String(payoutAccount.account_number || '').slice(-4),
         accountHolder: payoutAccount.account_holder || profile.full_name || '',
         approvedAt: new Date(now),
         sources,
-        grossSalesRands: grossSalesRands || amountRands,
-        bookingFeesRands: Math.max(0, (grossSalesRands || amountRands) - amountRands),
-        gatewayFeesRands: 0,
+        grossSalesRands,
+        bookingFeesRands,
+        gatewayFeesRands,
       })
 
       const emailResult = await sendPayoutStatementEmail(profile.email, {

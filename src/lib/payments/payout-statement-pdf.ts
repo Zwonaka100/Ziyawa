@@ -178,13 +178,34 @@ export async function buildPayoutStatementPdf(data: PayoutStatementData): Promis
   }
 
   // ── How it was worked out ────────────────────────────────────────────────
+  //
+  // This has to add up on the page. Earnings from the sales listed above are
+  // gross less the booking fee; a payout can also carry a balance from earlier
+  // that is not covered by those sales, so that is shown as its own line rather
+  // than quietly making the arithmetic wrong.
+  const earnedHereRands = data.grossSalesRands - data.bookingFeesRands
+  const broughtForwardRands = Math.round((data.amountRands - earnedHereRands) * 100) / 100
+
   page.drawText('HOW IT WAS WORKED OUT', { x: MARGIN, y, size: 8, font: bold, color: MUTED })
   y -= 18
   drawRow(page, y, 'Ticket sales', formatMoneyExact(data.grossSalesRands), fonts); y -= 16
   drawRow(page, y, 'Ziyawa booking fee', `-${formatMoneyExact(data.bookingFeesRands)}`, fonts); y -= 16
+
+  if (Math.abs(broughtForwardRands) >= 0.01) {
+    drawRow(page, y, 'Earnings from these sales', formatMoneyExact(earnedHereRands), fonts); y -= 16
+    drawRow(
+      page,
+      y,
+      broughtForwardRands > 0 ? 'Balance carried from earlier' : 'Kept back for your next payout',
+      `${broughtForwardRands > 0 ? '' : '-'}${formatMoneyExact(Math.abs(broughtForwardRands))}`,
+      fonts
+    )
+    y -= 16
+  }
+
   page.drawLine({ start: { x: MARGIN + 16, y: y + 6 }, end: { x: PAGE_WIDTH - MARGIN - 16, y: y + 6 }, thickness: 0.5, color: RULE })
   y -= 6
-  drawRow(page, y, 'Your earnings', formatMoneyExact(data.amountRands), fonts, { bold: true, size: 11 })
+  drawRow(page, y, 'Paid to you', formatMoneyExact(data.amountRands), fonts, { bold: true, size: 11 })
   y -= 28
 
   page.drawText(
