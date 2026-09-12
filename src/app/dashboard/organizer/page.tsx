@@ -11,8 +11,8 @@ import { BOOKING_STATUS, PROVINCES } from '@/lib/constants'
 import {
   VerificationBadge,
   VerificationStatusBanner,
-  verificationStateFrom,
 } from '@/components/organizer/verification-status'
+import { verificationStateFrom } from '@/lib/verification-state'
 
 export const metadata = {
   title: 'Organizer Dashboard | Ziyawa',
