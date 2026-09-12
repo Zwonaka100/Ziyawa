@@ -16,18 +16,7 @@
 import Link from 'next/link'
 import { ShieldCheck, ShieldAlert, Clock, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-
-export type VerificationState = 'verified' | 'pending' | 'rejected' | 'none'
-
-export function verificationStateFrom(
-  isVerified: boolean | null | undefined,
-  latestRequestStatus?: string | null
-): VerificationState {
-  if (isVerified) return 'verified'
-  if (latestRequestStatus === 'pending') return 'pending'
-  if (latestRequestStatus === 'rejected') return 'rejected'
-  return 'none'
-}
+import {VerificationState, verificationStateFrom} from '@/lib/verification-state'
 
 const VERIFY_HREF = '/dashboard/settings?tab=verification'
 
