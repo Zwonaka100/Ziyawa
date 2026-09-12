@@ -1,4 +1,4 @@
-export type VerificationState = 'verified | 'pending' | 'rejected' | 'none'
+export type VerificationState = 'verified' | 'pending' | 'rejected' | 'none'
 export function verificationStateFrom(
    isVerified: boolean | null | undefined,
    latestRequestStatus?: string | null 
