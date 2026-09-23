@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Calendar, MapPin, Clock, Users, Ticket, ArrowLeft, Play, ImageIcon, Star, CheckCircle, Flag, Minus, Plus } from 'lucide-react'
 import { formatCurrency, formatDate, formatTime, getDaysUntilEvent, isEventPast } from '@/lib/helpers'
-import { PROVINCES, calculateTicketSaleBreakdown } from '@/lib/constants'
+import { MAX_TICKETS_PER_ORDER, PROVINCES, calculateTicketSaleBreakdown } from '@/lib/constants'
 import { useAuth } from '@/components/providers/auth-provider'
 import { PaymentDialog } from '@/components/payments/payment-dialog'
 import { ReportDialog } from '@/components/report-dialog'
@@ -76,7 +76,7 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
     : [fallbackTier]
   const selectedTier = resolvedTicketTiers.find((tier) => tier.id === selectedTierId) || resolvedTicketTiers[0]
   const selectedTierRemaining = Math.max(0, Number(selectedTier?.quantity || 0) - Number(selectedTier?.sold_count || 0))
-  const maxSelectableQuantity = Math.max(1, Math.min(10, selectedTierRemaining || 1))
+  const maxSelectableQuantity = Math.max(1, Math.min(MAX_TICKETS_PER_ORDER, selectedTierRemaining || 1))
   const unitTicketPriceCents = Number(selectedTier?.price ?? event.ticket_price ?? 0) * 100
   const perTicketBreakdown = calculateTicketSaleBreakdown(unitTicketPriceCents)
   const liveTicketSubtotalCents = perTicketBreakdown.ticketPrice * ticketQuantity
@@ -501,7 +501,6 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
                     <span>{formatCurrency(liveOrderTotalCents / 100)}</span>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">Max 10 tickets per order.</p>
                 <p className="text-xs text-muted-foreground">
                   Buying for another groovist? You can assign each ticket holder at checkout.
                 </p>

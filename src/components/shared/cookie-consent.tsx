@@ -1,20 +1,48 @@
 'use client'
 
-import { useState } from 'react'
+import { useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 
 const COOKIE_CONSENT_KEY = 'ziyawa-cookie-consent'
 
-export function CookieConsent() {
-  const [visible, setVisible] = useState(() => {
-    if (typeof window === 'undefined') return false
+// Consent lives in localStorage, which the server can't see. Reading it in
+// useState's initialiser made the client's first render differ from the
+// server's and threw a hydration error on every page. useSyncExternalStore
+// renders the server snapshot (hidden) during hydration, then the real value.
+const listeners = new Set<() => void>()
+
+function subscribe(onChange: () => void) {
+  listeners.add(onChange)
+  window.addEventListener('storage', onChange)
+  return () => {
+    listeners.delete(onChange)
+    window.removeEventListener('storage', onChange)
+  }
+}
+
+// Covers "Got it" when storage is blocked, so the banner still closes.
+let dismissedThisSession = false
+
+function needsConsent() {
+  if (dismissedThisSession) return false
+  try {
     return !localStorage.getItem(COOKIE_CONSENT_KEY)
-  })
+  } catch {
+    // Storage blocked (private mode, strict settings) — show the notice.
+    return true
+  }
+}
+
+export function CookieConsent() {
+  const visible = useSyncExternalStore(subscribe, needsConsent, () => false)
 
   const handleAccept = () => {
-    localStorage.setItem(COOKIE_CONSENT_KEY, 'accepted')
-    setVisible(false)
+    dismissedThisSession = true
+    try {
+      localStorage.setItem(COOKIE_CONSENT_KEY, 'accepted')
+    } catch {}
+    listeners.forEach((notify) => notify())
   }
 
   if (!visible) return null

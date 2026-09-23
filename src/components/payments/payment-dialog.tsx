@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { formatCurrency } from '@/lib/helpers'
-import { calculateTicketSaleBreakdown } from '@/lib/constants'
+import { MAX_TICKETS_PER_ORDER, calculateTicketSaleBreakdown } from '@/lib/constants'
 import { toast } from 'sonner'
 import type { Event, Profile } from '@/types/database'
 import { Loader2, CreditCard, Shield, Gift } from 'lucide-react'
@@ -41,7 +41,7 @@ export function PaymentDialog({ open, onOpenChange, event, user, quantity = 1, s
   const maxQuantityFromTier = Math.max(
     1,
     Math.min(
-      10,
+      MAX_TICKETS_PER_ORDER,
       Math.max(0, Number(selectedTier?.quantity || 1) - Number(selectedTier?.sold_count || 0)) || 1
     )
   )

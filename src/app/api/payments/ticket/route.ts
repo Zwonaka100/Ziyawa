@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { initializePayment, generatePaymentReference } from '@/lib/paystack';
-import { SITE_URL, calculateTicketSaleBreakdown } from '@/lib/constants';
+import { SITE_URL, MAX_TICKETS_PER_ORDER, calculateTicketSaleBreakdown } from '@/lib/constants';
 
 interface TicketAttendeeInput {
   fullName?: string;
@@ -37,6 +37,16 @@ export async function POST(request: NextRequest) {
     if (!eventId) {
       return NextResponse.json(
         { error: 'Event ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // quantity drives the amount charged and how many tickets get issued, so
+    // it must be a whole number within the per-order cap — the UI's limit is
+    // not a control on its own.
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_TICKETS_PER_ORDER) {
+      return NextResponse.json(
+        { error: `You can buy between 1 and ${MAX_TICKETS_PER_ORDER} tickets per order` },
         { status: 400 }
       );
     }

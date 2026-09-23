@@ -425,6 +425,12 @@ export function calculateWithdrawalFee(amountCents: number): {
 }
 
 /**
+ * Most tickets one order can buy. Enforced by the ticket payment API; the
+ * event page and checkout read it too so the UI never offers more.
+ */
+export const MAX_TICKETS_PER_ORDER = 10
+
+/**
  * Calculate complete ticket sale breakdown
  * Shows exactly where every cent goes
  */
