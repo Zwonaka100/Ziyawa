@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Separator } from '@/components/ui/separator'
 import { Checkbox } from '@/components/ui/checkbox'
 import { SITE_URL } from '@/lib/constants'
+import { needsWelcome, WELCOME_PATH } from '@/lib/onboarding'
 import { Mail, Lock } from 'lucide-react'
 
 type AuthMode = 'signin' | 'signup' | 'forgot-password'
@@ -119,8 +120,13 @@ export function AuthForm({ onSuccess: _onSuccess, defaultMode = 'signin' }: Auth
           }
         }
         
-        // Regular users go to their intended destination if provided
-        router.push(nextPath || '/profile')
+        // Regular users go to their intended destination if provided (never
+        // interrupt a purchase), otherwise first-timers get the welcome.
+        if (!nextPath && data.user && await needsWelcome(supabase, data.user.id)) {
+          router.push(WELCOME_PATH)
+        } else {
+          router.push(nextPath || '/profile')
+        }
         router.refresh()
         
       } else if (mode === 'forgot-password') {

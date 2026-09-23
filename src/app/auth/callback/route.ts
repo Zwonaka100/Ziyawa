@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { needsWelcome, WELCOME_PATH } from '@/lib/onboarding'
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
@@ -26,8 +27,15 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}/admin`)
       }
       
-      // Regular users go where they were headed, otherwise their profile
-      return NextResponse.redirect(`${origin}${next || '/profile'}`)
+      // Regular users go where they were headed (never interrupt a purchase
+      // with the welcome), otherwise first-timers get the Groovist welcome.
+      if (next) {
+        return NextResponse.redirect(`${origin}${next}`)
+      }
+      if (await needsWelcome(supabase, data.user.id)) {
+        return NextResponse.redirect(`${origin}${WELCOME_PATH}`)
+      }
+      return NextResponse.redirect(`${origin}/profile`)
     }
   }
 

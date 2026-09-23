@@ -147,6 +147,8 @@ export interface Profile {
   avatar_url: string | null;
   bio: string | null;
   location?: SaProvince | null;
+  // Set once the Groovist welcome is finished or skipped (migration 039).
+  onboarded_at?: string | null;
   is_artist: boolean;
   is_organizer: boolean;
   is_provider: boolean;
