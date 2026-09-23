@@ -139,39 +139,41 @@ export function ShareEventButton({ event, className }: ShareEventButtonProps) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className={className}>
-          <Share2 className="h-4 w-4 mr-2" />
+          <Share2 />
           Share this event
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      {/* DialogContent is a CSS grid; *:min-w-0 stops any child from forcing
+          it wider than a phone screen. */}
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto p-5 sm:p-6 *:min-w-0">
+        <DialogHeader className="text-left pr-6">
           <DialogTitle>Share this event</DialogTitle>
           <DialogDescription>Pull the whole crew through. Anyone with the link lands right on the event.</DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-2 gap-2">
-          <Button variant="outline" className="justify-start h-11" onClick={() => openExternal(`https://wa.me/?text=${encodedMessage}`)}>
-            <WhatsAppIcon className="h-4 w-4 mr-2" />
+          <Button variant="outline" className="h-11 justify-start" onClick={() => openExternal(`https://wa.me/?text=${encodedMessage}`)}>
+            <WhatsAppIcon className="size-4" />
             WhatsApp
           </Button>
           <Button
             variant="outline"
-            className="justify-start h-11"
+            className="h-11 justify-start"
             onClick={() => openExternal(`https://twitter.com/intent/tweet?text=${encodeURIComponent(blurb)}&url=${encodedUrl}`)}
           >
-            <Twitter className="h-4 w-4 mr-2" />
+            <Twitter />
             X
           </Button>
           <Button
             variant="outline"
-            className="justify-start h-11"
+            className="h-11 justify-start"
             onClick={() => openExternal(`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`)}
           >
-            <Facebook className="h-4 w-4 mr-2" />
+            <Facebook />
             Facebook
           </Button>
-          <Button variant="outline" className="justify-start h-11" onClick={() => void copyLink()}>
-            {copied ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+          <Button variant="outline" className="h-11 justify-start" onClick={() => void copyLink()}>
+            {copied ? <Check /> : <Copy />}
             {copied ? 'Copied' : 'Copy link'}
           </Button>
         </div>
@@ -180,29 +182,22 @@ export function ShareEventButton({ event, className }: ShareEventButtonProps) {
           <div className="rounded-md bg-muted/40 p-3 space-y-2">
             <p className="text-sm font-medium">Posting to your Story or Status?</p>
             <p className="text-xs text-muted-foreground">
-              We&apos;ll grab the event poster and copy the link. Add the link with the Link sticker on Instagram,
-              or paste it in the caption on WhatsApp Status.
+              We&apos;ll share the event poster and copy the link. On Instagram, add it with the Link sticker. On WhatsApp
+              Status, paste it in the caption.
             </p>
-            <Button variant="secondary" className="w-full" disabled={preparingStory} onClick={() => void shareToStory()}>
-              {preparingStory ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Instagram className="h-4 w-4 mr-2" />}
-              Share poster to Story / Status
+            <Button variant="secondary" className="h-11 w-full" disabled={preparingStory} onClick={() => void shareToStory()}>
+              {preparingStory ? <Loader2 className="animate-spin" /> : <Instagram />}
+              Share to Story / Status
             </Button>
           </div>
         )}
 
         {canNativeShare && (
-          <Button variant="ghost" className="w-full" onClick={() => void shareNative()}>
-            <MoreHorizontal className="h-4 w-4 mr-2" />
+          <Button variant="ghost" className="h-11 w-full" onClick={() => void shareNative()}>
+            <MoreHorizontal />
             More apps
           </Button>
         )}
-
-        <div className="flex items-center gap-2 rounded-md border px-3 py-2">
-          <span className="flex-1 truncate text-sm text-muted-foreground">{url}</span>
-          <Button variant="ghost" size="sm" onClick={() => void copyLink()}>
-            {copied ? 'Copied' : 'Copy'}
-          </Button>
-        </div>
       </DialogContent>
     </Dialog>
   )
