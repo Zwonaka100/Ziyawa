@@ -15,6 +15,7 @@ import { PROVINCES, calculateTicketSaleBreakdown } from '@/lib/constants'
 import { useAuth } from '@/components/providers/auth-provider'
 import { PaymentDialog } from '@/components/payments/payment-dialog'
 import { ReportDialog } from '@/components/report-dialog'
+import { ShareEventButton } from '@/components/events/share-event-button'
 import { extractYouTubeId, getYouTubeThumbnail } from '@/types/database'
 import type { Event, Profile, Artist, Booking, EventMedia } from '@/types/database'
 import { buildFallbackTier, isTierOnSale, type EventTicketTier } from '@/lib/ticketing'
@@ -143,7 +144,10 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
 
           {/* Event Title & Info */}
           <div>
-            <h1 className="text-3xl font-bold mb-4">{event.title}</h1>
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+              <h1 className="text-3xl font-bold">{event.title}</h1>
+              <ShareEventButton event={event} className="self-start shrink-0" />
+            </div>
             
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="flex items-center gap-3 text-muted-foreground">
