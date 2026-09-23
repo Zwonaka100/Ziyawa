@@ -131,8 +131,11 @@ export default function ProfilePage() {
   const router = useRouter()
   const { user, profile, loading: authLoading } = useAuth()
 
+  // Only bounce when there is no session. `loading` releases before the profile
+  // row arrives, so redirecting on a missing profile sent freshly signed-in users
+  // (especially on slow mobile connections) straight back to the sign-in page.
   useEffect(() => {
-    if (!authLoading && (!user || !profile)) {
+    if (!authLoading && !user) {
       router.replace('/auth/signin')
     }
   }, [authLoading, user, profile, router])

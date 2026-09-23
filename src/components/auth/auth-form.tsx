@@ -30,15 +30,22 @@ export function AuthForm({ onSuccess: _onSuccess, defaultMode = 'signin' }: Auth
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const router = useRouter()
-  const nextPath = typeof window !== 'undefined'
-    ? new URLSearchParams(window.location.search).get('next')
-    : null
+  // Pages link here with either ?next= or ?redirect=; honour both, but only
+  // same-site paths so the param can't be used to bounce users off-site.
+  const nextPath = (() => {
+    if (typeof window === 'undefined') return null
+    const params = new URLSearchParams(window.location.search)
+    const target = params.get('next') || params.get('redirect')
+    return target && target.startsWith('/') && !target.startsWith('//') ? target : null
+  })()
 
   const supabase = createClient()
 
-  const getRedirectUrl = () => {
+  const getRedirectUrl = (next = nextPath) => {
     const baseUrl = SITE_URL.replace(/\/$/, '')
-    return `${baseUrl}/auth/callback`
+    return next
+      ? `${baseUrl}/auth/callback?next=${encodeURIComponent(next)}`
+      : `${baseUrl}/auth/callback`
   }
 
   const handleGoogleSignIn = async () => {
@@ -119,7 +126,7 @@ export function AuthForm({ onSuccess: _onSuccess, defaultMode = 'signin' }: Auth
       } else if (mode === 'forgot-password') {
         // Send password reset email
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${getRedirectUrl()}?next=/auth/reset-password`,
+          redirectTo: getRedirectUrl('/auth/reset-password'),
         })
 
         if (resetError) throw resetError

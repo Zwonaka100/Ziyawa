@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
-import { Calendar, MapPin, Clock, Users, Ticket, ArrowLeft, Play, ImageIcon, Star, CheckCircle, Flag } from 'lucide-react'
+import { Calendar, MapPin, Clock, Users, Ticket, ArrowLeft, Play, ImageIcon, Star, CheckCircle, Flag, Minus, Plus } from 'lucide-react'
 import { formatCurrency, formatDate, formatTime, getDaysUntilEvent, isEventPast } from '@/lib/helpers'
 import { PROVINCES, calculateTicketSaleBreakdown } from '@/lib/constants'
 import { useAuth } from '@/components/providers/auth-provider'
@@ -51,6 +51,8 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
   const [lightboxIndex, setLightboxIndex] = useState(0)
   const [selectedTierId, setSelectedTierId] = useState(ticketTiers[0]?.id || '')
   const [ticketQuantity, setTicketQuantity] = useState(1)
+  // Raw text in the quantity field, so buyers can clear it and type a new number without it snapping back.
+  const [quantityDraft, setQuantityDraft] = useState('1')
 
   const daysUntil = getDaysUntilEvent(event.event_date)
   const ticketsRemaining = event.capacity - event.tickets_sold
@@ -80,13 +82,22 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
   const liveBookingFeeCents = perTicketBreakdown.bookingFee * ticketQuantity
   const liveOrderTotalCents = perTicketBreakdown.buyerTotal * ticketQuantity
 
+  const updateTicketQuantity = (next: number) => {
+    const clamped = Math.min(Math.max(1, Math.floor(next) || 1), maxSelectableQuantity)
+    setTicketQuantity(clamped)
+    setQuantityDraft(String(clamped))
+  }
+
   useEffect(() => {
-    setTicketQuantity((current) => Math.min(Math.max(1, current), maxSelectableQuantity))
+    const clamped = Math.min(Math.max(1, ticketQuantity), maxSelectableQuantity)
+    setTicketQuantity(clamped)
+    setQuantityDraft(String(clamped))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maxSelectableQuantity])
 
   const handleBuyTicket = () => {
     if (!user) {
-      router.push('/auth/signin')
+      router.push(`/auth/signin?next=${encodeURIComponent(window.location.pathname)}`)
       return
     }
     setShowPayment(true)
@@ -427,21 +438,51 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
               </div>
 
               <div className="space-y-2 text-sm">
-                <label className="flex items-center justify-between gap-3">
-                  <span className="text-neutral-900 font-medium">Quantity</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max={maxSelectableQuantity}
-                    value={ticketQuantity}
-                    onChange={(e) => {
-                      const parsed = Number(e.target.value) || 1
-                      const clamped = Math.min(Math.max(1, parsed), maxSelectableQuantity)
-                      setTicketQuantity(clamped)
-                    }}
-                    className="w-20 rounded-md border border-input bg-background px-2 py-1 text-right"
-                  />
-                </label>
+                <div className="flex items-center justify-between gap-3">
+                  <label htmlFor="ticket-quantity" className="text-neutral-900 font-medium">Quantity</label>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9"
+                      aria-label="Decrease quantity"
+                      disabled={ticketQuantity <= 1}
+                      onClick={() => updateTicketQuantity(ticketQuantity - 1)}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <input
+                      id="ticket-quantity"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={quantityDraft}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 3)
+                        setQuantityDraft(digits)
+                        const parsed = Number(digits)
+                        if (parsed >= 1) setTicketQuantity(Math.min(parsed, maxSelectableQuantity))
+                      }}
+                      onBlur={() => updateTicketQuantity(Number(quantityDraft))}
+                      className="h-9 w-14 rounded-md border border-input bg-background px-2 text-center"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9"
+                      aria-label="Increase quantity"
+                      disabled={ticketQuantity >= maxSelectableQuantity}
+                      onClick={() => updateTicketQuantity(ticketQuantity + 1)}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                {maxSelectableQuantity > 1 && (
+                  <p className="text-xs text-muted-foreground text-right">Max {maxSelectableQuantity} per order</p>
+                )}
                 <div className="rounded-md bg-muted/40 p-3 space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Ticket subtotal</span>

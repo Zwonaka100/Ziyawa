@@ -4,6 +4,10 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
+  // Where the user was headed before auth (e.g. back to an event, or the
+  // password-reset form). Same-site paths only.
+  const nextParam = searchParams.get('next')
+  const next = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : null
 
   if (code) {
     const supabase = await createClient()
@@ -22,8 +26,8 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}/admin`)
       }
       
-      // Regular users go to their profile
-      return NextResponse.redirect(`${origin}/profile`)
+      // Regular users go where they were headed, otherwise their profile
+      return NextResponse.redirect(`${origin}${next || '/profile'}`)
     }
   }
 
