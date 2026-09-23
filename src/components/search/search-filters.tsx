@@ -187,17 +187,19 @@ export function SearchFilters({ onSearch, className, compact = false }: SearchFi
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input
-            placeholder="Search by event name, venue, or description..."
+            placeholder="Search events or venues..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="pl-10 h-12 text-lg"
+            className="pl-10 h-12 text-base sm:text-lg"
           />
         </div>
         
         <Select value={location} onValueChange={setLocation}>
-          <SelectTrigger className="w-full sm:w-[200px] h-12">
-            <MapPin className="h-4 w-4 mr-2" />
+          {/* Icon, value, chevron: left-align the value like the search box
+              (justify-between centred it between icon and chevron). */}
+          <SelectTrigger className="w-full sm:w-[200px] h-12 justify-start [&>svg:last-child]:ml-auto">
+            <MapPin className="h-4 w-4" />
             <SelectValue placeholder="All Provinces" />
           </SelectTrigger>
           <SelectContent>
@@ -214,8 +216,8 @@ export function SearchFilters({ onSearch, className, compact = false }: SearchFi
           setTimeframe(value);
           handleSearch({ timeframe: value });
         }}>
-          <SelectTrigger className="w-full sm:w-[180px] h-12">
-            <CalendarIcon className="h-4 w-4 mr-2" />
+          <SelectTrigger className="w-full sm:w-[180px] h-12 justify-start [&>svg:last-child]:ml-auto">
+            <CalendarIcon className="h-4 w-4" />
             <SelectValue placeholder="All Events" />
           </SelectTrigger>
           <SelectContent>

@@ -45,7 +45,7 @@ function EventCard({ event }: { event: EventWithOrganizer }) {
   const isPast = isEventPast(event.event_date)
 
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+    <Card className="overflow-hidden py-0 gap-0 hover:shadow-lg transition-shadow">
       {/* Cover Image Placeholder */}
       <div className="relative h-48 bg-gradient-to-br from-primary/20 to-primary/5">
         {event.cover_image ? (

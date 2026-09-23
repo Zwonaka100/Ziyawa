@@ -437,7 +437,7 @@ function EventCard({ event }: { event: EventResult }) {
 
   return (
     <Link href={`/events/${event.id}`}>
-      <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
+      <Card className="overflow-hidden py-0 gap-0 hover:shadow-md transition-shadow cursor-pointer">
         <div className="flex">
           {/* Image */}
           <div className="w-24 h-24 flex-shrink-0 bg-muted">

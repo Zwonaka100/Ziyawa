@@ -43,7 +43,7 @@ import type {
 } from '@/types/database';
 
 interface ArtistWithProfile extends Artist {
-  profiles: Pick<Profile, 'id' | 'full_name' | 'email' | 'avatar_url'> & {
+  profiles: Pick<Profile, 'id' | 'full_name' | 'avatar_url'> & {
     is_verified?: boolean
     verified_entity_type?: string | null
   };
@@ -155,7 +155,9 @@ export function ArtistProfileEnhanced({
               {/* Name and badges */}
               <div className="text-center md:text-left pb-4">
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-2">
-                  <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg">
+                  {/* The name sits below the dark banner, on white, at every
+                      width — it was white-on-white and unreadable. */}
+                  <h1 className="text-3xl md:text-4xl font-bold text-neutral-900">
                     {artist.stage_name}
                   </h1>
                   {artist.verified_at && (
@@ -173,7 +175,7 @@ export function ArtistProfileEnhanced({
                     </Badge>
                   )}
                 </div>
-                <p className="text-white/80">{artist.profiles.full_name}</p>
+                <p className="text-neutral-500">{artist.profiles.full_name}</p>
               </div>
             </div>
           </div>
@@ -181,7 +183,7 @@ export function ArtistProfileEnhanced({
           {/* Back button */}
           <Link 
             href="/artists" 
-            className="absolute top-4 left-4 md:top-[-220px] inline-flex items-center text-white/80 hover:text-white transition-colors"
+            className="absolute -top-60 left-4 md:top-[-220px] inline-flex items-center text-white/80 hover:text-white transition-colors"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Artists

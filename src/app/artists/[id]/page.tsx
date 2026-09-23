@@ -56,7 +56,9 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
   const { id } = await params
   const supabase = await createClient()
 
-  // Fetch artist with profile info
+  // Fetch artist with profile info. Public columns only: logged-out visitors
+  // can't read profiles.email (029), and asking for it failed the whole query,
+  // so every artist page 404'd for anyone not signed in.
   const { data: artist, error } = await supabase
     .from('artists')
     .select(`
@@ -64,7 +66,6 @@ export default async function ArtistPage({ params }: ArtistPageProps) {
       profiles:profile_id (
         id,
         full_name,
-        email,
         avatar_url,
         is_verified,
         verified_entity_type

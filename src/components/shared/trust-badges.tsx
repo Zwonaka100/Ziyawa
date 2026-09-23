@@ -349,7 +349,7 @@ export function TrackRecordCard({
             <span className="font-semibold text-neutral-900">
               {rating > 0 ? rating.toFixed(1) : '-'}
             </span>
-            <span className="text-neutral-500 text-sm">({totalReviews} reviews)</span>
+            <span className="text-neutral-500 text-sm">({totalReviews} {totalReviews === 1 ? 'review' : 'reviews'})</span>
           </div>
         </div>
 

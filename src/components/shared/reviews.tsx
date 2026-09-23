@@ -289,7 +289,7 @@ export function ReviewsList({
               />
             ))}
           </div>
-          <p className="text-sm text-neutral-500 mt-1">{totalReviews} reviews</p>
+          <p className="text-sm text-neutral-500 mt-1">{totalReviews} {totalReviews === 1 ? 'review' : 'reviews'}</p>
         </div>
 
         {/* Distribution */}

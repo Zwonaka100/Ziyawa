@@ -248,7 +248,7 @@ export function ReviewsList({
           {/* Sort Dropdown */}
           <div className="flex justify-between items-center">
             <p className="text-sm text-muted-foreground">
-              {ratingSummary?.total_reviews || 0} reviews
+              {ratingSummary?.total_reviews || 0} {ratingSummary?.total_reviews === 1 ? 'review' : 'reviews'}
             </p>
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger className="w-[160px]">

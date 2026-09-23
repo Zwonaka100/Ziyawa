@@ -179,7 +179,7 @@ export function OrganizerProfile({
                   {organizerRating > 0 ? organizerRating.toFixed(1) : 'New'}
                 </span>
               </div>
-              <p className="text-sm text-neutral-500">{totalOrganizerReviews} Reviews</p>
+              <p className="text-sm text-neutral-500">{totalOrganizerReviews} {totalOrganizerReviews === 1 ? 'Review' : 'Reviews'}</p>
             </div>
           </div>
         </div>
@@ -200,12 +200,16 @@ export function OrganizerProfile({
 
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="bg-white border border-neutral-200 p-1">
+              {/* Full width with short labels on phones — the long labels ran
+                  past the screen edge at 360px and made the page scroll sideways. */}
+              <TabsList className="bg-white border border-neutral-200 p-1 w-full sm:w-auto">
                 <TabsTrigger value="events">
-                  Upcoming Events ({upcomingEvents.length})
+                  <span className="sm:hidden">Upcoming</span>
+                  <span className="hidden sm:inline">Upcoming Events</span> ({upcomingEvents.length})
                 </TabsTrigger>
                 <TabsTrigger value="past">
-                  Past Events ({pastEvents.length})
+                  <span className="sm:hidden">Past</span>
+                  <span className="hidden sm:inline">Past Events</span> ({pastEvents.length})
                 </TabsTrigger>
                 <TabsTrigger value="reviews">
                   Reviews ({reviews.length})

@@ -218,7 +218,7 @@ function EventCard({ event }: { event: Event }) {
 
   return (
     <Link href={`/events/${event.id}`}>
-      <Card className="group overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 h-full">
+      <Card className="group overflow-hidden py-0 gap-0 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 h-full">
         {/* Image */}
         <div className="relative aspect-[16/9] overflow-hidden">
           {event.cover_image ? (
@@ -319,7 +319,7 @@ function EventCard({ event }: { event: Event }) {
 
 function EventCardSkeleton() {
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden py-0 gap-0">
       <Skeleton className="aspect-[16/9]" />
       <CardContent className="p-4 space-y-3">
         <Skeleton className="h-6 w-3/4" />

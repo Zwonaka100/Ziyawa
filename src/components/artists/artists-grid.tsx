@@ -37,7 +37,7 @@ export function ArtistsGrid({ artists }: ArtistsGridProps) {
 
 function ArtistCard({ artist }: { artist: ArtistWithProfile }) {
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
+    <Card className="overflow-hidden py-0 gap-0 hover:shadow-lg transition-shadow">
       {/* Profile Image */}
       <div className="relative h-48 bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center overflow-hidden">
         {artist.profile_image ? (

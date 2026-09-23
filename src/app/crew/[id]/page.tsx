@@ -77,7 +77,6 @@ const CATEGORY_COLORS: Record<ServiceCategory, string> = {
 interface ProviderWithProfile extends Provider {
   profile?: {
     full_name: string | null
-    email: string
     is_verified: boolean
     verified_entity_type: string | null
   }
@@ -122,12 +121,14 @@ export default function ProviderProfilePage() {
     try {
       const supabase = createClient()
       
-      // Fetch provider with profile
+      // Fetch provider with profile. Public columns only: logged-out visitors
+      // can't read profiles.email (029), and asking for it failed the query
+      // and bounced them to /crew — so a shared crew profile link never opened.
       const { data: providerData, error: providerError } = await supabase
         .from('providers')
         .select(`
           *,
-          profile:profiles(full_name, email, is_verified, verified_entity_type)
+          profile:profiles(full_name, is_verified, verified_entity_type)
         `)
         .eq('id', providerId)
         .single()

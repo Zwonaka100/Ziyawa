@@ -118,7 +118,7 @@ export default async function HomePage() {
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {events.map((event) => (
                 <Link key={event.id} href={`/events/${event.id}`}>
-                  <Card className="overflow-hidden hover:shadow-lg transition-shadow h-full">
+                  <Card className="overflow-hidden py-0 gap-0 hover:shadow-lg transition-shadow h-full">
                     <div className="aspect-[16/9] relative bg-neutral-100">
                       {event.cover_image ? (
                         <Image

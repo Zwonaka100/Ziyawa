@@ -255,7 +255,7 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
                               <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                               <span className="font-medium">{organizerStats.rating.toFixed(1)}</span>
                               <span className="text-muted-foreground">
-                                ({organizerStats.totalReviews} reviews)
+                                ({organizerStats.totalReviews} {organizerStats.totalReviews === 1 ? 'review' : 'reviews'})
                               </span>
                             </div>
                           )}

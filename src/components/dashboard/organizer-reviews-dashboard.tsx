@@ -329,7 +329,7 @@ export function OrganizerReviewsDashboard({
                           <div className="flex items-center gap-2 mt-1">
                             <StarRating rating={summary.average_rating} size="sm" />
                             <span className="text-sm text-muted-foreground">
-                              ({summary.total_reviews} reviews)
+                              ({summary.total_reviews} {summary.total_reviews === 1 ? 'review' : 'reviews'})
                             </span>
                           </div>
                         ) : (
