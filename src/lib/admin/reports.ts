@@ -39,7 +39,9 @@ async function loadReportedContent(
     case 'event': {
       const { data } = await supabaseAdmin
         .from('events')
-        .select('id, title, description, status, event_date, venue, location, organizer_id, organizer:profiles!events_organizer_id_fkey(full_name, email)')
+        // `state`, not `status` — events has no status column, so this query
+        // failed and every event report opened with no event details.
+        .select('id, title, description, state, event_date, venue, location, organizer_id, organizer:profiles!events_organizer_id_fkey(full_name, email)')
         .eq('id', id)
         .maybeSingle()
       return data as Record<string, unknown> | null
@@ -47,7 +49,8 @@ async function loadReportedContent(
     case 'review': {
       const { data } = await supabaseAdmin
         .from('reviews')
-        .select('id, content, rating, created_at, user:profiles!reviews_user_id_fkey(full_name, email)')
+        // The text column is `comment`; `content` doesn't exist and failed the query.
+        .select('id, user_id, content:comment, rating, created_at, user:profiles!reviews_user_id_fkey(full_name, email)')
         .eq('id', id)
         .maybeSingle()
       return data as Record<string, unknown> | null

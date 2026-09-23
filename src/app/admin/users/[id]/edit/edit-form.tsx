@@ -11,13 +11,12 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
+import { PROVINCES } from '@/lib/constants'
 import {
   Select,
   SelectContent,
@@ -46,17 +45,9 @@ interface UserProfile {
   ban_reason: string | null
 }
 
-const SA_PROVINCES = [
-  'Eastern Cape',
-  'Free State',
-  'Gauteng',
-  'KwaZulu-Natal',
-  'Limpopo',
-  'Mpumalanga',
-  'North West',
-  'Northern Cape',
-  'Western Cape',
-]
+// Stored as codes ('gauteng'), like everywhere else in the app — this list
+// used to save display labels, which Ziwaphi's province filter never matched.
+const SA_PROVINCES = Object.entries(PROVINCES)
 
 export function AdminUserEditForm({
   userId,
@@ -66,7 +57,6 @@ export function AdminUserEditForm({
   initialUser: UserProfile
 }) {
   const router = useRouter()
-  const supabase = createClient()
 
   const [loading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -75,7 +65,6 @@ export function AdminUserEditForm({
     full_name: initialUser?.full_name || '',
     phone: initialUser?.phone || '',
     location: initialUser?.location || '',
-    bio: initialUser?.bio || '',
     is_organizer: initialUser?.is_organizer || false,
     is_verified: initialUser?.is_verified || false,
   })
@@ -86,35 +75,25 @@ export function AdminUserEditForm({
     setSaving(true)
 
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          full_name: formData.full_name || null,
-          phone: formData.phone || null,
-          location: formData.location || null,
-          bio: formData.bio || null,
-          is_organizer: formData.is_organizer,
-          is_verified: formData.is_verified,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', userId)
-
-      if (error) throw error
-
-      // Log the action
-      const { data: { user: currentAdmin } } = await supabase.auth.getUser()
-      if (currentAdmin) {
-        await supabase.from('admin_audit_logs').insert({
-          admin_id: currentAdmin.id,
-          action: 'update',
-          entity_type: 'user',
-          entity_id: userId,
-          details: {
-            updated_fields: Object.keys(formData),
+      // Through the admin API (service key, audit-logged). Updating profiles
+      // from the browser only matched the admin's own row, so edits to anyone
+      // else silently did nothing.
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profile: {
             full_name: formData.full_name,
+            phone: formData.phone,
+            location: formData.location,
+            is_organizer: formData.is_organizer,
           },
-        })
-      }
+          // Only when toggled, so a routine save doesn't reset verified_at.
+          ...(formData.is_verified !== Boolean(initialUser?.is_verified) ? { verify: formData.is_verified } : {}),
+        }),
+      })
+      const payload = await response.json().catch(() => ({})) as { error?: string }
+      if (!response.ok) throw new Error(payload.error || 'Failed to update user')
 
       toast.success('User updated successfully')
       router.push(`/admin/users/${userId}`)
@@ -197,24 +176,13 @@ export function AdminUserEditForm({
                       <SelectValue placeholder="Select province" />
                     </SelectTrigger>
                     <SelectContent>
-                      {SA_PROVINCES.map((province) => (
-                        <SelectItem key={province} value={province}>
-                          {province}
+                      {SA_PROVINCES.map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="bio">Bio</Label>
-                  <Textarea
-                    id="bio"
-                    value={formData.bio}
-                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                    placeholder="User bio..."
-                    rows={4}
-                  />
                 </div>
               </CardContent>
             </Card>

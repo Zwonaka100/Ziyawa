@@ -274,7 +274,7 @@ export function AdminReportDetail({
       void fetchReport()
     } catch (error) {
       console.error('Action error:', error)
-      toast.error('Failed to process action')
+      toast.error(error instanceof Error ? error.message : 'Failed to process action')
     } finally {
       setProcessing(false)
     }
@@ -285,29 +285,49 @@ export function AdminReportDetail({
 
     const { data: { user: admin } } = await supabase.auth.getUser()
 
+    // The person behind the report. reported_id is only a user id for person
+    // reports; for an event it's the event, for a review it's the review.
+    const data = reportedContent.data as (ReportedContent['data'] & { organizer_id?: string; user_id?: string }) | null
+    const targetUserId =
+      report.reported_type === 'event' ? data?.organizer_id
+      : report.reported_type === 'review' ? data?.user_id
+      : data?.id
+
+    const moderateUser = async (body: Record<string, unknown>) => {
+      if (!targetUserId) throw new Error('Could not find the user behind this report')
+      const response = await fetch(`/api/admin/users/${targetUserId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const payload = await response.json().catch(() => ({})) as { error?: string }
+      if (!response.ok) throw new Error(payload.error || 'Failed to update user')
+    }
+
+    const reason = moderationNote || `Reported for: ${report.reason}`
+
     switch (action) {
       case 'warn_user':
-        // Send warning notification
+        // Records a warning on the account (and bumps warnings_count), then
+        // tells them why.
+        await moderateUser({ warn: { reason, severity: 'moderate' } })
         await supabase.from('notifications').insert({
-          user_id: report.reported_id,
+          user_id: targetUserId,
           type: 'warning',
           title: 'Content Warning',
           message: `Your ${report.reported_type} has been flagged for violating our community guidelines. Please review our terms of service.`,
         })
         break
 
+      // These used to set a `status` column that doesn't exist on profiles,
+      // against reported_id (the event/review id for content reports), from
+      // the browser — so they never did anything.
       case 'suspend_user':
-        await supabase
-          .from('profiles')
-          .update({ status: 'suspended', suspended_at: new Date().toISOString() })
-          .eq('id', report.reported_id)
+        await moderateUser({ suspend: true, reason })
         break
 
       case 'ban_user':
-        await supabase
-          .from('profiles')
-          .update({ status: 'banned', banned_at: new Date().toISOString() })
-          .eq('id', report.reported_id)
+        await moderateUser({ ban: true, reason })
         break
 
       case 'remove_content':

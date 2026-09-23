@@ -26,7 +26,6 @@ import {
   CheckCircle,
   UserX
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 
 interface UserActionsProps {
@@ -53,183 +52,63 @@ export function UserActions({ user }: UserActionsProps) {
   const [banOpen, setBanOpen] = useState(false)
   const [banReason, setBanReason] = useState('')
 
-  const handleWarn = async () => {
+  // Every action goes through the admin API on the service key. Writing
+  // profiles from the browser only ever touched the admin's own row, so these
+  // used to report success while changing nothing.
+  const runAction = async (body: Record<string, unknown>, success: string, onDone?: () => void) => {
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/admin/users/${user.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const payload = await response.json().catch(() => ({})) as { error?: string }
+      if (!response.ok) throw new Error(payload.error || 'Action failed')
+      toast.success(success)
+      onDone?.()
+      router.refresh()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Action failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleWarn = () => {
     if (!warningReason.trim()) {
       toast.error('Please provide a reason')
       return
     }
-
-    setLoading(true)
-    const supabase = createClient()
-
-    const { data: { user: currentUser } } = await supabase.auth.getUser()
-
-    const { error } = await supabase
-      .from('user_warnings')
-      .insert({
-        user_id: user.id,
-        issued_by: currentUser?.id,
-        reason: warningReason,
-        severity: warningSeverity,
-      })
-
-    if (!error) {
-      // Update warnings count
-      await supabase
-        .from('profiles')
-        .update({ warnings_count: ((user as UserActionsProps['user'] & { warnings_count?: number }).warnings_count || 0) + 1 })
-        .eq('id', user.id)
-
-      toast.success('Warning issued')
+    void runAction({ warn: { reason: warningReason, severity: warningSeverity } }, 'Warning issued', () => {
       setWarningOpen(false)
       setWarningReason('')
-      router.refresh()
-    } else {
-      toast.error('Failed to issue warning')
-    }
-
-    setLoading(false)
+    })
   }
 
-  const handleSuspend = async () => {
-    setLoading(true)
-    const supabase = createClient()
+  const handleSuspend = () =>
+    void runAction({ suspend: true, reason: suspendReason }, 'User suspended', () => setSuspendOpen(false))
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        is_suspended: true,
-        suspended_at: new Date().toISOString(),
-        suspension_reason: suspendReason || null,
-      })
-      .eq('id', user.id)
+  const handleUnsuspend = () => void runAction({ suspend: false }, 'User unsuspended')
 
-    if (!error) {
-      toast.success('User suspended')
-      setSuspendOpen(false)
-      router.refresh()
-    } else {
-      toast.error('Failed to suspend user')
-    }
-
-    setLoading(false)
-  }
-
-  const handleUnsuspend = async () => {
-    setLoading(true)
-    const supabase = createClient()
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        is_suspended: false,
-        suspended_at: null,
-        suspension_reason: null,
-      })
-      .eq('id', user.id)
-
-    if (!error) {
-      toast.success('User unsuspended')
-      router.refresh()
-    } else {
-      toast.error('Failed to unsuspend user')
-    }
-
-    setLoading(false)
-  }
-
-  const handleBan = async () => {
+  const handleBan = () => {
     if (!banReason.trim()) {
       toast.error('Please provide a reason')
       return
     }
-
-    setLoading(true)
-    const supabase = createClient()
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        is_banned: true,
-        banned_at: new Date().toISOString(),
-        ban_reason: banReason,
-      })
-      .eq('id', user.id)
-
-    if (!error) {
-      toast.success('User banned')
-      setBanOpen(false)
-      router.refresh()
-    } else {
-      toast.error('Failed to ban user')
-    }
-
-    setLoading(false)
+    void runAction({ ban: true, reason: banReason }, 'User banned', () => setBanOpen(false))
   }
 
-  const handleUnban = async () => {
-    setLoading(true)
-    const supabase = createClient()
+  const handleUnban = () => void runAction({ ban: false }, 'User unbanned')
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        is_banned: false,
-        banned_at: null,
-        ban_reason: null,
-      })
-      .eq('id', user.id)
+  const handleVerify = () =>
+    void runAction(
+      { verify: !user.is_verified },
+      user.is_verified ? 'Verification removed' : 'User verified'
+    )
 
-    if (!error) {
-      toast.success('User unbanned')
-      router.refresh()
-    } else {
-      toast.error('Failed to unban user')
-    }
-
-    setLoading(false)
-  }
-
-  const handleVerify = async () => {
-    setLoading(true)
-    const supabase = createClient()
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({ is_verified: !user.is_verified })
-      .eq('id', user.id)
-
-    if (!error) {
-      toast.success(user.is_verified ? 'Verification removed' : 'User verified')
-      router.refresh()
-    } else {
-      toast.error('Failed to update verification')
-    }
-
-    setLoading(false)
-  }
-
-  const handleMakeAdmin = async (role: string | null) => {
-    setLoading(true)
-    const supabase = createClient()
-
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        is_admin: role !== null,
-        admin_role: role,
-      })
-      .eq('id', user.id)
-
-    if (!error) {
-      toast.success(role ? `User made ${role}` : 'Admin role removed')
-      router.refresh()
-    } else {
-      toast.error('Failed to update admin role')
-    }
-
-    setLoading(false)
-  }
+  const handleMakeAdmin = (role: string | null) =>
+    void runAction({ adminRole: role }, role ? `User made ${role}` : 'Admin role removed')
 
   return (
     <div className="space-y-3">
