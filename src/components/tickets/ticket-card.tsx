@@ -144,7 +144,7 @@ export function TicketCard({ ticket, showQR = true, compact = false }: TicketCar
             {/* Ticket Type & Price */}
             <div className="flex items-center justify-between text-sm">
               <Badge variant="secondary">{ticket.ticket_type}</Badge>
-              <span className="font-medium">{formatCurrency(ticket.price_paid)}</span>
+              <span className="font-medium">{Number(ticket.price_paid) === 0 ? 'Free' : formatCurrency(ticket.price_paid)}</span>
             </div>
 
             {/* Check-in time if checked in */}
