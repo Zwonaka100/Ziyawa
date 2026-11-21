@@ -88,6 +88,9 @@ for (const [label, rate] of [['international', INTL_RATE], ['local', LOCAL_RATE]
     let worstAt = null
 
     for (const priceCents of prices()) {
+      // A free ticket never reaches Paystack, so there is no cost to cover.
+      if (priceCents === 0) continue
+
       const fee = calculateBookingFee(priceCents)
       const margin = fee - costCents(priceCents + fee, rate)
 
@@ -118,8 +121,14 @@ test('the fee is a formula, not a capped tier list', () => {
   )
 })
 
-test('cheap and free tickets fall back to the R5 floor', () => {
-  for (const priceCents of [0, 100, 500, 2000]) {
+test('free tickets carry no booking fee', () => {
+  // R0 orders skip Paystack entirely, so charging a fee would make a "free"
+  // ticket cost money and push the buyer through a card payment for nothing.
+  assert.equal(calculateBookingFee(0), 0, 'A free ticket must not charge a booking fee')
+})
+
+test('cheap tickets fall back to the R5 floor', () => {
+  for (const priceCents of [1, 100, 500, 2000]) {
     assert.equal(
       calculateBookingFee(priceCents),
       500,

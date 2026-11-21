@@ -2,13 +2,32 @@
  * TICKET PURCHASE API
  * POST /api/payments/ticket
  * 
- * Initializes a Paystack payment for ticket purchase
+ * Initializes a Paystack payment for ticket purchase.
+ *
+ * Free (R0) tickets skip Paystack entirely: there is nothing to charge, so
+ * the order is recorded and the tickets are issued straight away.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { initializePayment, generatePaymentReference } from '@/lib/paystack';
 import { SITE_URL, MAX_TICKETS_PER_ORDER, calculateTicketSaleBreakdown } from '@/lib/constants';
+import { fulfilTicketOrder } from '@/lib/payments/ticket-fulfilment';
+
+// Free orders are moved through their states and fulfilled here, which the
+// buyer's own session is not allowed to do.
+const supabaseAdmin = createAdminClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+/**
+ * How many free tickets one account can hold for a single event, across all
+ * of its orders. Without it, one person could claim a free event's entire
+ * capacity ten tickets at a time.
+ */
+const MAX_FREE_TICKETS_PER_ACCOUNT = MAX_TICKETS_PER_ORDER;
 
 interface TicketAttendeeInput {
   fullName?: string;
@@ -184,8 +203,39 @@ export async function POST(request: NextRequest) {
     const breakdown = calculateTicketSaleBreakdown(ticketPriceCents);
     const totalAmount = breakdown.buyerTotal * quantity;
 
+    const isFreeOrder = totalAmount === 0;
+
+    if (isFreeOrder) {
+      const { count: freeTicketsHeld, error: countError } = await supabaseAdmin
+        .from('tickets')
+        .select('id', { count: 'exact', head: true })
+        .eq('event_id', eventId)
+        .eq('user_id', user.id)
+        .eq('price_paid', 0);
+
+      if (countError) {
+        console.error('Free ticket count error:', countError);
+        return NextResponse.json(
+          { error: 'Could not check your existing tickets. Please try again.' },
+          { status: 500 }
+        );
+      }
+
+      const remainingAllowance = MAX_FREE_TICKETS_PER_ACCOUNT - (freeTicketsHeld || 0);
+      if (quantity > remainingAllowance) {
+        return NextResponse.json(
+          {
+            error: remainingAllowance > 0
+              ? `You can claim ${remainingAllowance} more free ticket${remainingAllowance === 1 ? '' : 's'} for this event`
+              : `You already have the maximum of ${MAX_FREE_TICKETS_PER_ACCOUNT} free tickets for this event`,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     // Generate unique reference
-    const reference = generatePaymentReference('TKT');
+    const reference = generatePaymentReference(isFreeOrder ? 'FREE' : 'TKT');
 
     // Create pending transaction record
     const { data: transaction, error: txnError } = await supabase
@@ -201,8 +251,9 @@ export async function POST(request: NextRequest) {
         recipient_id: event.organizer_id,
         recipient_type: 'organizer',
         event_id: eventId,
-        gateway_provider: 'paystack',
+        gateway_provider: isFreeOrder ? null : 'paystack',
         gateway_response: {
+          free: isFreeOrder,
           quantity,
           attendees: normalizedAttendees,
           buyer_name: profile.full_name || 'Ticket Buyer',
@@ -225,6 +276,68 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const orderMetadata = {
+      transaction_id: transaction.id,
+      event_id: eventId,
+      event_title: event.title,
+      user_id: user.id,
+      user_name: profile.full_name,
+      quantity,
+      attendees: normalizedAttendees,
+      buyer_email: profile.email,
+      buyer_name: profile.full_name || 'Ticket Buyer',
+      ticket_type_id: selectedTier?.id || null,
+      ticket_type_name: selectedTier?.name || ticketTypeName || 'General Admission',
+      ticket_price: ticketPriceCents,
+      booking_fee: breakdown.bookingFee,
+      type: 'ticket_purchase',
+    };
+
+    if (isFreeOrder) {
+      // Same claim the webhook makes for a paid order, so the order can only
+      // ever be fulfilled once.
+      const { data: authorizedTransaction, error: authorizeError } = await supabaseAdmin
+        .from('transactions')
+        .update({ state: 'authorized', authorized_at: new Date().toISOString() })
+        .eq('id', transaction.id)
+        .eq('state', 'initiated')
+        .select('*')
+        .single();
+
+      if (authorizeError || !authorizedTransaction) {
+        console.error('Free order authorize error:', authorizeError);
+        return NextResponse.json(
+          { error: 'Could not confirm your free tickets. Please try again.' },
+          { status: 500 }
+        );
+      }
+
+      const issued = await fulfilTicketOrder(authorizedTransaction, orderMetadata);
+      if (!issued) {
+        return NextResponse.json(
+          { error: 'Could not issue your free tickets. Please try again.' },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          free: true,
+          reference,
+          transaction_id: transaction.id,
+          redirect_url: '/dashboard/tickets',
+          breakdown: {
+            ticketPrice: 0,
+            bookingFee: 0,
+            quantity,
+            ticketType: orderMetadata.ticket_type_name,
+            total: 0,
+          },
+        },
+      });
+    }
+
     // Initialize Paystack payment
     const appUrl = SITE_URL;
     
@@ -234,22 +347,7 @@ export async function POST(request: NextRequest) {
       reference,
       callback_url: `${appUrl}/payments/callback?type=ticket`,
       channels: ['card', 'qr', 'eft', 'ussd', 'apple_pay'],
-      metadata: {
-        transaction_id: transaction.id,
-        event_id: eventId,
-        event_title: event.title,
-        user_id: user.id,
-        user_name: profile.full_name,
-        quantity,
-        attendees: normalizedAttendees,
-        buyer_email: profile.email,
-        buyer_name: profile.full_name || 'Ticket Buyer',
-        ticket_type_id: selectedTier?.id || null,
-        ticket_type_name: selectedTier?.name || ticketTypeName || 'General Admission',
-        ticket_price: ticketPriceCents,
-        booking_fee: breakdown.bookingFee,
-        type: 'ticket_purchase',
-      },
+      metadata: orderMetadata,
     });
 
     // Update transaction with Paystack reference

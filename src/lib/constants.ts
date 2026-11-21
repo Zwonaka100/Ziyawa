@@ -212,7 +212,8 @@ export const PLATFORM_FEES = {
       // Guaranteed margin per ticket on top of the real gateway cost, in rands.
       // Zero by design: the fee covers the cost and rounds up, nothing more.
       smallWinRands: 0,
-      // Floor for cheap and free tickets, in cents.
+      // Floor for cheap tickets, in cents. Free (R0) tickets carry no fee at
+      // all: nothing goes through Paystack, so there is no cost to cover.
       minimumFeeCents: 500,
       // Round the fee up to a whole rand. Rounding up can only strengthen the
       // guarantee, never weaken it.
@@ -318,6 +319,9 @@ export function paystackCostCents(
  * out — so every caller keeps working.
  */
 export function calculateBookingFee(ticketPriceCents: number): number {
+  // Free tickets skip the gateway entirely, so there is nothing to cover.
+  if (!(ticketPriceCents > 0)) return 0;
+
   const { smallWinRands, minimumFeeCents, roundToCents } = PLATFORM_FEES.ticketing.bookingFee;
   const vat = 1 + PLATFORM_FEES.paystack.vatPercent / 100;
 

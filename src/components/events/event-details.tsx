@@ -82,6 +82,7 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
   const liveTicketSubtotalCents = perTicketBreakdown.ticketPrice * ticketQuantity
   const liveBookingFeeCents = perTicketBreakdown.bookingFee * ticketQuantity
   const liveOrderTotalCents = perTicketBreakdown.buyerTotal * ticketQuantity
+  const isFreeSelection = liveOrderTotalCents === 0
 
   const updateTicketQuantity = (next: number) => {
     const clamped = Math.min(Math.max(1, Math.floor(next) || 1), maxSelectableQuantity)
@@ -492,13 +493,15 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
                     <span className="text-muted-foreground">Ticket subtotal</span>
                     <span>{formatCurrency(liveTicketSubtotalCents / 100)}</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Booking fee ({ticketQuantity}x)</span>
-                    <span>{formatCurrency(liveBookingFeeCents / 100)}</span>
-                  </div>
+                  {!isFreeSelection && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Booking fee ({ticketQuantity}x)</span>
+                      <span>{formatCurrency(liveBookingFeeCents / 100)}</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between font-semibold">
                     <span>Total due now</span>
-                    <span>{formatCurrency(liveOrderTotalCents / 100)}</span>
+                    <span>{isFreeSelection ? 'Free' : formatCurrency(liveOrderTotalCents / 100)}</span>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -514,7 +517,7 @@ export function EventDetails({ event, bookings, media = [], organizerStats, tick
                 disabled={isSoldOut || isPast || !selectedTier || !isTierOnSale(selectedTier)}
                 onClick={handleBuyTicket}
               >
-                {isPast ? 'Past Event' : isSoldOut ? 'Sold Out' : selectedTier ? `Buy ${selectedTier.name}` : 'Buy Ticket'}
+                {isPast ? 'Past Event' : isSoldOut ? 'Sold Out' : isFreeSelection ? 'Get Free Ticket' : selectedTier ? `Buy ${selectedTier.name}` : 'Buy Ticket'}
               </Button>
 
               {!user && (
