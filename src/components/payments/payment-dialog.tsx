@@ -17,7 +17,7 @@ import { formatCurrency } from '@/lib/helpers'
 import { MAX_TICKETS_PER_ORDER, calculateTicketSaleBreakdown } from '@/lib/constants'
 import { toast } from 'sonner'
 import type { Event, Profile } from '@/types/database'
-import { Loader2, CreditCard, Shield, Gift } from 'lucide-react'
+import { Loader2, CreditCard, Shield, Gift, Ticket } from 'lucide-react'
 import type { EventTicketTier } from '@/lib/ticketing'
 
 interface PaymentDialogProps {
@@ -62,6 +62,7 @@ export function PaymentDialog({ open, onOpenChange, event, user, quantity = 1, s
     ziyawaTotal: unitBreakdown.ziyawaTotal * effectiveQuantity,
   }
   const totalAmount = breakdown.buyerTotal // This is what the buyer pays (in cents)
+  const isFree = totalAmount === 0
 
   useEffect(() => {
     if (!open) return
@@ -116,7 +117,14 @@ export function PaymentDialog({ open, onOpenChange, event, user, quantity = 1, s
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to initialize payment')
+        throw new Error(data.error || (isFree ? 'Could not claim your free tickets' : 'Failed to initialize payment'))
+      }
+
+      // Free tickets are issued immediately; there is no payment page.
+      if (data.data?.free) {
+        toast.success(`Your free ticket${effectiveQuantity > 1 ? 's are' : ' is'} confirmed 🎟️`)
+        window.location.href = data.data.redirect_url || '/dashboard/tickets'
+        return
       }
 
       // Redirect to Paystack checkout
@@ -145,9 +153,9 @@ export function PaymentDialog({ open, onOpenChange, event, user, quantity = 1, s
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Complete Your Purchase</DialogTitle>
+          <DialogTitle>{isFree ? 'Claim Your Free Tickets' : 'Complete Your Purchase'}</DialogTitle>
           <DialogDescription>
-            You&apos;re buying {effectiveQuantity} {selectedTier?.name || 'ticket'}{effectiveQuantity > 1 ? 's' : ''} for {event.title}
+            You&apos;re {isFree ? 'getting' : 'buying'} {effectiveQuantity} {selectedTier?.name || 'ticket'}{effectiveQuantity > 1 ? 's' : ''} for {event.title}
           </DialogDescription>
         </DialogHeader>
 
@@ -162,16 +170,18 @@ export function PaymentDialog({ open, onOpenChange, event, user, quantity = 1, s
             )}
             <div className="flex justify-between">
               <span>Ticket Price {effectiveQuantity > 1 ? `(${effectiveQuantity}x)` : ''}</span>
-              <span>{formatCurrency(breakdown.ticketPrice / 100)}</span>
+              <span>{isFree ? 'Free' : formatCurrency(breakdown.ticketPrice / 100)}</span>
             </div>
-            <div className="flex justify-between text-sm text-muted-foreground">
-              <span>Booking Fee</span>
-              <span>{formatCurrency(breakdown.bookingFee / 100)}</span>
-            </div>
+            {!isFree && (
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>Booking Fee</span>
+                <span>{formatCurrency(breakdown.bookingFee / 100)}</span>
+              </div>
+            )}
             <Separator />
             <div className="flex justify-between font-bold text-lg">
               <span>Total</span>
-              <span>{formatCurrency(totalAmount / 100)}</span>
+              <span>{isFree ? 'Free' : formatCurrency(totalAmount / 100)}</span>
             </div>
           </div>
 
@@ -226,12 +236,14 @@ export function PaymentDialog({ open, onOpenChange, event, user, quantity = 1, s
           </div>
 
           {/* Security Badge - Simplified */}
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm flex items-center gap-3">
-            <Shield className="h-5 w-5 text-green-600 flex-shrink-0" />
-            <p className="text-green-700">
-              Secure payments by <span className="font-semibold">Paystack</span>
-            </p>
-          </div>
+          {!isFree && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm flex items-center gap-3">
+              <Shield className="h-5 w-5 text-green-600 flex-shrink-0" />
+              <p className="text-green-700">
+                Secure payments by <span className="font-semibold">Paystack</span>
+              </p>
+            </div>
+          )}
 
           {/* Payment Button */}
           <Button 
@@ -243,7 +255,12 @@ export function PaymentDialog({ open, onOpenChange, event, user, quantity = 1, s
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Connecting to Paystack...
+                {isFree ? 'Confirming your tickets...' : 'Connecting to Paystack...'}
+              </>
+            ) : isFree ? (
+              <>
+                <Ticket className="mr-2 h-4 w-4" />
+                Get free ticket{effectiveQuantity > 1 ? 's' : ''}
               </>
             ) : (
               <>
@@ -254,7 +271,7 @@ export function PaymentDialog({ open, onOpenChange, event, user, quantity = 1, s
           </Button>
 
           <p className="text-xs text-center text-muted-foreground">
-            By completing this purchase, you agree to our Terms of Service.
+            By {isFree ? 'claiming these tickets' : 'completing this purchase'}, you agree to our Terms of Service.
           </p>
         </div>
       </DialogContent>
